@@ -36,13 +36,11 @@ pub(crate) struct Config {
 
 impl Config {
     fn get_tokens(network: &str) -> Result<Vec<Address>, Error> {
-        let zksync_home = env::var("ZKSYNC_HOME").unwrap();
+        let zksync_home = env::var("ZKSYNC_HOME").map_err(|_| Error::NoZkSyncHome)?;
 
-        let tokens =
-            std::fs::read_to_string(format!("{zksync_home}/etc/tokens/{network}.json")).unwrap();
+        let tokens = std::fs::read_to_string(format!("{zksync_home}/etc/tokens/{network}.json"))?;
 
-        Ok(serde_json::from_str::<Vec<TokenConfig>>(&tokens)
-            .unwrap()
+        Ok(serde_json::from_str::<Vec<TokenConfig>>(&tokens)?
             .into_iter()
             .map(|t| t.address)
             .collect())
@@ -74,19 +72,14 @@ impl Config {
         if is_localhost {
             l1_tokens_to_process.extend(Self::get_tokens("localhost")?.into_iter());
         }
-        let l1_web3_url = env::var(ETH_CLIENT_WEB3_URL)
-            .map_err(|_| Error::NoL1Web3Url)
-            .as_ref()
-            .map(|url| Url::parse(url))
-            .unwrap()
-            .unwrap();
+        let l1_web3_url = env::var(ETH_CLIENT_WEB3_URL).map_err(|_| Error::NoL1Web3Url)?;
 
-        let zksync_web3_url = env::var(API_WEB3_JSON_RPC_HTTP_URL)
-            .map_err(|_| Error::NoZkSyncWeb3Url)
-            .as_ref()
-            .map(|url| Url::parse(url))
-            .unwrap()
-            .unwrap();
+        let l1_web3_url = Url::parse(&l1_web3_url)?;
+
+        let zksync_web3_url =
+            env::var(API_WEB3_JSON_RPC_HTTP_URL).map_err(|_| Error::NoZkSyncWeb3Url)?;
+
+        let zksync_web3_url = Url::parse(&zksync_web3_url)?;
 
         Ok(Self {
             l1_tokens_to_process,

@@ -29,12 +29,10 @@ async fn main() -> Result<()> {
         None => Config::from_env(true)?,
     };
 
-    let provider = Provider::<Http>::try_from("http://localhost:8545").unwrap();
+    let provider = Provider::<Http>::try_from("http://localhost:8545")?;
     let client = Arc::new(provider);
 
-    let address: Address = "0x5fba9bE50d447BF9d77874862e76e7b2fc12ecf9"
-        .parse()
-        .unwrap();
+    let address: Address = "0x5fba9bE50d447BF9d77874862e76e7b2fc12ecf9".parse()?;
     let contract = L1Bridge::new(address, client);
 
     let bridge_addr = contract.l2bridge().await?;
