@@ -1,0 +1,10 @@
+[package]
+name = "client"
+version = "0.1.0"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+edition = "2021"
+
+[dependencies]
+ethers = "2.0.3"
+thiserror = "1.0.40"
