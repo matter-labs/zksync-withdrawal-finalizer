@@ -3,4 +3,5 @@ resolver = "2"
 
 members = [
     "client",
+    "bin/withdrawal-finalizer",
 ]

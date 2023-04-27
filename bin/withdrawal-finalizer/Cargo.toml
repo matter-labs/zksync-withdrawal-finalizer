@@ -1,0 +1,22 @@
+[package]
+name = "withdrawal-finalizer"
+version = "0.1.0"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.2.4", features = ["derive", "string"] }
+color-eyre = "0.6.2"
+ethers = { version = "2.0.3", default-features = false }
+hex = "0.4.3"
+rustc-hex = "2.1.0"
+serde = "1.0.160"
+serde_json = "1.0.96"
+thiserror = "1.0.40"
+tokio = { version = "1.28.0", features = ["full"] }
+toml = "0.7.3"
+url = { version = "2.3.1", features = ["serde"] }
+
+client = { path = "../../client" }
+
