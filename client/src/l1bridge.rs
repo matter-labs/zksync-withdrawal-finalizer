@@ -9,13 +9,7 @@ use crate::Result;
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(
-        IL1Bridge,
-        r#"[
-            function l2TokenAddress(address l1Token) external view returns (address)
-            function l2Bridge() external view returns (address)
-        ]"#,
-    );
+    abigen!(IL1Bridge, "./src/contracts/IL1bridge.json");
 }
 
 /// A struct wrapper for interacting with the `L1Bridge` contract.
