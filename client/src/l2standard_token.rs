@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use ethers::{
     providers::Middleware,
-    types::{Address, BlockNumber, H256, U256},
+    types::{Address, BlockNumber},
 };
 
-use crate::Result;
+use crate::{Result, WithdrawalEvent};
 
 mod codegen {
     use ethers::prelude::abigen;
@@ -18,22 +18,6 @@ mod codegen {
 /// A struct wrapper for interfacing with `L2StandardToken` contract.
 pub struct L2StandardToken<M> {
     contract: codegen::L2StandardToken<M>,
-}
-
-/// Withdrawal event struct
-#[derive(Debug)]
-pub struct WithdrawalEvent {
-    /// A hash of the transaction of this withdrawal.
-    pub tx_hash: H256,
-
-    /// Number of the block this withdrawal happened in.
-    pub block_number: u64,
-
-    /// Address of the transfered token
-    pub token: Address,
-
-    /// The amount transfered.
-    pub amount: U256,
 }
 
 impl<M: Middleware> L2StandardToken<M> {

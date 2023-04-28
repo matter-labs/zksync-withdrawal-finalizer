@@ -2,13 +2,12 @@
 
 use std::sync::Arc;
 
-use crate::l2standard_token::WithdrawalEvent;
 use ethers::{
     providers::Middleware,
     types::{Address, BlockNumber},
 };
 
-use crate::Result;
+use crate::{Result, WithdrawalEvent};
 
 mod codegen {
     use ethers::prelude::abigen;
