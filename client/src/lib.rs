@@ -8,5 +8,6 @@ mod error;
 
 pub use error::{Error, Result};
 
+pub mod ethtoken;
 pub mod l1bridge;
 pub mod l2standard_token;
