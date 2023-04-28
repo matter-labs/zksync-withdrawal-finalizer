@@ -6,6 +6,9 @@ use ethers::prelude::Middleware;
 pub enum Error {
     #[error("Contract error {0}")]
     ContractError(String),
+
+    #[error("Middleware error {0}")]
+    Middleware(String),
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {
