@@ -11,6 +11,7 @@ use ethers::types::{Address, H256, U256};
 
 pub mod ethtoken;
 pub mod l1bridge;
+pub mod l2bridge;
 pub mod l2standard_token;
 
 /// Withdrawal event struct
