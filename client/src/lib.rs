@@ -14,6 +14,7 @@ use ethers::{
     types::{Address, H256, U256},
 };
 
+use zksync_types::api::L2ToL1LogProof;
 pub use zksync_types::api::{Log as ZKSLog, TransactionReceipt as ZKSTransactionReceipt};
 
 pub mod ethtoken;
@@ -81,4 +82,22 @@ pub async fn get_withdrawal_log<J: JsonRpcClient>(
         .collect();
 
     Ok(logs)
+}
+
+/// Get the `zksync` withdrawal proof by tx hash
+///
+/// # Arguments
+///
+/// * `client`: `JsonRpcClient` instance to perform the request with
+/// * `tx_hash`: Hash of the withdrawal transaction
+pub async fn get_log_proof<J: JsonRpcClient>(
+    client: &J,
+    tx_hash: H256,
+) -> Result<Option<L2ToL1LogProof>> {
+    let proof = client
+        .request::<[H256; 1], Option<L2ToL1LogProof>>("zks_getL2ToL1LogProof", [tx_hash])
+        .await
+        .map_err(Into::<ProviderError>::into)?;
+
+    Ok(proof)
 }
