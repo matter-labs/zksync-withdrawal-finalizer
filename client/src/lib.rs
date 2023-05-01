@@ -11,33 +11,18 @@ pub use error::{Error, Result};
 use ethers::{
     contract::EthEvent,
     providers::{JsonRpcClient, ProviderError},
-    types::{Address, H256, U256},
+    types::{Address, H160, H256},
 };
 
-use zksync_types::api::L2ToL1LogProof;
-pub use zksync_types::api::{Log as ZKSLog, TransactionReceipt as ZKSTransactionReceipt};
+use zksync_types::{L2ToL1LogProof, Log as ZKSLog, TransactionReceipt as ZKSTransactionReceipt};
 
+pub use zksync_types::WithdrawalEvent;
 pub mod ethtoken;
 pub mod l1bridge;
 pub mod l1messenger;
 pub mod l2bridge;
 pub mod l2standard_token;
-
-/// Withdrawal event struct
-#[derive(Debug)]
-pub struct WithdrawalEvent {
-    /// A hash of the transaction of this withdrawal.
-    pub tx_hash: H256,
-
-    /// Number of the block this withdrawal happened in.
-    pub block_number: u64,
-
-    /// Address of the transfered token
-    pub token: Address,
-
-    /// The amount transfered.
-    pub amount: U256,
-}
+pub mod zksync_types;
 
 /// Get the `zksync` transaction receipt by transaction hash
 ///
@@ -57,6 +42,12 @@ pub async fn get_transaction_receipt<J: JsonRpcClient>(
     Ok(receipt)
 }
 
+#[allow(missing_docs)]
+pub const L1_MESSENGER_ADDRESS: Address = H160([
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x80, 0x08,
+]);
+
 /// Get the `zksync` withdrawal logs by tx hash.
 ///
 /// # Arguments
@@ -72,12 +63,8 @@ pub async fn get_withdrawal_log<J: JsonRpcClient>(
         .logs
         .into_iter()
         .filter(|entry| {
-            entry.address == zksync_config::constants::contracts::L1_MESSENGER_ADDRESS
-                // Hash types from zksync on ZKSTransactionReceipt
-                // do not match hash type H256 from ethers since
-                // primitive-types crate version mismatch.
-                && entry.topics[0].as_bytes()
-                    == l1messenger::L1MessageSentFilter::signature().as_bytes()
+            entry.address == L1_MESSENGER_ADDRESS
+                && entry.topics[0] == l1messenger::L1MessageSentFilter::signature()
         })
         .collect();
 
