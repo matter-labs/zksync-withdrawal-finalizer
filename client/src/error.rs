@@ -1,9 +1,11 @@
-use ethers::contract::ContractError;
-use ethers::prelude::Middleware;
+use ethers::{contract::ContractError, prelude::Middleware, providers::ProviderError};
 
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error(transparent)]
+    ProviderError(#[from] ProviderError),
+
     #[error("Contract error {0}")]
     ContractError(String),
 

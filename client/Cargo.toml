@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 ethers = "2.0.3"
 thiserror = "1.0.40"
+
+zksync_types = { git = "https://github.com/matter-labs/zksync-2-dev.git", branch = "main" }
+zksync_config = { git = "https://github.com/matter-labs/zksync-2-dev.git", branch = "main" }
