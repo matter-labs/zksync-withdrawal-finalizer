@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use ethers::prelude::{Address, Middleware};
+use ethers::{
+    prelude::{Address, Middleware},
+    types::{Bytes, U256},
+};
 
 use crate::Result;
 
@@ -43,6 +46,28 @@ impl<M: Middleware> L1Bridge<M> {
     pub async fn l2_token_address(&self, address: Address) -> Result<Address> {
         self.contract
             .l_2_token_address(address)
+            .call()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Call `finalizeWithdrawal` function of the `L1Bridge` contract.
+    pub async fn finalize_withdrawal(
+        &self,
+        l2_block_number: U256,
+        l2_message_index: U256,
+        l2_tx_number_in_block: u16,
+        message: Bytes,
+        merkle_proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        self.contract
+            .finalize_withdrawal(
+                l2_block_number,
+                l2_message_index,
+                l2_tx_number_in_block,
+                message,
+                merkle_proof,
+            )
             .call()
             .await
             .map_err(Into::into)

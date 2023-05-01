@@ -11,6 +11,9 @@ pub enum Error {
 
     #[error("Middleware error {0}")]
     Middleware(String),
+
+    #[error("Index not found {0}")]
+    NoSuchIndex(usize),
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {
