@@ -24,6 +24,7 @@ pub mod l1bridge;
 pub mod l1messenger;
 pub mod l2bridge;
 pub mod l2standard_token;
+pub mod withdrawal_finalizer;
 pub mod zksync_contract;
 pub mod zksync_types;
 
