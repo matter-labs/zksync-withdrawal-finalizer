@@ -9,10 +9,31 @@ use ethers::{
 
 use crate::Result;
 
+#[allow(missing_docs)]
 mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(IZkSync, "./src/contracts/IZkSync.json");
+}
+
+pub use codegen::{
+    BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
+    IZkSyncEvents,
+};
+
+/// An `enum` wrapping different block `event`s
+pub enum BlockEvent {
+    /// A `BlockCommit` event
+    BlockCommit(BlockCommitFilter),
+
+    /// A `BlockExecution` event
+    BlockExecutionFilter(BlockExecutionFilter),
+
+    /// A `BlocksVerification` event
+    BlocksVerificationFilter(BlocksVerificationFilter),
+
+    /// A `BlocksRevert` event.
+    BlocksRevertFilter(BlocksRevertFilter),
 }
 
 /// A struct wrapper for interacting with `ZkSync` contract.

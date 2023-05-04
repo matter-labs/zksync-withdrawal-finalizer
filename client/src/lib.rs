@@ -124,6 +124,24 @@ pub async fn get_log_proof<J: JsonRpcClient>(
     Ok(proof)
 }
 
+/// Call `zks_getL1BatchBlockRange` RPC method.
+///
+/// # Arguments
+///
+/// * `client`: `JsonRpcCLient` instance to perform the request with
+/// * `batch_number`: the number of the batch
+pub async fn get_l1_batch_block_range<J: JsonRpcClient>(
+    client: &J,
+    batch_number: u32,
+) -> Result<Option<(U64, U64)>> {
+    let range = client
+        .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
+        .await
+        .map_err(Into::<ProviderError>::into)?;
+
+    Ok(range)
+}
+
 /// Withdrawal params
 #[allow(unused)]
 pub struct WithdrawalParams {
