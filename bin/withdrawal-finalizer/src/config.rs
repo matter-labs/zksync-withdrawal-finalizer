@@ -1,52 +1,95 @@
-#![allow(dead_code)]
 use std::{env, fs, path::Path, str::FromStr};
 
-use crate::error::Error;
+use envconfig::Envconfig;
 use ethers::types::{Address, H160};
 use serde::Deserialize;
 use url::Url;
 
-const ACCOUNT_PRIVATE_KEY: &str = "WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY";
-const L1_TOKENS: &str = "WITHDRAWAL_FINALIZER_L1_TOKENS";
-const CHAIN_ETH_NETWORK: &str = "CHAIN_ETH_NETWORK";
-const API_WEB3_JSON_RPC_HTTP_URL: &str = "API_WEB3_JSON_RPC_HTTP_URL";
-const ETHERSCAN_TOKEN: &str = "ETHERSCAN_TOKEN";
-const ZKSYNC_NETWORK: &str = "ZKSYNC_NETWORK";
-const SENTRY_URL: &str = "WITHDRAWAL_FINALIZER_SENTRY_URL";
-const CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS: &str = "CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS";
-const BATCH_FINALIZATION_GAS_LIMIT: &str = "BATCH_FINALIZATION_GAS_LIMIT";
-const ONE_WITHDRAWAL_GAS_LIMIT: &str = "GAS_LIMIT";
-const FETCH_DATA_ATTEMPTS: &str = "FETCH_DATA_ATTEMPTS";
-const SUBMIT_REQUEST_ATTEMPTS: &str = "SUBMIT_REQUEST_ATTEMPTS";
-const FINALIZE_WITHDRAWAL_FLOW_ATTEMPTS: &str = "FINALIZE_WITHDRAWAL_FLOW_ATTEMPTS";
-const SLEEP_TIME: &str = "SLEEP_TIME";
-const SENT_ETH_TX_MINING_TIMEOUT_IN_MS: &str = "SENT_ETH_TX_MINING_TIMEOUT_IN_MS";
-const START_FROM_BLOCK: &str = "WITHDRAWAL_FINALIZER_START_FROM_BLOCK";
-const PROCESSING_BLOCK_OFFSET: &str = "WITHDRAWAL_FINALIZER_PROCESSING_BLOCK_OFFSET";
-const ETH_CLIENT_WEB3_URL: &str = "ETH_CLIENT_WEB3_URL";
+use crate::error::Error;
 
-#[derive(Deserialize, Debug)]
-pub(crate) struct Config {
-    l1_tokens_to_process: Vec<Address>,
-    account_private_key: String,
-    l1_web3_url: Url,
-    zksync_web3_url: Url,
-    sentry_url: Option<Url>,
+/// A list of tokens to process.
+///
+/// The sole purpose of this newtype is `FromStr` implementation that
+/// reads from a string of comma-separated addresses.
+#[derive(serde::Deserialize, Default, Debug)]
+pub struct TokensToProcess(pub Vec<Address>);
+
+impl FromStr for TokensToProcess {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut res = vec![];
+        for token in s.split(',') {
+            let address = Address::from_str(token).map_err(|_| ())?;
+            res.push(address);
+        }
+
+        Ok(TokensToProcess(res))
+    }
+}
+
+/// Withdrawal finalizer configuration.
+///
+/// Can be read from
+/// * `env` via [`Self::init_from_env()`]
+/// * TOML config file via [`Self::from_file()`]
+#[derive(Deserialize, Debug, Envconfig)]
+pub struct Config {
+    /// A list of L1 tokens to process.
+    #[envconfig(from = "WITHDRAWAL_FINALIZER_L1_TOKENS")]
+    pub l1_tokens_to_process: Option<TokensToProcess>,
+
+    /// Private key of the finalizer account.
+    #[envconfig(from = "WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY")]
+    pub account_private_key: String,
+
+    /// L1 RPC url.
+    #[envconfig(from = "ETH_CLIENT_WEB3_URL")]
+    pub l1_web3_url: Url,
+
+    /// L2 RPC url.
+    #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
+    pub zksync_web3_url: Url,
+
+    /// Sentry url.
+    #[envconfig(from = "SENTRY_URL")]
+    pub sentry_url: Option<Url>,
+
+    /// Address of the `L1Bridge` contract.
+    // TODO: #[envconfig(from = "CONTRACTS_L1_ETH_BRIDGE_ADDR")]
+    #[envconfig(from = "CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR")]
+    pub l1_eth_bridge_addr: Address,
+
+    /// Address of the
+    #[envconfig(from = "CONTRACTS_L1_ERC20_BRIDGE_IMPL_ADDR")]
+    pub l1_erc20_bridge_addr: Address,
+
+    /// Address of the `L2ERC20Bridge` contract.
+    #[envconfig(from = "CONTRACTS_L2_ERC20_BRIDGE_ADDR")]
+    pub l2_erc20_bridge_addr: Address,
 }
 
 impl Config {
-    fn get_tokens(network: &str) -> Result<Vec<Address>, Error> {
+    pub fn get_tokens(&mut self, network: &str) -> Result<(), Error> {
         let zksync_home = env::var("ZKSYNC_HOME").map_err(|_| Error::NoZkSyncHome)?;
 
         let tokens = std::fs::read_to_string(format!("{zksync_home}/etc/tokens/{network}.json"))?;
 
-        Ok(serde_json::from_str::<Vec<TokenConfig>>(&tokens)?
+        let mut l1_tokens_to_process = self.l1_tokens_to_process.take().unwrap_or_default();
+
+        for addr in serde_json::from_str::<Vec<TokenConfig>>(&tokens)?
             .into_iter()
             .map(|t| t.address)
-            .collect())
+        {
+            l1_tokens_to_process.0.push(addr);
+        }
+
+        self.l1_tokens_to_process = Some(l1_tokens_to_process);
+
+        Ok(())
     }
 
-    pub(crate) fn from_file<P: AsRef<Path>>(config_path: P) -> Result<Self, Error> {
+    pub fn from_file<P: AsRef<Path>>(config_path: P) -> Result<Self, Error> {
         let contents = fs::read_to_string(config_path)?;
 
         let config: Config = toml::from_str(&contents)?;
@@ -54,48 +97,13 @@ impl Config {
         Ok(config)
     }
 
-    pub(crate) fn from_env(is_localhost: bool) -> Result<Self, Error> {
-        let mut l1_tokens_to_process: Vec<_> = match env::var(L1_TOKENS) {
-            Ok(tokens) => {
-                let mut res = vec![];
-                for token in tokens.split(',') {
-                    let address = Address::from_str(token)?;
-                    res.push(address);
-                }
-                res
-            }
-            Err(_) => vec![],
-        };
-
-        let account_private_key = env::var(ACCOUNT_PRIVATE_KEY).unwrap_or_default();
-
-        if is_localhost {
-            l1_tokens_to_process.extend(Self::get_tokens("localhost")?.into_iter());
-        }
-        let l1_web3_url = env::var(ETH_CLIENT_WEB3_URL).map_err(|_| Error::NoL1Web3Url)?;
-
-        let l1_web3_url = Url::parse(&l1_web3_url)?;
-
-        let zksync_web3_url =
-            env::var(API_WEB3_JSON_RPC_HTTP_URL).map_err(|_| Error::NoZkSyncWeb3Url)?;
-
-        let zksync_web3_url = Url::parse(&zksync_web3_url)?;
-
-        Ok(Self {
-            l1_tokens_to_process,
-            account_private_key,
-            l1_web3_url,
-            zksync_web3_url,
-            sentry_url: None,
-        })
-    }
-
-    pub(crate) fn l1_tokens_to_process(&self) -> &[H160] {
-        self.l1_tokens_to_process.as_ref()
+    pub fn l1_tokens_to_process(&self) -> Option<&[H160]> {
+        self.l1_tokens_to_process.as_ref().map(|f| f.0.as_ref())
     }
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TokenConfig {
     name: String,
     symbol: String,
