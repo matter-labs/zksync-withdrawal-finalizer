@@ -132,10 +132,10 @@ pub async fn get_log_proof<J: JsonRpcClient>(
 /// * `batch_number`: the number of the batch
 pub async fn get_l1_batch_block_range<J: JsonRpcClient>(
     client: &J,
-    batch_number: u32,
+    batch_number: U64,
 ) -> Result<Option<(U64, U64)>> {
     let range = client
-        .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
+        .request::<[U64; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
         .await
         .map_err(Into::<ProviderError>::into)?;
 
@@ -143,14 +143,24 @@ pub async fn get_l1_batch_block_range<J: JsonRpcClient>(
 }
 
 /// Withdrawal params
-#[allow(unused)]
 pub struct WithdrawalParams {
-    l1_batch_number: U64,
-    l2_message_index: u32,
-    l2_tx_number_in_bloc: u16,
-    message: Bytes,
-    sender: Address,
-    proof: Vec<[u8; 32]>,
+    /// The number of batch on L1
+    pub l1_batch_number: U64,
+
+    /// Index of the message on L2
+    pub l2_message_index: u32,
+
+    /// Index of tx number in L2 block
+    pub l2_tx_number_in_block: u16,
+
+    /// Message
+    pub message: Bytes,
+
+    /// Sender of the transaction
+    pub sender: Address,
+
+    /// Proof
+    pub proof: Vec<[u8; 32]>,
 }
 
 /// Get the parameters necessary to call `finalize_withdrawals`.
@@ -188,7 +198,7 @@ pub async fn finalize_withdrawal_params<J: JsonRpcClient>(
     Ok(WithdrawalParams {
         l1_batch_number: log.l1_batch_number.unwrap(),
         l2_message_index,
-        l2_tx_number_in_bloc: l1_batch_tx_id.unwrap().as_u32() as u16,
+        l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
         message: message.0.into(),
         sender,
         proof,

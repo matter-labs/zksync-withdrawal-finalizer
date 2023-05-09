@@ -67,6 +67,10 @@ pub struct Config {
     /// Address of the `L2ERC20Bridge` contract.
     #[envconfig(from = "CONTRACTS_L2_ERC20_BRIDGE_ADDR")]
     pub l2_erc20_bridge_addr: Address,
+
+    /// Main contract
+    #[envconfig(from = "CONTRACTS_DIAMOND_PROXY_ADDR")]
+    pub main_contract: Address,
 }
 
 impl Config {

@@ -72,4 +72,17 @@ impl<M: Middleware> L1Bridge<M> {
             .await
             .map_err(Into::into)
     }
+
+    /// Call `isWithdrawalFinalized` function of the `L1Bridge` contract.
+    pub async fn is_withdrawal_finalized(
+        &self,
+        l2_block_number: U256,
+        l2_message_index: U256,
+    ) -> Result<bool> {
+        self.contract
+            .is_withdrawal_finalized(l2_block_number, l2_message_index)
+            .call()
+            .await
+            .map_err(Into::into)
+    }
 }

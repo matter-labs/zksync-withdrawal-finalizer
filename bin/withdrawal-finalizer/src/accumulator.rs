@@ -12,10 +12,14 @@ pub struct WithdrawalsAccumulator {
     tx_fee_limit: U256,
     batch_finalization_gas_limit: U256,
     one_withdrawal_gas_limit: U256,
-    withdrawals: HashMap<(U256, U256), RequestFinalizeWithdrawal>,
+    withdrawals: Vec<RequestFinalizeWithdrawal>,
 }
 
 impl WithdrawalsAccumulator {
+    pub fn take_withdrawals(&mut self) -> Vec<RequestFinalizeWithdrawal> {
+        std::mem::replace(&mut self.withdrawals, vec![])
+    }
+
     /// Create a new `WithdrawalsAccumulator`.
     pub fn new(
         gas_price: U256,
@@ -28,7 +32,7 @@ impl WithdrawalsAccumulator {
             tx_fee_limit,
             batch_finalization_gas_limit,
             one_withdrawal_gas_limit,
-            withdrawals: HashMap::new(),
+            withdrawals: Vec::new(),
         }
     }
 
@@ -38,10 +42,7 @@ impl WithdrawalsAccumulator {
     ///
     /// * `request` A finalization request.
     pub fn add_withdrawal(&mut self, request: RequestFinalizeWithdrawal) {
-        self.withdrawals.insert(
-            (request.l_2_block_number, request.l_2_message_index),
-            request,
-        );
+        self.withdrawals.push(request);
     }
 
     /// Get the current number of withdrawals in this accumulator.
@@ -73,6 +74,6 @@ impl WithdrawalsAccumulator {
     /// * `block_number`: the number of the block
     /// * `message_index`: the index of the message in the block
     pub fn remove_withdrawal(&mut self, block_number: U256, message_index: U256) {
-        self.withdrawals.remove(&(block_number, message_index));
+        todo!()
     }
 }

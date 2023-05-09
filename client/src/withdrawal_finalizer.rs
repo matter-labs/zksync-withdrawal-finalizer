@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use ethers::{providers::Middleware, types::Address};
+use ethers::{
+    providers::Middleware,
+    types::{Address, TransactionReceipt},
+};
 
 use crate::Result;
 
@@ -46,5 +49,20 @@ impl<M: Middleware> WithdrawalFinalizer<M> {
             .call()
             .await
             .map_err(Into::into)
+    }
+
+    /// Send `finalizeWithdrawals` tranaction
+    pub async fn send_finalize_withdrawals(
+        &self,
+        requests: Vec<RequestFinalizeWithdrawal>,
+    ) -> Result<Option<TransactionReceipt>> {
+        let pending_tx = self.contract.finalize_withdrawals(requests);
+
+        let x = pending_tx
+            .send()
+            .await
+            .map_err(Into::<crate::Error>::into)?
+            .await?;
+        Ok(x)
     }
 }
