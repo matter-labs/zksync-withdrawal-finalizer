@@ -17,7 +17,7 @@ pub struct WithdrawalsAccumulator {
 
 impl WithdrawalsAccumulator {
     pub fn take_withdrawals(&mut self) -> Vec<RequestFinalizeWithdrawal> {
-        std::mem::replace(&mut self.withdrawals, vec![])
+        std::mem::take(&mut self.withdrawals)
     }
 
     /// Create a new `WithdrawalsAccumulator`.

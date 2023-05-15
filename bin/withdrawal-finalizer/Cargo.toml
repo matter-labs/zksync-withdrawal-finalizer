@@ -17,13 +17,11 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.0", features = ["full"] }
 toml = "0.7.3"
 url = { version = "2.3.1", features = ["serde"] }
-
 eyre = "0.6.8"
 tokio-stream = "0.1.14"
-futures-core = "0.3.28"
-
 client = { path = "../../client" }
 log = "0.4.17"
 env_logger = "0.10.0"
 envconfig = "0.10.0"
-
+futures = "0.3.28"
+tokio-util = "0.7.8"

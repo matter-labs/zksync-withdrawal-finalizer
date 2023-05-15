@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{env, fs, path::Path, str::FromStr};
 
 use envconfig::Envconfig;
@@ -71,6 +72,13 @@ pub struct Config {
     /// Main contract
     #[envconfig(from = "CONTRACTS_DIAMOND_PROXY_ADDR")]
     pub main_contract: Address,
+
+    /// L2 WS Endpoint
+    #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
+    pub zk_server_ws_url: Option<Url>,
+
+    #[envconfig(form = "AIP_WEB3_JSON_RPC_HTTP_URL")]
+    pub zk_server_http_url: Option<Url>,
 }
 
 impl Config {
@@ -107,7 +115,6 @@ impl Config {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct TokenConfig {
     name: String,
     symbol: String,

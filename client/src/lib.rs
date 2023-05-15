@@ -18,7 +18,9 @@ use zksync_types::{
     L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, TransactionReceipt as ZKSTransactionReceipt,
 };
 
+pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
+
 pub mod ethtoken;
 pub mod l1bridge;
 pub mod l1messenger;

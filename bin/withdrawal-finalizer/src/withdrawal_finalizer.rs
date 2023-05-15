@@ -6,7 +6,8 @@ use ethers::{
     providers::{JsonRpcClient, Middleware},
     types::{Address, BlockNumber, H256, U256, U64},
 };
-use tokio::time::timeout;
+use futures::{stream::StreamExt, Stream};
+use tokio::{pin, select, signal, time::timeout};
 
 use client::{
     finalize_withdrawal_params, get_l1_batch_block_range,
@@ -14,7 +15,7 @@ use client::{
     withdrawal_finalizer::{
         RequestFinalizeWithdrawal, WithdrawalFinalizer as WithdrawalFinalizerContract,
     },
-    WithdrawalEvent,
+    BlockEvent, WithdrawalEvent,
 };
 
 use crate::{accumulator::WithdrawalsAccumulator, Result};
@@ -23,6 +24,29 @@ const L2_ETH_TOKEN_ADDRESS: &str = "0x000000000000000000000000000000000000800a";
 
 fn is_eth(address: &Address) -> bool {
     address == &Address::zero() || address == &Address::from_str(L2_ETH_TOKEN_ADDRESS).unwrap()
+}
+
+pub async fn main_loop<BE, WE>(block_events: BE, withdrawal_events: WE) -> Result<()>
+where
+    BE: Stream<Item = BlockEvent>,
+    WE: Stream<Item = WithdrawalEvent>,
+{
+    pin!(block_events);
+    pin!(withdrawal_events);
+
+    loop {
+        select! {
+            block_event = block_events.next() => {
+                println!("block event");
+            }
+            withdrawal_event = withdrawal_events.next() => {
+                println!("withdrawal_event");
+            }
+            _ = signal::ctrl_c() => break,
+        }
+    }
+
+    Ok(())
 }
 
 pub struct WithdrawalFinalizer<M> {

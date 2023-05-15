@@ -8,42 +8,68 @@ use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::eyre::Result;
-use ethers::providers::{Http, Provider};
-use ethers::types::Address;
+use envconfig::Envconfig;
+use ethers::providers::{Http, Provider, StreamExt, Ws};
+use log::LevelFilter;
 
 use cli::Args;
-use client::l1bridge::L1Bridge;
+use client::{l2bridge::L2Bridge, zksync_contract::BlockEvents};
 use config::Config;
 
+mod accumulator;
 mod cli;
 mod config;
 mod error;
+mod withdrawal_finalizer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Info)
+        .init();
+
     let args = Args::parse();
 
-    let config = match args.config_path {
+    log::info!("starting withdrawal finalizer");
+
+    let mut config = match args.config_path {
         Some(path) => Config::from_file(path)?,
-        None => Config::from_env(true)?,
+        None => Config::init_from_env()?,
     };
 
-    let provider = Provider::<Http>::try_from("http://localhost:8545")?;
+    config.get_tokens("localhost")?;
+
+    let provider = Provider::<Http>::try_from(config.zksync_web3_url.as_str())?;
     let client = Arc::new(provider);
 
-    let address: Address = "0x5fba9bE50d447BF9d77874862e76e7b2fc12ecf9".parse()?;
-    let contract = L1Bridge::new(address, client);
+    let provider_l1 = Provider::<Ws>::connect("ws://127.0.0.1:8546")
+        .await
+        .unwrap();
+    let client_l1 = Arc::new(provider_l1);
 
-    let bridge_addr = contract.l2bridge().await?;
+    let _contract = L2Bridge::new(config.l2_erc20_bridge_addr, client.clone());
 
-    for token in config.l1_tokens_to_process() {
-        let res = contract.l2_token_address(*token).await?;
+    let event_mux = BlockEvents::new(client_l1).await?;
+    let (blocks_rx, blocks_tx) = tokio::sync::mpsc::channel(1024);
 
-        println!("Address of token {token} is {res}");
+    let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
+    let mut blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
+
+    tokio::spawn(event_mux.run(config.main_contract, 0, blocks_rx));
+
+    loop {
+        tokio::select! {
+            event = blocks_tx.next() => {
+                if let Some(event) = event {
+                    log::info!("event {event}");
+                }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                break
+            }
+        }
     }
-
-    println!("l2brdige addr is {bridge_addr}");
 
     Ok(())
 }
