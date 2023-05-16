@@ -53,7 +53,9 @@ pub async fn last_processed_l1_batch(
     for tx in &transactions {
         if let Ok(wf_tx) = crate::withdrawal_finalizer::FinalizeWithdrawalsCall::decode(&tx.input) {
             if tx.to == Some(withdrawal_contract) {
-                if let Some(request) = wf_tx.requests.get(0) {
+                // Within the vector the requests are sorted in ascending
+                // order so we need to look at the last one.
+                if let Some(request) = wf_tx.requests.last() {
                     return Ok(Some(request.l_2_block_number));
                 }
             }
