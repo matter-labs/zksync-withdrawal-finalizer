@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 #![warn(unused_imports)]
@@ -21,6 +22,7 @@ use zksync_types::{
 pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
 
+pub mod etherscan;
 pub mod ethtoken;
 pub mod l1bridge;
 pub mod l1messenger;

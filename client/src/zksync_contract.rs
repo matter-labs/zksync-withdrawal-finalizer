@@ -20,7 +20,7 @@ mod codegen {
 
 pub use codegen::{
     BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
-    IZkSyncEvents,
+    FinalizeEthWithdrawalCall, IZkSyncEvents,
 };
 
 /// An `enum` wrapping different block `event`s

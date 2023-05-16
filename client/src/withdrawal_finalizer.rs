@@ -19,7 +19,7 @@ mod codegen {
     );
 }
 
-pub use codegen::{RequestFinalizeWithdrawal, Result as FinalizeResult};
+pub use codegen::{FinalizeWithdrawalsCall, RequestFinalizeWithdrawal, Result as FinalizeResult};
 
 /// A struct wrapper for interacting with the `WithdrawalFinalizer` contract
 pub struct WithdrawalFinalizer<M> {
