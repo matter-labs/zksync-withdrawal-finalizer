@@ -1,0 +1,20 @@
+l1_tokens_to_process = [
+    "0xCA063A2AB07491eE991dCecb456D1265f842b568",
+    "0x63bfb2118771bd0da7A6936667A7BB705A06c1bA",
+    "0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4",
+    "0x5C221E77624690fff6dd741493D735a17716c26B"
+]
+account_private_key = ""
+l1_web3_url = "https://testnet.era.zksync.dev"
+# You have to supply your infura ws url with api key
+# l1_ws_url = ""
+zksync_web3_url = "https://testnet.era.zksync.dev"
+l1_eth_bridge_addr = "0x927DdFcc55164a59E0F33918D13a2D559bC10ce7"
+l1_erc20_bridge_addr = "0x00ff932A6d70E2B8f1Eb4919e1e09C1923E7e57b"
+l2_erc20_bridge_addr = "0x00ff932A6d70E2B8f1Eb4919e1e09C1923E7e57b"
+main_contract = "0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319"
+withdrawal_finalizer_contract = "0xFbDE4aCaE6C489197280635f0Fa172148c61838b"
+withdrawal_finalizer_eth_address = "0x4cCF429019abAa7e06AAB09Dbc2e05f33C11429c"
+zk_server_ws_url = "wss://testnet.era.zksync.dev/ws"
+# You have to supply your etherscan token
+# etherscan_token = ""

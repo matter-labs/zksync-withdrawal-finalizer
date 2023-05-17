@@ -48,6 +48,9 @@ pub struct Config {
     #[envconfig(from = "ETH_CLIENT_WEB3_URL")]
     pub l1_web3_url: Url,
 
+    /// L1 WS url.
+    pub l1_ws_url: Option<Url>,
+
     /// L2 RPC url.
     #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
     pub zksync_web3_url: Url,
@@ -75,10 +78,19 @@ pub struct Config {
 
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
-    pub zk_server_ws_url: Option<Url>,
+    pub zk_server_ws_url: Url,
 
-    #[envconfig(form = "AIP_WEB3_JSON_RPC_HTTP_URL")]
+    #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
     pub zk_server_http_url: Option<Url>,
+
+    #[envconfig(from = "ETHERSCAN_TOKEN")]
+    pub etherscan_token: Option<String>,
+
+    #[envconfig(from = "CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS")]
+    pub withdrawal_finalizer_contract: Address,
+
+    #[envconfig(from = "WITHDRAWAL_FINALIZER_ETH_ADDRESS")]
+    pub withdrawal_finalizer_eth_address: Address,
 }
 
 impl Config {

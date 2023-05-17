@@ -9,11 +9,14 @@ use ethers::{
 
 use crate::{Result, WithdrawalEvent};
 
+#[allow(missing_docs)]
 mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(EthToken, "./src/contracts/IEthToken.json",);
 }
+
+pub use codegen::WithdrawalFilter;
 
 /// A struct wrapper for interfacing with `L2StandardToken` contract.
 pub struct EthToken<M> {
