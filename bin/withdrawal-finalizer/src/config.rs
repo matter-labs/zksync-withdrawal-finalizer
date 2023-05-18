@@ -2,7 +2,7 @@
 use std::{env, fs, path::Path, str::FromStr};
 
 use envconfig::Envconfig;
-use ethers::types::{Address, H160};
+use ethers::types::{Address, H160, U256};
 use serde::Deserialize;
 use url::Url;
 
@@ -91,6 +91,12 @@ pub struct Config {
 
     #[envconfig(from = "WITHDRAWAL_FINALIZER_ETH_ADDRESS")]
     pub withdrawal_finalizer_eth_address: Address,
+
+    #[envconfig(from = "GAS_LIMIT")]
+    pub one_withdrawal_gas_limit: U256,
+
+    #[envconfig(from = "BATCH_FINALIZATION_GAS_LIMIT")]
+    pub batch_finalization_gas_limit: U256,
 }
 
 impl Config {
