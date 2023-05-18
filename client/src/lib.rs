@@ -118,12 +118,9 @@ pub async fn get_log_proof<J: JsonRpcClient>(
     index: usize,
 ) -> Result<Option<L2ToL1LogProof>> {
     let proof = client
-        .request::<[H256; 1], Option<Vec<L2ToL1LogProof>>>("zks_getL2ToL1LogProof", [tx_hash])
+        .request::<[H256; 1], Option<L2ToL1LogProof>>("zks_getL2ToL1LogProof", [tx_hash])
         .await
-        .map_err(Into::<ProviderError>::into)?
-        .ok_or(Error::NoSuchIndex(index))?
-        .into_iter()
-        .nth(index);
+        .map_err(Into::<ProviderError>::into)?;
 
     Ok(proof)
 }
