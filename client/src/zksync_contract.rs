@@ -144,6 +144,19 @@ impl<M: Middleware> ZkSync<M> {
     pub fn event_of_type<D: EthEvent>(&self) -> Event<Arc<M>, M, D> {
         self.contract.event::<D>()
     }
+
+    /// Call `isEthWithdrawalFinalized` method from the contract.
+    pub async fn is_eth_withdrawal_finalized(
+        &self,
+        l2_block_number: U256,
+        l2_message_index: U256,
+    ) -> Result<bool> {
+        self.contract
+            .is_eth_withdrawal_finalized(l2_block_number, l2_message_index)
+            .call()
+            .await
+            .map_err(Into::into)
+    }
 }
 
 /// A convenience multiplexer for `Block`-related events.
