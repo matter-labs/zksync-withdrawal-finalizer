@@ -4,20 +4,20 @@
 
 //! A withdraw-finalizer
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use clap::Parser;
 use color_eyre::eyre::Result;
 use envconfig::Envconfig;
 use ethers::{
-    providers::{Provider, StreamExt, Ws},
+    providers::{Provider, Ws},
     types::Chain,
 };
 use log::LevelFilter;
 
 use cli::Args;
 use client::{
-    l2bridge::L2Bridge, l2standard_token::WithdrawalEvents, zksync_contract::BlockEvents,
+    l2bridge::L2Bridge, l2standard_token::WithdrawalEventsStream, zksync_contract::BlockEvents,
 };
 use config::Config;
 
@@ -57,17 +57,19 @@ async fn main() -> Result<()> {
 
     let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
-    let event_mux = BlockEvents::new(client_l1).await?;
+    let event_mux = BlockEvents::new(client_l1.clone()).await?;
     let (blocks_rx, blocks_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEvents::new(client_l2).await?;
+    let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
 
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
-    let mut blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
+    let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
+
+    let from_l2_block = 5822469;
 
     let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
-    let mut we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
+    let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
     tokio::spawn(event_mux.run(config.main_contract, 9015215, blocks_rx));
 
@@ -84,41 +86,32 @@ async fn main() -> Result<()> {
         tokens.push(l2_token);
     }
 
-    tokio::spawn(we_mux.run(tokens, 5723175, we_rx));
+    tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
 
-    let mut query_last_batch = tokio::time::interval(Duration::from_secs(10));
+    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
+        client_l1,
+        client_l2,
+        config.l1_eth_bridge_addr,
+        config.withdrawal_finalizer_contract,
+        config.main_contract,
+        config.one_withdrawal_gas_limit,
+        config.batch_finalization_gas_limit,
+    );
 
-    loop {
-        tokio::select! {
-            event = blocks_tx.next() => {
-                if let Some(event) = event {
-                    log::info!("event {event}");
-                }
-            }
-            event = we_tx.next() => {
-                if let Some(event) = event {
-                    log::info!("withdrawal event {event:?}");
-                }
-            }
-            _ = query_last_batch.tick() => {
-                let last_batch = client::etherscan::last_processed_l1_batch(
-                    Chain::Goerli,
-                    config.withdrawal_finalizer_contract,
-                    config.withdrawal_finalizer_eth_address,
-                    config.main_contract,
-                    config.l1_erc20_bridge_addr,
-                    config.etherscan_token.as_ref().unwrap().clone(),
-                ).await;
+    let last_batch = client::etherscan::last_processed_l1_batch(
+        Chain::Goerli,
+        config.withdrawal_finalizer_contract,
+        config.withdrawal_finalizer_eth_address,
+        config.main_contract,
+        config.l1_erc20_bridge_addr,
+        config.etherscan_token.as_ref().unwrap().clone(),
+    )
+    .await;
 
-                if let Ok(last_batch) = last_batch {
-                    log::info!("last_batch: {last_batch:?}");
-                }
-            }
-            _ = tokio::signal::ctrl_c() => {
-                break
-            }
-        }
+    if let Ok(last_batch) = last_batch {
+        log::info!("last_batch: {last_batch:?}");
     }
+    wf.run(blocks_tx, we_tx, from_l2_block).await?;
 
     Ok(())
 }

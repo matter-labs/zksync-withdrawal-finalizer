@@ -3,14 +3,14 @@
 use std::{collections::HashMap, marker::PhantomData, str::FromStr, sync::Arc, time::Duration};
 
 use ethers::{
-    providers::{JsonRpcClient, Middleware},
+    providers::{JsonRpcClient, Middleware, Provider},
     types::{Address, BlockNumber, H256, U256, U64},
 };
 use futures::{stream::StreamExt, Stream};
 use tokio::{pin, select, signal, time::timeout};
 
 use client::{
-    finalize_withdrawal_params, get_l1_batch_block_range,
+    finalize_withdrawal_params, get_l1_batch_block_range, get_log_proof,
     l1bridge::L1Bridge,
     withdrawal_finalizer::{
         RequestFinalizeWithdrawal, WithdrawalFinalizer as WithdrawalFinalizerContract,
@@ -26,39 +26,18 @@ fn is_eth(address: &Address) -> bool {
     address == &Address::zero() || address == &Address::from_str(L2_ETH_TOKEN_ADDRESS).unwrap()
 }
 
-pub async fn main_loop<BE, WE>(block_events: BE, withdrawal_events: WE) -> Result<()>
-where
-    BE: Stream<Item = BlockEvent>,
-    WE: Stream<Item = WithdrawalEvent>,
-{
-    pin!(block_events);
-    pin!(withdrawal_events);
+pub struct WithdrawalFinalizer<M1, M2> {
+    l1_provider: Arc<Provider<M1>>,
 
-    loop {
-        select! {
-            block_event = block_events.next() => {
-                println!("block event");
-            }
-            withdrawal_event = withdrawal_events.next() => {
-                println!("withdrawal_event");
-            }
-            _ = signal::ctrl_c() => break,
-        }
-    }
+    l2_provider: Arc<Provider<M2>>,
 
-    Ok(())
-}
+    l1_bridge: client::l1bridge::L1Bridge<Provider<M1>>,
 
-pub struct WithdrawalFinalizer<M> {
-    l1_provider: Arc<M>,
+    l1_main_contract: client::zksync_contract::ZkSync<Provider<M1>>,
 
-    l2_provider: Arc<M>,
+    withdrawal_finalizer: WithdrawalFinalizerContract<Provider<M1>>,
 
-    l1_bridge: client::l1bridge::L1Bridge<M>,
-
-    withdrawal_finalizer: WithdrawalFinalizerContract<M>,
-
-    processing_block_offset: U64,
+    processing_block_offset: usize,
 
     max_block_range: usize,
 
@@ -67,151 +46,160 @@ pub struct WithdrawalFinalizer<M> {
     batch_finalization_gas_limit: U256,
 
     one_withdrawal_gas_limit: U256,
-
-    accumulator: WithdrawalsAccumulator,
 }
 
-impl<M: Middleware + JsonRpcClient> WithdrawalFinalizer<M> {
-    pub async fn process(&mut self) -> Result<()> {
-        let provider = self.l2_provider.clone();
+impl<M1, M2> WithdrawalFinalizer<M1, M2>
+where
+    M1: JsonRpcClient,
+    M2: JsonRpcClient,
+{
+    pub fn new(
+        l1_provider: Arc<Provider<M1>>,
+        l2_provider: Arc<Provider<M2>>,
+        l1_bridge_address: Address,
+        withdrawal_finalizer_address: Address,
+        main_contract_address: Address,
+        one_withdrawal_gas_limit: U256,
+        batch_finalization_gas_limit: U256,
+    ) -> Self {
+        let l1_bridge = client::l1bridge::L1Bridge::new(l1_bridge_address, l1_provider.clone());
 
-        let last_finalized_block = provider
-            .get_block(BlockNumber::Finalized)
-            .await
-            .unwrap()
-            .expect("the is always a last finalized block; qed")
-            .number
-            .expect("the last finalized block always has a number; qed");
+        let l1_main_contract =
+            client::zksync_contract::ZkSync::new(main_contract_address, l1_provider.clone());
 
-        let last_processed_l1_batch = self.fetch_last_processed_l1_batch().await;
+        let withdrawal_finalizer =
+            WithdrawalFinalizerContract::new(withdrawal_finalizer_address, l1_provider.clone());
 
-        let last_processed_l1_batch_with_offset =
-            last_processed_l1_batch.saturating_sub(self.processing_block_offset);
+        let processing_block_offset = 0;
 
-        let last_processed_block =
-            get_l1_batch_block_range(&provider, last_processed_l1_batch_with_offset)
-                .await
-                .unwrap()
-                .unwrap()
-                .0;
+        let tx_fee_limit =
+            ethers::utils::parse_ether("0.8").expect("0.8 ether is a parsable amount; qed");
 
-        let mut withdrawal_events: Vec<WithdrawalEvent> = vec![];
+        let max_block_range = 1000usize;
 
-        let mut number_of_logs_per_tx: HashMap<H256, usize> = HashMap::new();
-
-        for _starting_block in (last_processed_block.as_u64()..last_finalized_block.as_u64())
-            .step_by(self.max_block_range)
-        {
-            // TODO: fetch withdrawal events
+        Self {
+            l1_provider,
+            l2_provider,
+            l1_main_contract,
+            l1_bridge,
+            withdrawal_finalizer,
+            processing_block_offset,
+            max_block_range,
+            tx_fee_limit,
+            batch_finalization_gas_limit,
+            one_withdrawal_gas_limit,
         }
+    }
 
-        let gas_price = provider.get_gas_price().await.unwrap();
-        let tx_fee_limit = self.tx_fee_limit;
+    pub async fn run<BE, WE>(
+        self,
+        block_events: BE,
+        withdrawal_events: WE,
+        from_l2_block: u64,
+    ) -> Result<()>
+    where
+        BE: Stream<Item = BlockEvent>,
+        WE: Stream<Item = WithdrawalEvent>,
+    {
+        pin!(block_events);
+        pin!(withdrawal_events);
 
-        let accounts = provider.get_accounts().await.unwrap();
-        let nonce = provider
-            .get_transaction_count(accounts[0], None)
-            .await
-            .unwrap();
+        let mut curr_block_number = from_l2_block;
 
-        for event in &withdrawal_events {
-            *number_of_logs_per_tx.entry(event.tx_hash).or_default() += 1;
+        let mut accumulator = WithdrawalsAccumulator::new(
+            0.into(),
+            self.tx_fee_limit,
+            self.batch_finalization_gas_limit,
+            self.one_withdrawal_gas_limit,
+        );
 
-            let params = finalize_withdrawal_params(
-                &provider,
-                event.tx_hash,
-                *number_of_logs_per_tx
-                    .get(&event.tx_hash)
-                    .expect("the entry has been inserted on the previous step; qed"),
-            )
-            .await
-            .unwrap();
+        // While reading the stream of withdrawal events asyncronously
+        // we may never be sure that we are currenly looking at the last
+        // event from the given block.
+        let mut in_block_events = vec![];
 
-            if self
-                .l1_bridge
-                .is_withdrawal_finalized(event.block_number.into(), 0.into())
-                .await
-                .unwrap()
-            {
-                continue;
-            }
-
-            self.accumulator.add_withdrawal(
-                client::withdrawal_finalizer::RequestFinalizeWithdrawal {
-                    l_2_block_number: params.l1_batch_number.as_u64().into(),
-                    l_2_message_index: params.l2_message_index.into(),
-                    l_2_tx_number_in_block: params.l2_tx_number_in_block,
-                    message: params.message,
-                    merkle_proof: params.proof,
-                    is_eth: is_eth(&params.sender),
-                    gas: self.one_withdrawal_gas_limit,
-                },
-            );
-
-            if self.accumulator.ready_to_finalize() {
-                self.finalize().await.unwrap();
+        loop {
+            tokio::select! {
+                block_event = block_events.next() => {
+                    if let Some(event) = block_event {
+                        log::info!("event {event}");
+                    }
+                }
+                withdrawal_event = withdrawal_events.next() => {
+                    if let Some(event) = withdrawal_event {
+                        log::info!("withdrawal event {event:?}");
+                        if event.block_number > curr_block_number {
+                            self.process_withdrawals_in_block(&mut in_block_events, &mut accumulator).await;
+                            curr_block_number = event.block_number;
+                        }
+                        in_block_events.push(event);
+                    }
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    log::info!("terminating finalizer loop on ctrl-c");
+                    break;
+                }
             }
         }
 
         Ok(())
     }
 
-    async fn fetch_last_processed_l1_batch(&self) -> U64 {
-        0.into()
+    async fn process_withdrawals_in_block(
+        &self,
+        events: &mut Vec<WithdrawalEvent>,
+        accumulator: &mut WithdrawalsAccumulator,
+    ) {
+        let mut numbers_in_blocks: HashMap<H256, usize> = HashMap::new();
+
+        for event in events.drain(..) {
+            let r = numbers_in_blocks.entry(event.tx_hash).or_default();
+
+            let index = *r;
+
+            *r += 1;
+
+            log::info!("withdrawal {event:?} index in transaction is {index}");
+        }
     }
 
-    async fn finalize(&mut self) -> Result<FinalizeResult> {
-        let withdrawals = self.accumulator.take_withdrawals();
-
-        let withdrawals_predictions = self
-            .withdrawal_finalizer
-            .finalize_withdrawals(withdrawals.clone())
+    async fn is_withdrawal_finalized(&self, tx_hash: H256, index: usize) -> Result<bool> {
+        let log = client::get_withdrawal_log(self.l2_provider.provider().as_ref(), tx_hash, index)
             .await
             .unwrap();
 
-        let mut predicted_ok = vec![];
-        let mut predicted_to_fail = vec![];
-
-        for (w, p) in withdrawals
-            .into_iter()
-            .zip(withdrawals_predictions.into_iter())
-        {
-            if p.success && p.gas <= self.one_withdrawal_gas_limit {
-                predicted_ok.push(w);
-            } else {
-                predicted_to_fail.push(w);
-            }
-        }
-
-        let mut res = FinalizeResult {
-            failed: predicted_to_fail,
-        };
-
-        match timeout(
-            Duration::from_secs(10),
-            self.withdrawal_finalizer
-                .send_finalize_withdrawals(predicted_ok.clone()),
+        let logindex = client::get_withdrawal_l2_to_l1_log(
+            self.l2_provider.provider().as_ref(),
+            tx_hash,
+            index,
         )
         .await
-        {
-            Ok(res) => {
-                let res = res?;
-                if let Some(receipt) = res {
-                    println!(
-                        "Eth tx {} with {} withdrawals has been mined",
-                        receipt.transaction_hash,
-                        predicted_ok.len()
-                    );
-                }
-            }
-            Err(_) => {
-                // TX was not mined after a timeout so the withdrawals
-                // in it also considered failed.
-                res.failed.extend_from_slice(predicted_ok.as_slice());
-            }
-        }
+        .unwrap();
 
-        Ok(res)
+        let sender: Address = log.0.topics[1].into();
+
+        let proof = get_log_proof(self.l2_provider.provider().as_ref(), tx_hash, index)
+            .await
+            .unwrap()
+            .unwrap();
+
+        if is_eth(&sender) {
+            self.l1_main_contract
+                .is_eth_withdrawal_finalized(
+                    log.0.l1_batch_number.unwrap().as_u64().into(),
+                    proof.id.into(),
+                )
+                .await
+                .map_err(Into::into)
+        } else {
+            self.l1_bridge
+                .is_withdrawal_finalized(
+                    log.0.l1_batch_number.unwrap().as_u64().into(),
+                    proof.id.into(),
+                )
+                .await
+                .map_err(Into::into)
+        }
     }
 }
 

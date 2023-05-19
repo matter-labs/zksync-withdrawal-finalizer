@@ -20,6 +20,9 @@ pub enum Error {
 
     #[error("Index not found {0}")]
     NoSuchIndex(usize),
+
+    #[error("Channel is closed")]
+    ChannelClosed,
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {

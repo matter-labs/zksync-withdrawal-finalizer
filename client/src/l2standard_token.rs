@@ -3,13 +3,14 @@
 use std::sync::Arc;
 
 use ethers::{
-    prelude::{Contract, Event},
+    abi::RawLog,
+    contract::EthEvent,
     providers::{Middleware, PubsubClient},
-    types::{Address, BlockNumber},
+    types::{Address, BlockNumber, Filter},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
-use crate::{ethtoken::WithdrawalFilter, Result, WithdrawalEvent};
+use crate::{ethtoken::WithdrawalFilter, Error, Result, WithdrawalEvent};
 
 use self::codegen::BridgeBurnFilter;
 
@@ -71,12 +72,11 @@ impl<M: Middleware> L2StandardToken<M> {
 }
 
 /// A convenience multiplexer for withdrawal-related events.
-pub struct WithdrawalEvents<M> {
-    withdrawal_events: Event<Arc<M>, M, BridgeBurnFilter>,
-    token_withdrawals: Event<Arc<M>, M, WithdrawalFilter>,
+pub struct WithdrawalEventsStream<M> {
+    middleware: Arc<M>,
 }
 
-impl<M> WithdrawalEvents<M>
+impl<M> WithdrawalEventsStream<M>
 where
     M: Middleware,
 {
@@ -86,18 +86,11 @@ where
     ///
     /// * `middleware`: THe middleware to perform requests with.
     pub async fn new(middleware: Arc<M>) -> Result<Self> {
-        let withdrawal_events = Contract::event_of_type::<BridgeBurnFilter>(middleware.clone());
-
-        let token_withdrawals = Contract::event_of_type::<WithdrawalFilter>(middleware);
-
-        Ok(Self {
-            withdrawal_events,
-            token_withdrawals,
-        })
+        Ok(Self { middleware })
     }
 }
 
-impl<M> WithdrawalEvents<M>
+impl<M> WithdrawalEventsStream<M>
 where
     M: Middleware,
     <M as Middleware>::Provider: PubsubClient,
@@ -114,7 +107,7 @@ where
     /// * `sender`: The `Sink` to send received events into.
     pub async fn run<B, S>(
         self,
-        addresses: Vec<Address>,
+        mut addresses: Vec<Address>,
         from_block: B,
         mut sender: S,
     ) -> Result<()>
@@ -123,54 +116,58 @@ where
         S: Sink<WithdrawalEvent> + Unpin,
         <S as Sink<WithdrawalEvent>>::Error: std::fmt::Debug,
     {
-        let sub_withdrawals = self
-            .withdrawal_events
-            .from_block(from_block.into())
-            .address(addresses.clone().into());
+        addresses.push(
+            ETH_TOKEN_ADDRESS
+                .parse()
+                .expect("eth token address constant is correct; qed"),
+        );
+        let filter = Filter::new()
+            .from_block(from_block)
+            .address(addresses)
+            .topic0(vec![
+                BridgeBurnFilter::signature(),
+                WithdrawalFilter::signature(),
+            ]);
 
-        let mut sub_withdrawals_s = sub_withdrawals.subscribe_with_meta().await?.fuse();
+        let logs = self
+            .middleware
+            .subscribe_logs(&filter)
+            .await
+            .map_err(|e| Error::Middleware(format!("{e}")))?;
 
-        let eth_token_address: Address = ETH_TOKEN_ADDRESS
-            .parse()
-            .expect("eth token address constant is correct; qed");
-
-        let eth_withdrawals = self
-            .token_withdrawals
-            .from_block(from_block.into())
-            .address(eth_token_address.into());
-
-        let mut eth_withdrawals_s = eth_withdrawals.subscribe_with_meta().await?.fuse();
-
+        let mut logs = logs.fuse();
         loop {
             futures::select! {
-                we = sub_withdrawals_s.next() => {
-                    if let Some(event) = we {
-                        let (event, meta) = event?;
+                we = logs.next() => {
+                    if let Some(log) = we {
+                        let raw_log: RawLog = log.clone().into();
 
-                        let we = WithdrawalEvent {
-                            tx_hash: meta.transaction_hash,
-                            block_number: meta.block_number.as_u64(),
-                            token: meta.address,
-                            amount: event.amount,
-                        };
+                        if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
+                            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+                                let we = WithdrawalEvent {
+                                    tx_hash,
+                                    block_number: block_number.as_u64(),
+                                    token: log.address,
+                                    amount: burn_event.amount,
+                                };
+                                sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
+                            }
+                            continue;
+                        }
 
-                        sender.send(we).await.unwrap();
+                        if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
+                            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+                                let we = WithdrawalEvent {
+                                    tx_hash,
+                                    block_number: block_number.as_u64(),
+                                    token: log.address,
+                                    amount: withdrawal_event.amount,
+                                };
+                                sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
+                            }
+                        }
                     }
                 },
-                eth = eth_withdrawals_s.next() => {
-                    if let Some(event) = eth {
-                        let (event, meta) = event?;
-
-                        let we = WithdrawalEvent {
-                            tx_hash: meta.transaction_hash,
-                            block_number: meta.block_number.as_u64(),
-                            token: meta.address,
-                            amount: event.amount,
-                        };
-
-                        sender.send(we).await.unwrap();
-                    }
-                }
                 complete => break,
             }
         }

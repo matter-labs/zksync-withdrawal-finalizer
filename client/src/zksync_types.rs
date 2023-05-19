@@ -3,6 +3,7 @@
 //!
 //! These are strictly the types that are necessary for
 //! interacting with the RPC endpoints.
+
 use ethers::types::{Address, Bloom, Bytes, H160, H256, U256, U64};
 
 use serde::{Deserialize, Serialize};
@@ -158,7 +159,6 @@ pub struct L2ToL1Log {
 
 /// Withdrawal event struct
 #[derive(Debug)]
-#[allow(missing_docs)]
 pub struct WithdrawalEvent {
     /// A hash of the transaction of this withdrawal.
     pub tx_hash: H256,

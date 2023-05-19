@@ -115,7 +115,7 @@ pub async fn get_withdrawal_l2_to_l1_log<J: JsonRpcClient>(
 pub async fn get_log_proof<J: JsonRpcClient>(
     client: &J,
     tx_hash: H256,
-    index: usize,
+    _index: usize,
 ) -> Result<Option<L2ToL1LogProof>> {
     let proof = client
         .request::<[H256; 1], Option<L2ToL1LogProof>>("zks_getL2ToL1LogProof", [tx_hash])
