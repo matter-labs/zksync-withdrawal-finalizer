@@ -70,7 +70,7 @@ async fn main() -> Result<()> {
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
     let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
-    tokio::spawn(event_mux.run(config.main_contract, 9040000, blocks_rx));
+    tokio::spawn(event_mux.run(config.main_zksync_contract, 9040000, blocks_rx));
 
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 
@@ -100,7 +100,7 @@ async fn main() -> Result<()> {
         client_l2,
         config.l1_eth_bridge_addr,
         config.withdrawal_finalizer_contract,
-        config.main_contract,
+        config.main_zksync_contract,
         config.one_withdrawal_gas_limit,
         config.batch_finalization_gas_limit,
         pgpool,
@@ -110,7 +110,7 @@ async fn main() -> Result<()> {
         Chain::Goerli,
         config.withdrawal_finalizer_contract,
         config.withdrawal_finalizer_eth_address,
-        config.main_contract,
+        config.main_zksync_contract,
         config.l1_erc20_bridge_addr,
         config.etherscan_token.as_ref().unwrap().clone(),
     )
