@@ -1,0 +1,15 @@
+[package]
+name = "storage"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sqlx = { version = "0.6.3", features = ["bigdecimal", "postgres", "runtime-tokio-rustls"] }
+bigdecimal = "0.3.1"
+num = "0.4.0"
+
+client = { path = "../client" }
+ethers = "2.0.4"
+thiserror = "1.0.40"

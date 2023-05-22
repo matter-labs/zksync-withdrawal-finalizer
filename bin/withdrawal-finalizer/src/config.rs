@@ -97,6 +97,9 @@ pub struct Config {
 
     #[envconfig(from = "BATCH_FINALIZATION_GAS_LIMIT")]
     pub batch_finalization_gas_limit: U256,
+
+    #[envconfig(from = "DATABASE_URL")]
+    pub database_url: Url,
 }
 
 impl Config {

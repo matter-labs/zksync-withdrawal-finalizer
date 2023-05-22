@@ -7,6 +7,7 @@ use ethers::{
     types::{Address, BlockNumber, H256, U256, U64},
 };
 use futures::{stream::StreamExt, Stream};
+use sqlx::PgConnection;
 use tokio::{pin, select, signal, time::timeout};
 
 use client::{
@@ -46,6 +47,8 @@ pub struct WithdrawalFinalizer<M1, M2> {
     batch_finalization_gas_limit: U256,
 
     one_withdrawal_gas_limit: U256,
+
+    pgpool: PgConnection,
 }
 
 impl<M1, M2> WithdrawalFinalizer<M1, M2>
@@ -53,6 +56,7 @@ where
     M1: JsonRpcClient,
     M2: JsonRpcClient,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         l1_provider: Arc<Provider<M1>>,
         l2_provider: Arc<Provider<M2>>,
@@ -61,6 +65,7 @@ where
         main_contract_address: Address,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
+        pgpool: PgConnection,
     ) -> Self {
         let l1_bridge = client::l1bridge::L1Bridge::new(l1_bridge_address, l1_provider.clone());
 
@@ -88,11 +93,12 @@ where
             tx_fee_limit,
             batch_finalization_gas_limit,
             one_withdrawal_gas_limit,
+            pgpool,
         }
     }
 
     pub async fn run<BE, WE>(
-        self,
+        mut self,
         block_events: BE,
         withdrawal_events: WE,
         from_l2_block: u64,
@@ -122,7 +128,7 @@ where
             tokio::select! {
                 block_event = block_events.next() => {
                     if let Some(event) = block_event {
-                        log::info!("event {event}");
+                        // log::info!("event {event}");
                     }
                 }
                 withdrawal_event = withdrawal_events.next() => {
@@ -146,7 +152,7 @@ where
     }
 
     async fn process_withdrawals_in_block(
-        &self,
+        &mut self,
         events: &mut Vec<WithdrawalEvent>,
         accumulator: &mut WithdrawalsAccumulator,
     ) {
@@ -160,6 +166,9 @@ where
             *r += 1;
 
             log::info!("withdrawal {event:?} index in transaction is {index}");
+            storage::add_withdrawal(&mut self.pgpool, &event, index)
+                .await
+                .unwrap();
         }
     }
 

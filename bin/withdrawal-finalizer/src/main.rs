@@ -64,8 +64,7 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let from_l2_block = 5822469;
-
+    let from_l2_block = 6000000;
     let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
@@ -88,6 +87,9 @@ async fn main() -> Result<()> {
 
     tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
 
+    use sqlx::Connection;
+    let pgpool = sqlx::postgres::PgConnection::connect(config.database_url.as_str()).await?;
+
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
         client_l1,
         client_l2,
@@ -96,6 +98,7 @@ async fn main() -> Result<()> {
         config.main_contract,
         config.one_withdrawal_gas_limit,
         config.batch_finalization_gas_limit,
+        pgpool,
     );
 
     let last_batch = client::etherscan::last_processed_l1_batch(
