@@ -163,7 +163,7 @@ pub struct WithdrawalEvent {
     /// A hash of the transaction of this withdrawal.
     pub tx_hash: H256,
 
-    /// Number of the block this withdrawal happened in.
+    /// Number of the L2 block this withdrawal happened in.
     pub block_number: u64,
 
     /// Address of the transfered token
