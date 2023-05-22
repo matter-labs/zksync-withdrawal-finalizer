@@ -11,11 +11,11 @@ use ethers::{
 
 use crate::Result;
 
-/// Get the last processed L1 batch from Etherscan
+/// Get the L1-batch number from the last processes withdrawal-finalizer's finalization transaction
 ///
 /// This function queries the transactions that were sent
 /// from the withdrawer account to determine what was the
-/// last processed l1 batch. In the past withdrawal transactions
+///  L1 batch of the last finalized withdrawal. In the past withdrawal transactions
 /// were sent to the bridge contracts instead of the standalone
 /// contract, we would also want to query those transactions and so
 /// the addresses of the bridges are among function parameters.
