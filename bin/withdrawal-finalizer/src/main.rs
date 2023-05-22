@@ -10,8 +10,8 @@ use clap::Parser;
 use color_eyre::eyre::Result;
 use envconfig::Envconfig;
 use ethers::{
-    providers::{Provider, Ws},
-    types::Chain,
+    providers::{Middleware, Provider, Ws},
+    types::{BlockNumber, Chain},
 };
 use log::LevelFilter;
 
@@ -64,13 +64,34 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let from_l2_block = 6026666;
+    let from_l2_block = match config.start_from_l2_block {
+        Some(l2_block) => l2_block,
+        None => client_l2
+            .get_block(BlockNumber::Finalized)
+            .await?
+            .expect("There is also a finalized block; qed")
+            .number
+            .expect("A finalized block number is always known; qed")
+            .as_u64(),
+    };
+
     let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
     let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
-    tokio::spawn(event_mux.run(config.main_zksync_contract, 9040000, blocks_rx));
+    let from_l1_block = match config.start_from_l1_block {
+        Some(l1_block) => l1_block,
+        None => client_l1
+            .get_block(BlockNumber::Finalized)
+            .await?
+            .expect("There is also a finalized block; qed")
+            .number
+            .expect("A finalized block number is always known; qed")
+            .as_u64(),
+    };
+
+    tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
 
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 
