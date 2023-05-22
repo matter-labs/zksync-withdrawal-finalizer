@@ -44,16 +44,8 @@ pub struct Config {
     #[envconfig(from = "WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY")]
     pub account_private_key: String,
 
-    /// L1 RPC url.
-    #[envconfig(from = "ETH_CLIENT_WEB3_URL")]
-    pub l1_web3_url: Url,
-
     /// L1 WS url.
-    pub l1_ws_url: Option<Url>,
-
-    /// L2 RPC url.
-    #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
-    pub zksync_web3_url: Url,
+    pub l1_ws_url: Url,
 
     /// Sentry url.
     #[envconfig(from = "SENTRY_URL")]

@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
         None => Config::init_from_env()?,
     };
 
-    let provider_l1 = Provider::<Ws>::connect(config.l1_ws_url.as_ref().unwrap())
+    let provider_l1 = Provider::<Ws>::connect(config.l1_ws_url.as_ref())
         .await
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
