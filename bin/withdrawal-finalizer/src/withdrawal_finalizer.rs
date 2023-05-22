@@ -128,7 +128,8 @@ where
             tokio::select! {
                 block_event = block_events.next() => {
                     if let Some(event) = block_event {
-                        // log::info!("event {event}");
+                        log::info!("event {event}");
+                        self.process_block_event(event).await?;
                     }
                 }
                 withdrawal_event = withdrawal_events.next() => {
@@ -146,6 +147,70 @@ where
                     break;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    async fn process_block_event(&mut self, event: BlockEvent) -> Result<()> {
+        match event {
+            BlockEvent::BlockCommit(event) => {
+                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
+                    &self.l2_provider.provider().as_ref(),
+                    event.block_number.as_u64() as u32,
+                )
+                .await?
+                {
+                    storage::commited_new_batch(
+                        &mut self.pgpool,
+                        range_begin.as_u64(),
+                        range_end.as_u64(),
+                    )
+                    .await?;
+
+                    log::info!(
+                        "Changed withdrawals status to committed for range {range_begin}-{range_end}"
+                    );
+                }
+            }
+            BlockEvent::BlocksVerification(event) => {
+                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
+                    &self.l2_provider.provider().as_ref(),
+                    event.current_last_verified_block.as_u64() as u32,
+                )
+                .await?
+                {
+                    storage::verified_new_batch(
+                        &mut self.pgpool,
+                        range_begin.as_u64(),
+                        range_end.as_u64(),
+                    )
+                    .await?;
+                    log::info!(
+                        "Changed withdrawals status to verified for range {range_begin}-{range_end}"
+                    );
+                }
+            }
+            BlockEvent::BlockExecution(event) => {
+                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
+                    &self.l2_provider.provider().as_ref(),
+                    event.block_number.as_u64() as u32,
+                )
+                .await?
+                {
+                    storage::executed_new_batch(
+                        &mut self.pgpool,
+                        range_begin.as_u64(),
+                        range_end.as_u64(),
+                    )
+                    .await?;
+
+                    log::info!(
+                        "Changed withdrawals status to executed for range {range_begin}-{range_end}"
+                    );
+                }
+            }
+            BlockEvent::BlocksRevert(_) => todo!(),
         }
 
         Ok(())

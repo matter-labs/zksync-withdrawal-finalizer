@@ -1,5 +1,8 @@
 CREATE TYPE withdrawal_status as ENUM (
     'Seen',
+    'Committed',
+    'Verified',
+    'Executed',
     'Finalized'
 );
 
@@ -10,5 +13,6 @@ CREATE TABLE withdrawals
     token BYTEA NOT NULL,
     amount NUMERIC(80) NOT NULL,
     event_index_in_tx INT NOT NULL,
-    status withdrawal_status NOT NULL
+    status withdrawal_status NOT NULL,
+    UNIQUE (tx_hash, blocknumber,event_index_in_tx)
 );

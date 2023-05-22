@@ -64,13 +64,13 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let from_l2_block = 6000000;
+    let from_l2_block = 6026666;
     let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
     let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
-    tokio::spawn(event_mux.run(config.main_contract, 9015215, blocks_rx));
+    tokio::spawn(event_mux.run(config.main_contract, 9040000, blocks_rx));
 
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 
@@ -87,8 +87,13 @@ async fn main() -> Result<()> {
 
     tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
 
-    use sqlx::Connection;
-    let pgpool = sqlx::postgres::PgConnection::connect(config.database_url.as_str()).await?;
+    use sqlx::ConnectOptions;
+    use std::str::FromStr;
+    let mut pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
+    let pgpool = pgpool_opts
+        .log_statements(LevelFilter::Debug)
+        .connect()
+        .await?;
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
         client_l1,
