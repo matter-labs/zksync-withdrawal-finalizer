@@ -30,7 +30,7 @@ use crate::Result;
 /// * `api_key`: Etherscan API key
 pub async fn last_processed_l1_batch(
     chain: Chain,
-    withdrawer_accout: Address,
+    withdrawer_account: Address,
     withdrawal_contract: Address,
     l1_eth_bridge: Address,
     l1_erc20_bridge: Address,
@@ -47,7 +47,7 @@ pub async fn last_processed_l1_batch(
     };
 
     let transactions = client
-        .get_transactions(&withdrawer_accout, Some(params))
+        .get_transactions(&withdrawer_account, Some(params))
         .await?;
 
     for tx in &transactions {
