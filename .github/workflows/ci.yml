@@ -33,7 +33,7 @@ jobs:
 
       - name: Install sqlx
         run: |
-          cargo install sqlx-cli --no-default-features --features native-tls,postgres
+          cargo install sqlx-cli --no-default-features --features rustls,postgres
 
       - name: Init DB
         run: |
