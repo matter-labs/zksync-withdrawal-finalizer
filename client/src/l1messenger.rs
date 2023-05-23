@@ -6,5 +6,8 @@ pub use codegen::L1MessageSentFilter;
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(L1Messenger, "./src/contracts/IL1Messenger.json");
+    abigen!(
+        L1Messenger,
+        "$CARGO_MANIFEST_DIR/src/contracts/IL1Messenger.json"
+    );
 }

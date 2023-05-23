@@ -17,7 +17,10 @@ use self::codegen::BridgeBurnFilter;
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(L2StandardToken, "./src/contracts/IL2StandardToken.json",);
+    abigen!(
+        L2StandardToken,
+        "$CARGO_MANIFEST_DIR/src/contracts/IL2StandardToken.json",
+    );
 }
 
 /// A struct wrapper for interfacing with `L2StandardToken` contract.

@@ -15,7 +15,7 @@ mod codegen {
 
     abigen!(
         WithdrawalFinalizer,
-        "./src/contracts/WithdrawalFinalizer.json"
+        "$CARGO_MANIFEST_DIR/src/contracts/WithdrawalFinalizer.json"
     );
 }
 

@@ -16,7 +16,7 @@ use crate::Result;
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(IZkSync, "./src/contracts/IZkSync.json");
+    abigen!(IZkSync, "$CARGO_MANIFEST_DIR/src/contracts/IZkSync.json");
 }
 
 pub use codegen::{

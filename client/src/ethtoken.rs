@@ -13,7 +13,7 @@ use crate::{Result, WithdrawalEvent};
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(EthToken, "./src/contracts/IEthToken.json",);
+    abigen!(EthToken, "$CARGO_MANIFEST_DIR/src/contracts/IEthToken.json",);
 }
 
 pub use codegen::WithdrawalFilter;

@@ -9,7 +9,10 @@ use crate::Result;
 mod codegen {
     use ethers::prelude::abigen;
 
-    abigen!(IL2Bridge, "./src/contracts/IL2bridge.json");
+    abigen!(
+        IL2Bridge,
+        "$CARGO_MANIFEST_DIR/src/contracts/IL2bridge.json"
+    );
 }
 
 /// A struct wrapper for interacting with the `L2Bridge` contract.
