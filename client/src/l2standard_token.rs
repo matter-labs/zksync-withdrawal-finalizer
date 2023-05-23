@@ -102,7 +102,7 @@ where
     ///
     /// # Arguments
     ///
-    /// * `addresses`: The addrs of the ERC20 tokens on L1 to monitor
+    /// * `addresses`: The address of the ERC20 tokens on L1 to monitor
     /// * `from_block`: Query the chain from this particular block
     /// * `sender`: The `Sink` to send received events into.
     pub async fn run<B, S>(

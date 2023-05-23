@@ -11,7 +11,7 @@ use ethers::{
 
 use crate::Result;
 
-/// Get the L1-batch number from the last processes withdrawal-finalizer's finalization transaction
+/// Get the L1-batch number from the last processed withdrawal-finalizer's finalization transaction
 ///
 /// This function queries the transactions that were sent
 /// from the withdrawer account to determine what was the
@@ -25,7 +25,7 @@ use crate::Result;
 /// * `chain`: Which chain to query
 /// * `withdrawer_account`: Address of the withdrawer wallet
 /// * `withdrawal_contract`: Address of finalizer contract
-/// * `l1_eth_bridge`: Address of L1 eth bridge contract
+/// * `l1_eth_bridge`: Address of L1 ETH bridge contract
 /// * `l1_erc20_bridge`: Address of L1 ERC20 bridge contract
 /// * `api_key`: Etherscan API key
 pub async fn last_processed_l1_batch(

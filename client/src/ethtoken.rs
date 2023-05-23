@@ -41,7 +41,7 @@ impl<M: Middleware> EthToken<M> {
     /// # Arguments
     ///
     /// * `from_block` - beginning of the block interval
-    /// * `to_block` = end of the block interval
+    /// * `to_block` - end of the block interval
     pub async fn withdrawal_events(
         &self,
         from_block: BlockNumber,
