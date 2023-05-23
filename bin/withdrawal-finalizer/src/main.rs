@@ -23,7 +23,6 @@ use client::{
 };
 use config::Config;
 
-mod accumulator;
 mod cli;
 mod config;
 mod withdrawal_finalizer;
@@ -116,16 +115,7 @@ async fn main() -> Result<()> {
         .connect()
         .await?;
 
-    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l1,
-        client_l2,
-        config.l1_eth_bridge_addr,
-        config.withdrawal_finalizer_contract,
-        config.main_zksync_contract,
-        config.one_withdrawal_gas_limit,
-        config.batch_finalization_gas_limit,
-        pgpool,
-    );
+    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
 
     let last_batch = client::etherscan::last_processed_l1_batch(
         Chain::Goerli,
