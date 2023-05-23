@@ -11,4 +11,4 @@ thiserror = "1.0.40"
 serde = "1.0.160"
 futures = "0.3.28"
 log = "0.4.17"
-tokio = "1.28.1"
+tokio = { version ="1.28.1", features =["full"] }
