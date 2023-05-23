@@ -14,7 +14,7 @@ mod codegen {
 
     abigen!(
         IL1Bridge,
-        "$CARGO_MANIFEST_DIR/src/contracts/IL1bridge.json"
+        "$CARGO_MANIFEST_DIR/src/contracts/IL1Bridge.json"
     );
 }
 
