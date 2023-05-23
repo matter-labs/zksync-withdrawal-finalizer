@@ -47,6 +47,8 @@ jobs:
 
       - name: Build project
         run: |
-          echo $(pwd)
           cargo build
 
+      - name: Run clippy
+        run: |
+          cargo clippy -- -D warnings
