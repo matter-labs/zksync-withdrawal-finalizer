@@ -157,7 +157,7 @@ where
                 )
                 .await?
                 {
-                    storage::commited_new_batch(
+                    storage::committed_new_batch(
                         &mut self.pgpool,
                         range_begin.as_u64(),
                         range_end.as_u64(),
@@ -238,7 +238,7 @@ where
             .await
             .unwrap();
 
-        let logindex = client::get_withdrawal_l2_to_l1_log(
+        let log_index = client::get_withdrawal_l2_to_l1_log(
             self.l2_provider.provider().as_ref(),
             tx_hash,
             index,

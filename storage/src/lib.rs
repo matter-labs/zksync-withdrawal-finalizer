@@ -27,7 +27,7 @@ enum WithdrawalStatus {
 }
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
-pub async fn commited_new_batch(
+pub async fn committed_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
