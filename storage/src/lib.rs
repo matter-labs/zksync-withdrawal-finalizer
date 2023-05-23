@@ -92,7 +92,7 @@ async fn update_status_for_block_range(
         batch_end as i64,
         prev_status as WithdrawalStatus,
     )
-    .fetch_optional(conn)
+    .execute(conn)
     .await?;
 
     Ok(())
@@ -135,7 +135,7 @@ pub async fn add_withdrawal(
         event_index_in_tx as i32,
         WithdrawalStatus::Seen as WithdrawalStatus,
     )
-    .fetch_optional(conn)
+    .execute(conn)
     .await?;
 
     Ok(())

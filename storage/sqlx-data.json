@@ -1,0 +1,73 @@
+{
+  "db": "PostgreSQL",
+  "84af2212b297c25e472d4b01ce8a205a1b856c3b5456555ecda141a5f4224505": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Seen",
+                  "Committed",
+                  "Verified",
+                  "Executed",
+                  "Finalized"
+                ]
+              },
+              "name": "withdrawal_status"
+            }
+          },
+          "Int8",
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Seen",
+                  "Committed",
+                  "Verified",
+                  "Executed",
+                  "Finalized"
+                ]
+              },
+              "name": "withdrawal_status"
+            }
+          }
+        ]
+      }
+    },
+    "query": "\n        UPDATE withdrawals\n        SET status=$1\n        WHERE blocknumber <= $2\n        AND status = $3\n        "
+  },
+  "ded946cb905cd50d54c3e8eb88efc97fe1d79a90480e383877c6a78aac58cd81": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Bytea",
+          "Numeric",
+          "Int4",
+          {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "Seen",
+                  "Committed",
+                  "Verified",
+                  "Executed",
+                  "Finalized"
+                ]
+              },
+              "name": "withdrawal_status"
+            }
+          }
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            blocknumber,\n            token,\n            amount,\n            event_index_in_tx,\n            status\n        )\n        VALUES (\n            $1, $2, $3, $4, $5, $6\n        )\n        ON CONFLICT (tx_hash, blocknumber, event_index_in_tx) DO NOTHING\n        "
+  }
+}
