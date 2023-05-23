@@ -43,7 +43,7 @@ jobs:
           cd ../
 
       - name: Build project
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+        run: |
+          echo $(pwd)
+          cargo build
 
