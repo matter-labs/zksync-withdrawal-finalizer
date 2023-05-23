@@ -25,6 +25,12 @@ jobs:
           docker-compose -f docker-compose-runner.yml pull
           docker-compose -f docker-compose-runner.yml up --build -d postgres
 
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
       - name: Install sqlx
         run: |
           cargo install sqlx-cli --no-default-features --features native-tls,postgres
