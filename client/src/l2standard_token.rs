@@ -132,49 +132,45 @@ where
                 WithdrawalFilter::signature(),
             ]);
 
-        let logs = self
+        let mut logs = self
             .middleware
             .subscribe_logs(&filter)
             .await
             .map_err(|e| Error::Middleware(format!("{e}")))?;
 
-        let mut logs = logs.fuse();
-        loop {
-            tokio::select! {
-                Some(log) = logs.next() => {
-                    let raw_log: RawLog = log.clone().into();
+        while let Some(log) = logs.next().await {
+            let raw_log: RawLog = log.clone().into();
 
-                    if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
-                        if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                            let we = WithdrawalEvent {
-                                tx_hash,
-                                block_number: block_number.as_u64(),
-                                token: log.address,
-                                amount: burn_event.amount,
-                            };
-                            sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
-                        }
-                        continue;
-                    }
+            if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
+                if let (Some(tx_hash), Some(block_number)) =
+                    (log.transaction_hash, log.block_number)
+                {
+                    let we = WithdrawalEvent {
+                        tx_hash,
+                        block_number: block_number.as_u64(),
+                        token: log.address,
+                        amount: burn_event.amount,
+                    };
+                    sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
+                }
+                continue;
+            }
 
-                    if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
-                        if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                            let we = WithdrawalEvent {
-                                tx_hash,
-                                block_number: block_number.as_u64(),
-                                token: log.address,
-                                amount: withdrawal_event.amount,
-                            };
-                            sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
-                        }
-                    }
-                },
-                else => {
-                    log::info!("withdrawal streams being closed");
-                    break
+            if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
+                if let (Some(tx_hash), Some(block_number)) =
+                    (log.transaction_hash, log.block_number)
+                {
+                    let we = WithdrawalEvent {
+                        tx_hash,
+                        block_number: block_number.as_u64(),
+                        token: log.address,
+                        amount: withdrawal_event.amount,
+                    };
+                    sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
                 }
             }
         }
+        log::info!("withdrawal streams being closed");
 
         Ok(())
     }

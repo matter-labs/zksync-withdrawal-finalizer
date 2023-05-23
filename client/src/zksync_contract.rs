@@ -218,38 +218,28 @@ where
                 BlockExecutionFilter::signature(),
             ]);
 
-        let logs = self
+        let mut logs = self
             .middleware
             .subscribe_logs(&filter)
             .await
             .map_err(|e| crate::Error::Middleware(format!("{e}")))?;
 
-        let mut logs = logs.fuse();
+        while let Some(log) = logs.next().await {
+            let raw_log: RawLog = log.clone().into();
 
-        loop {
-            tokio::select! {
-                Some(log) = logs.next() => {
-                    let raw_log: RawLog = log.clone().into();
+            if let Ok(commit_event) = BlockCommitFilter::decode_log(&raw_log) {
+                sender.send(commit_event.into()).await.unwrap();
+                continue;
+            }
 
-                    if let Ok(commit_event) = BlockCommitFilter::decode_log(&raw_log) {
-                        sender.send(commit_event.into()).await.unwrap();
-                        continue;
-                    }
+            if let Ok(verify_event) = BlocksVerificationFilter::decode_log(&raw_log) {
+                sender.send(verify_event.into()).await.unwrap();
+                continue;
+            }
 
-                    if let Ok(verify_event) = BlocksVerificationFilter::decode_log(&raw_log) {
-                        sender.send(verify_event.into()).await.unwrap();
-                        continue;
-                    }
-
-                    if let Ok(execution_event) = BlockExecutionFilter::decode_log(&raw_log) {
-                        sender.send(execution_event.into()).await.unwrap();
-                        continue;
-                    }
-                }
-                else => {
-                    log::info!("block event stream being closed");
-                    break
-                }
+            if let Ok(execution_event) = BlockExecutionFilter::decode_log(&raw_log) {
+                sender.send(execution_event.into()).await.unwrap();
+                continue;
             }
         }
 
