@@ -40,6 +40,7 @@ jobs:
           cd ./storage/
           sqlx database create
           sqlx migrate run
+          cd ../
 
       - name: Build project
         uses: actions-rs/cargo@v1
