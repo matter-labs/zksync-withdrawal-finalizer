@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env: 
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: 'postgres://postgres@localhost/finalizer_local'
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_test:
+    runs-on: [self-hosted, ci-runner]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose-runner.yml pull
+          docker-compose -f docker-compose-runner.yml up --build -d postgres
+
+      - name: Install sqlx
+        run: |
+          cargo install sqlx-cli --no-default-features --features native-tls,postgres
+
+      - name: Init DB
+        run: |
+          cd ./storage/
+          sqlx database create
+          sqlx migrate run
+
+      - name: Build project
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
