@@ -6,7 +6,9 @@ homepage = "https://zksync.io/"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.3"
+ethers = "2.0.4"
 thiserror = "1.0.40"
 serde = "1.0.160"
 futures = "0.3.28"
+log = "0.4.17"
+tokio = "1.28.1"

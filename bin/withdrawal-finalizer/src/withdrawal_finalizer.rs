@@ -126,25 +126,21 @@ where
 
         loop {
             tokio::select! {
-                block_event = block_events.next() => {
-                    if let Some(event) = block_event {
-                        log::info!("event {event}");
-                        self.process_block_event(event).await?;
-                    }
+                Some(event) = block_events.next() => {
+                    log::info!("event {event}");
+                    self.process_block_event(event).await?;
                 }
-                withdrawal_event = withdrawal_events.next() => {
-                    if let Some(event) = withdrawal_event {
-                        log::info!("withdrawal event {event:?}");
-                        if event.block_number > curr_block_number {
-                            self.process_withdrawals_in_block(&mut in_block_events, &mut accumulator).await;
-                            curr_block_number = event.block_number;
-                        }
-                        in_block_events.push(event);
+                Some(event) = withdrawal_events.next() => {
+                    log::info!("withdrawal event {event:?}");
+                    if event.block_number > curr_block_number {
+                        self.process_withdrawals_in_block(&mut in_block_events, &mut accumulator).await;
+                        curr_block_number = event.block_number;
                     }
+                    in_block_events.push(event);
                 }
-                _ = tokio::signal::ctrl_c() => {
-                    log::info!("terminating finalizer loop on ctrl-c");
-                    break;
+                else => {
+                    log::info!("terminating finalizer");
+                    break
                 }
             }
         }

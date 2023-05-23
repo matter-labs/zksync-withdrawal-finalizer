@@ -4,6 +4,7 @@
 
 //! A withdraw-finalizer
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::Parser;
@@ -14,6 +15,7 @@ use ethers::{
     types::{BlockNumber, Chain},
 };
 use log::LevelFilter;
+use sqlx::ConnectOptions;
 
 use cli::Args;
 use client::{
@@ -32,6 +34,7 @@ const CHANNEL_CAPACITY: usize = 1024;
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
+
     env_logger::Builder::new()
         .filter_level(LevelFilter::Info)
         .init();
@@ -67,7 +70,7 @@ async fn main() -> Result<()> {
     let from_l2_block = match config.start_from_l2_block {
         Some(l2_block) => l2_block,
         None => client_l2
-            .get_block(BlockNumber::Finalized)
+            .get_block(BlockNumber::Latest)
             .await?
             .expect("There is also a finalized block; qed")
             .number
@@ -83,7 +86,7 @@ async fn main() -> Result<()> {
     let from_l1_block = match config.start_from_l1_block {
         Some(l1_block) => l1_block,
         None => client_l1
-            .get_block(BlockNumber::Finalized)
+            .get_block(BlockNumber::Safe)
             .await?
             .expect("There is also a finalized block; qed")
             .number
@@ -108,8 +111,6 @@ async fn main() -> Result<()> {
 
     tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
 
-    use sqlx::ConnectOptions;
-    use std::str::FromStr;
     let mut pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
     let pgpool = pgpool_opts
         .log_statements(LevelFilter::Debug)

@@ -137,38 +137,39 @@ where
 
         let mut logs = logs.fuse();
         loop {
-            futures::select! {
-                we = logs.next() => {
-                    if let Some(log) = we {
-                        let raw_log: RawLog = log.clone().into();
+            tokio::select! {
+                Some(log) = logs.next() => {
+                    let raw_log: RawLog = log.clone().into();
 
-                        if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
-                            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                                let we = WithdrawalEvent {
-                                    tx_hash,
-                                    block_number: block_number.as_u64(),
-                                    token: log.address,
-                                    amount: burn_event.amount,
-                                };
-                                sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
-                            }
-                            continue;
+                    if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
+                        if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+                            let we = WithdrawalEvent {
+                                tx_hash,
+                                block_number: block_number.as_u64(),
+                                token: log.address,
+                                amount: burn_event.amount,
+                            };
+                            sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
                         }
+                        continue;
+                    }
 
-                        if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
-                            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                                let we = WithdrawalEvent {
-                                    tx_hash,
-                                    block_number: block_number.as_u64(),
-                                    token: log.address,
-                                    amount: withdrawal_event.amount,
-                                };
-                                sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
-                            }
+                    if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
+                        if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+                            let we = WithdrawalEvent {
+                                tx_hash,
+                                block_number: block_number.as_u64(),
+                                token: log.address,
+                                amount: withdrawal_event.amount,
+                            };
+                            sender.send(we).await.map_err(|_| Error::ChannelClosed)?;
                         }
                     }
                 },
-                complete => break,
+                else => {
+                    log::info!("withdrawal streams being closed");
+                    break
+                }
             }
         }
 

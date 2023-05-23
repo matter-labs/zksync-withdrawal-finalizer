@@ -3,9 +3,10 @@
 use std::{fmt::Debug, sync::Arc};
 
 use ethers::{
-    prelude::{Contract, EthEvent, Event},
+    abi::RawLog,
+    prelude::{EthEvent, Event},
     providers::{Middleware, PubsubClient},
-    types::{Address, BlockNumber, Bytes, H256, U256},
+    types::{Address, BlockNumber, Bytes, Filter, ValueOrArray, H256, U256},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
@@ -166,10 +167,7 @@ impl<M: Middleware> ZkSync<M> {
 // api relies on lifetimes and borrowing is hard to use otherwise
 // in the async context.
 pub struct BlockEvents<M: Middleware> {
-    commit_event: Event<Arc<M>, M, BlockCommitFilter>,
-    execution_event: Event<Arc<M>, M, BlockExecutionFilter>,
-    verification_event: Event<Arc<M>, M, BlocksVerificationFilter>,
-    revert_event: Event<Arc<M>, M, BlocksRevertFilter>,
+    middleware: Arc<M>,
 }
 
 impl<M> BlockEvents<M>
@@ -182,18 +180,7 @@ where
     ///
     /// * `middleware`: The middleware to perform requests with.
     pub async fn new(middleware: Arc<M>) -> Result<BlockEvents<M>> {
-        let commit_event = Contract::event_of_type::<BlockCommitFilter>(middleware.clone());
-        let execution_event = Contract::event_of_type::<BlockExecutionFilter>(middleware.clone());
-        let verification_event =
-            Contract::event_of_type::<BlocksVerificationFilter>(middleware.clone());
-        let revert_event = Contract::event_of_type::<BlocksRevertFilter>(middleware);
-
-        Ok(Self {
-            commit_event,
-            execution_event,
-            verification_event,
-            revert_event,
-        })
+        Ok(Self { middleware })
     }
 }
 
@@ -222,61 +209,51 @@ where
         S: Sink<BlockEvent> + Unpin,
         <S as Sink<BlockEvent>>::Error: std::fmt::Debug,
     {
-        let sub_commit = self
-            .commit_event
-            .from_block(from_block.into())
-            .address(address.into());
-        let mut sub_commit_stream = sub_commit.subscribe().await?.fuse();
+        let filter = Filter::new()
+            .from_block(from_block)
+            .address(Into::<ValueOrArray<Address>>::into(address))
+            .topic0(vec![
+                BlockCommitFilter::signature(),
+                BlocksVerificationFilter::signature(),
+                BlockExecutionFilter::signature(),
+            ]);
 
-        let sub_execute = self
-            .execution_event
-            .from_block(from_block.into())
-            .address(address.into());
+        let logs = self
+            .middleware
+            .subscribe_logs(&filter)
+            .await
+            .map_err(|e| crate::Error::Middleware(format!("{e}")))?;
 
-        let mut sub_commit_execute = sub_execute.subscribe().await?.fuse();
+        let mut logs = logs.fuse();
 
-        let sub_verification = self
-            .verification_event
-            .from_block(from_block.into())
-            .address(address.into());
-
-        let mut sub_commit_verify = sub_verification.subscribe().await?.fuse();
-
-        let sub_revert = self
-            .revert_event
-            .from_block(from_block.into())
-            .address(address.into());
-
-        let mut sub_revert = sub_revert.subscribe().await?.fuse();
         loop {
-            futures::select! {
-                commit_event = sub_commit_stream.next() => {
-                    if let Some(event) = commit_event {
-                        let commit_event = event?;
+            tokio::select! {
+                Some(log) = logs.next() => {
+                    let raw_log: RawLog = log.clone().into();
+
+                    if let Ok(commit_event) = BlockCommitFilter::decode_log(&raw_log) {
                         sender.send(commit_event.into()).await.unwrap();
+                        continue;
                     }
-                }
-                execute_event = sub_commit_execute.next() => {
-                    if let Some(event) = execute_event {
-                        let execute_event = event?;
-                        sender.send(execute_event.into()).await.unwrap();
-                    }
-                }
-                verify_event = sub_commit_verify.next() => {
-                    if let Some(event) = verify_event {
-                        let verify_event = event?;
+
+                    if let Ok(verify_event) = BlocksVerificationFilter::decode_log(&raw_log) {
                         sender.send(verify_event.into()).await.unwrap();
+                        continue;
+                    }
+
+                    if let Ok(execution_event) = BlockExecutionFilter::decode_log(&raw_log) {
+                        sender.send(execution_event.into()).await.unwrap();
+                        continue;
                     }
                 }
-                revert_event = sub_revert.next() => {
-                    if let Some(event) = revert_event {
-                        let revert_event = event?;
-                        sender.send(revert_event.into()).await.unwrap();
-                    }
+                else => {
+                    log::info!("block event stream being closed");
+                    break
                 }
-                complete => break,
             }
         }
+
+        log::info!("all event streams have terminated, exiting...");
 
         Ok(())
     }
