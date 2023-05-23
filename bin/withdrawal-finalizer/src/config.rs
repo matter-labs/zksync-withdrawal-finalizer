@@ -6,8 +6,6 @@ use ethers::types::{Address, H160, U256};
 use serde::Deserialize;
 use url::Url;
 
-use crate::error::Error;
-
 /// A list of tokens to process.
 ///
 /// The sole purpose of this newtype is `FromStr` implementation that
@@ -99,8 +97,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn get_tokens(&mut self, network: &str) -> Result<(), Error> {
-        let zksync_home = env::var("ZKSYNC_HOME").map_err(|_| Error::NoZkSyncHome)?;
+    pub fn get_tokens(&mut self, network: &str) -> eyre::Result<()> {
+        let zksync_home = env::var("ZKSYNC_HOME")?;
 
         let tokens = std::fs::read_to_string(format!("{zksync_home}/etc/tokens/{network}.json"))?;
 
@@ -118,7 +116,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn from_file<P: AsRef<Path>>(config_path: P) -> Result<Self, Error> {
+    pub fn from_file<P: AsRef<Path>>(config_path: P) -> eyre::Result<Self> {
         let contents = fs::read_to_string(config_path)?;
 
         let config: Config = toml::from_str(&contents)?;

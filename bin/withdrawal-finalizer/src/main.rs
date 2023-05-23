@@ -8,12 +8,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::Parser;
-use color_eyre::eyre::Result;
 use envconfig::Envconfig;
 use ethers::{
     providers::{Middleware, Provider, Ws},
     types::{BlockNumber, Chain},
 };
+use eyre::Result;
 use log::LevelFilter;
 use sqlx::ConnectOptions;
 
@@ -26,7 +26,6 @@ use config::Config;
 mod accumulator;
 mod cli;
 mod config;
-mod error;
 mod withdrawal_finalizer;
 
 const CHANNEL_CAPACITY: usize = 1024;
