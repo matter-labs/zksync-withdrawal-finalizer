@@ -1,16 +1,10 @@
-use ethers::{
-    contract::ContractError, etherscan::errors::EtherscanError, prelude::Middleware,
-    providers::ProviderError,
-};
+use ethers::{contract::ContractError, prelude::Middleware, providers::ProviderError};
 
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum Error {
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
-
-    #[error(transparent)]
-    EtherscanError(#[from] EtherscanError),
 
     #[error("Contract error {0}")]
     ContractError(String),

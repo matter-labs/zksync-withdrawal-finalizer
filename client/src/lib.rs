@@ -22,7 +22,6 @@ use zksync_types::{
 pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
 
-pub mod etherscan;
 pub mod ethtoken;
 pub mod l1bridge;
 pub mod l1messenger;

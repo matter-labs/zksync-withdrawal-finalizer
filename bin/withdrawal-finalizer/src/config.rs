@@ -73,9 +73,6 @@ pub struct Config {
     #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
     pub zk_server_http_url: Option<Url>,
 
-    #[envconfig(from = "ETHERSCAN_TOKEN")]
-    pub etherscan_token: Option<String>,
-
     #[envconfig(from = "CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS")]
     pub withdrawal_finalizer_contract: Address,
 

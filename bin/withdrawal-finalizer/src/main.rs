@@ -11,7 +11,7 @@ use clap::Parser;
 use envconfig::Envconfig;
 use ethers::{
     providers::{Middleware, Provider, Ws},
-    types::{BlockNumber, Chain},
+    types::BlockNumber,
 };
 use eyre::Result;
 use log::LevelFilter;
@@ -117,17 +117,6 @@ async fn main() -> Result<()> {
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
 
-    let last_batch = client::etherscan::last_processed_l1_batch(
-        Chain::Goerli,
-        config.withdrawal_finalizer_eth_address,
-        config.withdrawal_finalizer_contract,
-        config.main_zksync_contract,
-        config.l1_erc20_bridge_addr,
-        config.etherscan_token.as_ref().unwrap().clone(),
-    )
-    .await?;
-
-    log::info!("last_batch: {last_batch:?}");
     wf.run(blocks_tx, we_tx, from_l2_block).await?;
 
     Ok(())
