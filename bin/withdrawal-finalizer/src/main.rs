@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
         config.l1_erc20_bridge_addr,
         config.etherscan_token.as_ref().unwrap().clone(),
     )
-    .await;
+    .await?;
 
     if let Ok(last_batch) = last_batch {
         log::info!("last_batch: {last_batch:?}");
