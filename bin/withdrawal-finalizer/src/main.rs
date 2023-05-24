@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 #![warn(unused_imports)]
