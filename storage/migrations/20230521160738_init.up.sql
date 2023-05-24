@@ -9,10 +9,11 @@ CREATE TYPE withdrawal_status as ENUM (
 CREATE TABLE withdrawals
 (
     tx_hash BYTEA NOT NULL,
-    blocknumber BIGSERIAL NOT NULL,
+    block_number BIGSERIAL NOT NULL,
     token BYTEA NOT NULL,
     amount NUMERIC(80) NOT NULL,
     event_index_in_tx INT NOT NULL,
     status withdrawal_status NOT NULL,
-    UNIQUE (tx_hash, blocknumber,event_index_in_tx)
+    UNIQUE (tx_hash, block_number, event_index_in_tx)
 );
+CREATE INDEX withdrawals_block_number_index ON withdrawals (block_number);

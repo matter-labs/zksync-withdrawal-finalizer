@@ -85,7 +85,7 @@ async fn update_status_for_block_range(
         "
         UPDATE withdrawals
         SET status=$1
-        WHERE blocknumber <= $2
+        WHERE block_number <= $2
         AND status = $3
         ",
         status as WithdrawalStatus,
@@ -117,7 +117,7 @@ pub async fn add_withdrawal(
         INSERT INTO withdrawals
         (
             tx_hash,
-            blocknumber,
+            block_number,
             token,
             amount,
             event_index_in_tx,
@@ -126,7 +126,7 @@ pub async fn add_withdrawal(
         VALUES (
             $1, $2, $3, $4, $5, $6
         )
-        ON CONFLICT (tx_hash, blocknumber, event_index_in_tx) DO NOTHING
+        ON CONFLICT (tx_hash, block_number, event_index_in_tx) DO NOTHING
         ",
         event.tx_hash.0.to_vec(),
         event.block_number as i32,
