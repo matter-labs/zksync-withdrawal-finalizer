@@ -1,6 +1,24 @@
 {
   "db": "PostgreSQL",
-  "84af2212b297c25e472d4b01ce8a205a1b856c3b5456555ecda141a5f4224505": {
+  "376780edaa09ee456b49131bb1a390f67676c0a35f99879cf54b4082e6de5204": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT MAX(block_number)\n        FROM withdrawals\n        "
+  },
+  "6bf2efc76d48e3b9d3965ed6518cd30437e783762e1fb4a8f6a068efcaa05b2a": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -38,9 +56,9 @@
         ]
       }
     },
-    "query": "\n        UPDATE withdrawals\n        SET status=$1\n        WHERE blocknumber <= $2\n        AND status = $3\n        "
+    "query": "\n        UPDATE withdrawals\n        SET status=$1\n        WHERE block_number <= $2\n        AND status = $3\n        "
   },
-  "ded946cb905cd50d54c3e8eb88efc97fe1d79a90480e383877c6a78aac58cd81": {
+  "bc4cf78d336ede903fc077884c3e618079913f07e075eb6c715fba087baa09cb": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -68,6 +86,6 @@
         ]
       }
     },
-    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            blocknumber,\n            token,\n            amount,\n            event_index_in_tx,\n            status\n        )\n        VALUES (\n            $1, $2, $3, $4, $5, $6\n        )\n        ON CONFLICT (tx_hash, blocknumber, event_index_in_tx) DO NOTHING\n        "
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            status\n        )\n        VALUES (\n            $1, $2, $3, $4, $5, $6\n        )\n        ON CONFLICT (tx_hash, block_number, event_index_in_tx) DO NOTHING\n        "
   }
 }
