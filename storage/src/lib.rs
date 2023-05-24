@@ -140,3 +140,19 @@ pub async fn add_withdrawal(
 
     Ok(())
 }
+
+/// Get the block number of the last L2 withdrawal the DB has record of.
+pub async fn last_block_processed(conn: &mut PgConnection) -> Result<Option<u64>> {
+    let res = sqlx::query!(
+        "
+        SELECT MAX(block_number)
+        FROM withdrawals
+        "
+    )
+    .fetch_one(conn)
+    .await?
+    .max
+    .map(|max| max as u64);
+
+    Ok(res)
+}

@@ -13,9 +13,9 @@ use ethers::{
     providers::{Middleware, Provider, Ws},
     types::BlockNumber,
 };
-use eyre::Result;
+use eyre::{anyhow, Result};
 use log::LevelFilter;
-use sqlx::ConnectOptions;
+use sqlx::{ConnectOptions, PgConnection};
 
 use cli::Args;
 use client::{
@@ -28,6 +28,40 @@ mod config;
 mod withdrawal_finalizer;
 
 const CHANNEL_CAPACITY: usize = 1024;
+
+// Determine an L2 block to start processing withdrawals from.
+//
+// The priority is:
+// 1. Config variable `start_from_l2_block`. If not present:
+// 2. The block of last seen withdrawal event decremented by one. If not present:
+// 3. Last finalized block on L2.
+async fn start_from_l2_block<M: Middleware>(
+    client: Arc<M>,
+    conn: &mut PgConnection,
+    config: &Config,
+) -> Result<u64> {
+    let res = match config.start_from_l2_block {
+        Some(l2_block) => l2_block,
+        None => {
+            if let Some(block_number) = storage::last_block_processed(conn).await? {
+                // May have stored not the last withdrawal event in `block_number`
+                // so to be sure, re-start from the previous block.
+                block_number - 1
+            } else {
+                client
+                    .get_block(BlockNumber::Finalized)
+                    .await
+                    .map_err(|err| anyhow!("{err}"))?
+                    .expect("There is also a finalized block; qed")
+                    .number
+                    .expect("A finalized block number is always known; qed")
+                    .as_u64()
+            }
+        }
+    };
+
+    Ok(res)
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -65,16 +99,15 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let from_l2_block = match config.start_from_l2_block {
-        Some(l2_block) => l2_block,
-        None => client_l2
-            .get_block(BlockNumber::Latest)
-            .await?
-            .expect("There is also a finalized block; qed")
-            .number
-            .expect("A finalized block number is always known; qed")
-            .as_u64(),
-    };
+    let mut pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
+    let mut pgpool = pgpool_opts
+        .log_statements(LevelFilter::Debug)
+        .connect()
+        .await?;
+
+    let from_l2_block = start_from_l2_block(client_l2.clone(), &mut pgpool, &config).await?;
+
+    log::info!("Starting from L2 block number {from_l2_block}");
 
     let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
@@ -108,13 +141,6 @@ async fn main() -> Result<()> {
     }
 
     tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
-
-    let mut pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
-    let pgpool = pgpool_opts
-        .log_statements(LevelFilter::Debug)
-        .connect()
-        .await?;
-
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
 
     wf.run(blocks_tx, we_tx, from_l2_block).await?;
