@@ -32,14 +32,7 @@ pub async fn committed_new_batch(
     batch_start: u64,
     batch_end: u64,
 ) -> Result<()> {
-    update_status_for_block_range(
-        conn,
-        batch_start,
-        batch_end,
-        WithdrawalStatus::Seen,
-        WithdrawalStatus::Committed,
-    )
-    .await
+    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Committed).await
 }
 
 /// A new batch with a given range has been verified, update statuses of withdrawal records.
@@ -48,14 +41,7 @@ pub async fn verified_new_batch(
     batch_start: u64,
     batch_end: u64,
 ) -> Result<()> {
-    update_status_for_block_range(
-        conn,
-        batch_start,
-        batch_end,
-        WithdrawalStatus::Committed,
-        WithdrawalStatus::Verified,
-    )
-    .await
+    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Verified).await
 }
 
 /// A new batch with a given range has been executed, update statuses of withdrawal records.
@@ -64,33 +50,24 @@ pub async fn executed_new_batch(
     batch_start: u64,
     batch_end: u64,
 ) -> Result<()> {
-    update_status_for_block_range(
-        conn,
-        batch_start,
-        batch_end,
-        WithdrawalStatus::Verified,
-        WithdrawalStatus::Executed,
-    )
-    .await
+    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Executed).await
 }
 
 async fn update_status_for_block_range(
     conn: &mut PgConnection,
-    _batch_start: u64,
+    batch_start: u64,
     batch_end: u64,
-    prev_status: WithdrawalStatus,
     status: WithdrawalStatus,
 ) -> Result<()> {
     sqlx::query!(
         "
         UPDATE withdrawals
         SET status=$1
-        WHERE block_number <= $2
-        AND status = $3
+        WHERE block_number >= $2 AND block_number <= $3
         ",
         status as WithdrawalStatus,
-        batch_end as i64,
-        prev_status as WithdrawalStatus,
+        batch_start as i64,
+        batch_end as i64
     )
     .execute(conn)
     .await?;
