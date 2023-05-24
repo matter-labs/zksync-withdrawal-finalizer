@@ -52,7 +52,7 @@ where
         loop {
             tokio::select! {
                 Some(event) = block_events.next() => {
-                    log::info!("event {event}");
+                    log::info!("block event {event}");
                     self.process_block_event(event).await?;
                 }
                 Some(event) = withdrawal_events.next() => {
