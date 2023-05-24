@@ -127,9 +127,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    if let Ok(last_batch) = last_batch {
-        log::info!("last_batch: {last_batch:?}");
-    }
+    log::info!("last_batch: {last_batch:?}");
     wf.run(blocks_tx, we_tx, from_l2_block).await?;
 
     Ok(())
