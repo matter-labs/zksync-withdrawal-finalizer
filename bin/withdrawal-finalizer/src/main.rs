@@ -119,8 +119,8 @@ async fn main() -> Result<()> {
 
     let last_batch = client::etherscan::last_processed_l1_batch(
         Chain::Goerli,
-        config.withdrawal_finalizer_contract,
         config.withdrawal_finalizer_eth_address,
+        config.withdrawal_finalizer_contract,
         config.main_zksync_contract,
         config.l1_erc20_bridge_addr,
         config.etherscan_token.as_ref().unwrap().clone(),

@@ -3,13 +3,18 @@
 #![warn(unused_imports)]
 
 //! Etherscan API related functionality.
+
 use ethers::{
     abi::{AbiDecode, Address},
+    etherscan::Client,
     prelude::account::{Sort, TxListParams},
     types::{Chain, U256},
 };
 
-use crate::Result;
+use crate::{
+    withdrawal_finalizer::FinalizeWithdrawalsCall, zksync_contract::FinalizeEthWithdrawalCall,
+    Result,
+};
 
 /// Get the L1-batch number from the last processed withdrawal-finalizer's finalization transaction
 ///
@@ -31,12 +36,12 @@ use crate::Result;
 pub async fn last_processed_l1_batch(
     chain: Chain,
     withdrawer_account: Address,
-    withdrawal_contract: Address,
+    withdrawer_contract: Address,
     l1_eth_bridge: Address,
     l1_erc20_bridge: Address,
     api_key: impl Into<String>,
 ) -> Result<Option<U256>> {
-    let client = ethers::etherscan::Client::new(chain, api_key)?;
+    let client = Client::new(chain, api_key)?;
 
     let params = TxListParams {
         start_block: 0,
@@ -51,8 +56,8 @@ pub async fn last_processed_l1_batch(
         .await?;
 
     for tx in &transactions {
-        if let Ok(wf_tx) = crate::withdrawal_finalizer::FinalizeWithdrawalsCall::decode(&tx.input) {
-            if tx.to == Some(withdrawal_contract) {
+        if let Ok(wf_tx) = FinalizeWithdrawalsCall::decode(&tx.input) {
+            if tx.to == Some(withdrawer_contract) {
                 // Within the vector the requests are sorted in ascending
                 // order so we need to look at the last one.
                 if let Some(request) = wf_tx.requests.last() {
@@ -61,8 +66,7 @@ pub async fn last_processed_l1_batch(
             }
         }
 
-        if let Ok(legacy_tx) = crate::zksync_contract::FinalizeEthWithdrawalCall::decode(&tx.input)
-        {
+        if let Ok(legacy_tx) = FinalizeEthWithdrawalCall::decode(&tx.input) {
             if tx.to == Some(l1_eth_bridge) || tx.to == Some(l1_erc20_bridge) {
                 return Ok(Some(legacy_tx.l_2_block_number));
             }
