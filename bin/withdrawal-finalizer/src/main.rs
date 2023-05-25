@@ -15,7 +15,6 @@ use ethers::{
     types::BlockNumber,
 };
 use eyre::{anyhow, Result};
-use log::LevelFilter;
 use sqlx::{ConnectOptions, PgConnection};
 
 use cli::Args;
@@ -68,9 +67,7 @@ async fn start_from_l2_block<M: Middleware>(
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
-        .init();
+    tracing_subscriber::fmt::init();
 
     let args = Args::parse();
 
@@ -100,11 +97,8 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let mut pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
-    let mut pgpool = pgpool_opts
-        .log_statements(LevelFilter::Debug)
-        .connect()
-        .await?;
+    let pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
+    let mut pgpool = pgpool_opts.connect().await?;
 
     let from_l2_block = start_from_l2_block(client_l2.clone(), &mut pgpool, &config).await?;
 
