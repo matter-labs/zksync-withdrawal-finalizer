@@ -28,35 +28,59 @@ pub use codegen::{
 #[derive(Debug)]
 pub enum BlockEvent {
     /// A `BlockCommit` event
-    BlockCommit(BlockCommitFilter),
+    BlockCommit {
+        /// Number of the block in which the event happened.
+        block_number: u64,
+
+        /// Event itself.
+        event: BlockCommitFilter,
+    },
 
     /// A `BlockExecution` event
-    BlockExecution(BlockExecutionFilter),
+    BlockExecution {
+        /// Number of the block in which the event happened.
+        block_number: u64,
+
+        /// Event itself.
+        event: BlockExecutionFilter,
+    },
 
     /// A `BlocksVerification` event
-    BlocksVerification(BlocksVerificationFilter),
+    BlocksVerification {
+        /// Number of the block in which the event happened.
+        block_number: u64,
+
+        /// Event itself.
+        event: BlocksVerificationFilter,
+    },
 
     /// A `BlocksRevert` event.
-    BlocksRevert(BlocksRevertFilter),
+    BlocksRevert {
+        /// Number of the block in which the event happened.
+        block_number: u64,
+
+        /// Event itself.
+        event: BlocksRevertFilter,
+    },
 }
 
 // This custom impl sole purpose is pretty hash display instead of [u8; 32]
 impl std::fmt::Display for BlockEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::BlockCommit(bc) => f
+            Self::BlockCommit { event: bc, .. } => f
                 .debug_struct("BlockCommitFilter")
                 .field("block_number", &bc.block_number)
                 .field("block_hash", &H256::from(&bc.block_hash))
                 .field("commitment", &H256::from(&bc.commitment))
                 .finish(),
-            Self::BlockExecution(be) => f
+            Self::BlockExecution { event: be, .. } => f
                 .debug_struct("BlockExecution")
                 .field("block_number", &be.block_number)
                 .field("block_hash", &H256::from(&be.block_hash))
                 .field("commitment", &H256::from(&be.commitment))
                 .finish(),
-            Self::BlocksVerification(bv) => f
+            Self::BlocksVerification { event: bv, .. } => f
                 .debug_struct("BlocksVerification")
                 .field(
                     "previous_last_verified_block",
@@ -67,37 +91,13 @@ impl std::fmt::Display for BlockEvent {
                     &bv.current_last_verified_block,
                 )
                 .finish(),
-            Self::BlocksRevert(br) => f
+            Self::BlocksRevert { event: br, .. } => f
                 .debug_struct("BlocksRevert")
                 .field("total_blocks_commited", &br.total_blocks_committed)
                 .field("total_blocks_verified", &br.total_blocks_verified)
                 .field("total_blocks_executed", &br.total_blocks_executed)
                 .finish(),
         }
-    }
-}
-
-impl From<BlockCommitFilter> for BlockEvent {
-    fn from(value: BlockCommitFilter) -> Self {
-        Self::BlockCommit(value)
-    }
-}
-
-impl From<BlockExecutionFilter> for BlockEvent {
-    fn from(value: BlockExecutionFilter) -> Self {
-        Self::BlockExecution(value)
-    }
-}
-
-impl From<BlocksVerificationFilter> for BlockEvent {
-    fn from(value: BlocksVerificationFilter) -> Self {
-        Self::BlocksVerification(value)
-    }
-}
-
-impl From<BlocksRevertFilter> for BlockEvent {
-    fn from(value: BlocksRevertFilter) -> Self {
-        Self::BlocksRevert(value)
     }
 }
 
@@ -225,20 +225,44 @@ where
             .map_err(|e| crate::Error::Middleware(format!("{e}")))?;
 
         while let Some(log) = logs.next().await {
+            let block_number = match log.block_number {
+                Some(b) => b.as_u64(),
+                None => {
+                    continue;
+                }
+            };
             let raw_log: RawLog = log.clone().into();
 
-            if let Ok(commit_event) = BlockCommitFilter::decode_log(&raw_log) {
-                sender.send(commit_event.into()).await.unwrap();
+            if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
+                sender
+                    .send(BlockEvent::BlockCommit {
+                        block_number,
+                        event,
+                    })
+                    .await
+                    .unwrap();
                 continue;
             }
 
-            if let Ok(verify_event) = BlocksVerificationFilter::decode_log(&raw_log) {
-                sender.send(verify_event.into()).await.unwrap();
+            if let Ok(event) = BlocksVerificationFilter::decode_log(&raw_log) {
+                sender
+                    .send(BlockEvent::BlocksVerification {
+                        block_number,
+                        event,
+                    })
+                    .await
+                    .unwrap();
                 continue;
             }
 
-            if let Ok(execution_event) = BlockExecutionFilter::decode_log(&raw_log) {
-                sender.send(execution_event.into()).await.unwrap();
+            if let Ok(event) = BlockExecutionFilter::decode_log(&raw_log) {
+                sender
+                    .send(BlockEvent::BlockExecution {
+                        block_number,
+                        event,
+                    })
+                    .await
+                    .unwrap();
                 continue;
             }
         }

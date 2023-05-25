@@ -18,6 +18,42 @@
     },
     "query": "\n        SELECT MAX(block_number)\n        FROM withdrawals\n        "
   },
+  "5bdc324880a550ef7062fd67caee4ad07a99f13517683f6063bec804a865d1e8": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO last_verified_block (block_number) VALUES ($1)\n        ON CONFLICT ON CONSTRAINT last_verified_block_pkey\n        DO UPDATE SET block_number = $1\n        "
+  },
+  "718662912937b46f6df4d6576cadb1990b176924d859a2b639b47d356c70d749": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO last_committed_block (block_number) VALUES ($1)\n        ON CONFLICT ON CONSTRAINT last_committed_block_pkey\n        DO UPDATE SET block_number = $1\n        "
+  },
+  "9761884476d4b312d38c6553e86db6d53ad2d259a06e361dc602462d5f134c3b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO last_executed_block (block_number) VALUES ($1)\n        ON CONFLICT ON CONSTRAINT last_executed_block_pkey\n        DO UPDATE SET block_number = $1\n        "
+  },
   "bc4cf78d336ede903fc077884c3e618079913f07e075eb6c715fba087baa09cb": {
     "describe": {
       "columns": [],

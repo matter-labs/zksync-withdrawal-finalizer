@@ -5,7 +5,7 @@
 
 //! Finalizer storage operations.
 
-use sqlx::PgConnection;
+use sqlx::{Connection, PgConnection};
 
 use client::WithdrawalEvent;
 
@@ -31,8 +31,26 @@ pub async fn committed_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
+    block_number: u64,
 ) -> Result<()> {
-    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Committed).await
+    let mut tx = conn.begin().await?;
+    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Committed)
+        .await?;
+
+    sqlx::query!(
+        "
+        INSERT INTO last_committed_block (block_number) VALUES ($1)
+        ON CONFLICT ON CONSTRAINT last_committed_block_pkey
+        DO UPDATE SET block_number = $1
+        ",
+        block_number as i64,
+    )
+    .execute(&mut tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
 }
 
 /// A new batch with a given range has been verified, update statuses of withdrawal records.
@@ -40,8 +58,26 @@ pub async fn verified_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
+    block_number: u64,
 ) -> Result<()> {
-    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Verified).await
+    let mut tx = conn.begin().await?;
+    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Verified)
+        .await?;
+
+    sqlx::query!(
+        "
+        INSERT INTO last_verified_block (block_number) VALUES ($1)
+        ON CONFLICT ON CONSTRAINT last_verified_block_pkey
+        DO UPDATE SET block_number = $1
+        ",
+        block_number as i64,
+    )
+    .execute(&mut tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
 }
 
 /// A new batch with a given range has been executed, update statuses of withdrawal records.
@@ -49,8 +85,27 @@ pub async fn executed_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
+    block_number: u64,
 ) -> Result<()> {
-    update_status_for_block_range(conn, batch_start, batch_end, WithdrawalStatus::Executed).await
+    let mut tx = conn.begin().await?;
+
+    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Executed)
+        .await?;
+
+    sqlx::query!(
+        "
+        INSERT INTO last_executed_block (block_number) VALUES ($1)
+        ON CONFLICT ON CONSTRAINT last_executed_block_pkey
+        DO UPDATE SET block_number = $1
+        ",
+        block_number as i64,
+    )
+    .execute(&mut tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
 }
 
 async fn update_status_for_block_range(

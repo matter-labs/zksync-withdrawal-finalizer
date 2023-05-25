@@ -75,7 +75,10 @@ where
 
     async fn process_block_event(&mut self, event: BlockEvent) -> Result<()> {
         match event {
-            BlockEvent::BlockCommit(event) => {
+            BlockEvent::BlockCommit {
+                block_number,
+                event,
+            } => {
                 if let Some((range_begin, range_end)) = get_l1_batch_block_range(
                     &self.l2_provider.provider().as_ref(),
                     event.block_number.as_u64() as u32,
@@ -86,6 +89,7 @@ where
                         &mut self.pgpool,
                         range_begin.as_u64(),
                         range_end.as_u64(),
+                        block_number,
                     )
                     .await?;
 
@@ -94,7 +98,10 @@ where
                     );
                 }
             }
-            BlockEvent::BlocksVerification(event) => {
+            BlockEvent::BlocksVerification {
+                block_number,
+                event,
+            } => {
                 if let Some((range_begin, range_end)) = get_l1_batch_block_range(
                     &self.l2_provider.provider().as_ref(),
                     event.current_last_verified_block.as_u64() as u32,
@@ -105,6 +112,7 @@ where
                         &mut self.pgpool,
                         range_begin.as_u64(),
                         range_end.as_u64(),
+                        block_number,
                     )
                     .await?;
                     log::info!(
@@ -112,7 +120,10 @@ where
                     );
                 }
             }
-            BlockEvent::BlockExecution(event) => {
+            BlockEvent::BlockExecution {
+                block_number,
+                event,
+            } => {
                 if let Some((range_begin, range_end)) = get_l1_batch_block_range(
                     &self.l2_provider.provider().as_ref(),
                     event.block_number.as_u64() as u32,
@@ -123,6 +134,7 @@ where
                         &mut self.pgpool,
                         range_begin.as_u64(),
                         range_end.as_u64(),
+                        block_number,
                     )
                     .await?;
 
@@ -131,7 +143,7 @@ where
                     );
                 }
             }
-            BlockEvent::BlocksRevert(_) => todo!(),
+            BlockEvent::BlocksRevert { .. } => todo!(),
         }
 
         Ok(())
