@@ -81,12 +81,12 @@ async fn main() -> Result<()> {
         None => Config::init_from_env()?,
     };
 
-    let provider_l1 = Provider::<Ws>::connect(config.l1_ws_url.as_ref())
+    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.l1_ws_url.as_ref(), 0)
         .await
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let provider_l2 = Provider::<Ws>::connect(config.zk_server_ws_url.as_str())
+    let provider_l2 = Provider::<Ws>::connect_with_reconnects(config.zk_server_ws_url.as_str(), 0)
         .await
         .unwrap();
     let client_l2 = Arc::new(provider_l2);
@@ -126,7 +126,8 @@ async fn main() -> Result<()> {
             .as_u64(),
     };
 
-    tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
+    let block_events_handle =
+        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
 
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 
@@ -141,10 +142,22 @@ async fn main() -> Result<()> {
         tokens.push(l2_token);
     }
 
-    tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
+    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
 
-    wf.run(blocks_tx, we_tx, from_l2_block).await?;
+    let finalizer_handle = tokio::spawn(wf.run(blocks_tx, we_tx, from_l2_block));
+
+    tokio::select! {
+        r = block_events_handle => {
+            log::error!("Block Events stream ended with {r:?}");
+        }
+        r = withdrawal_events_handle => {
+            log::error!("Withdrawals Events stream ended with {r:?}");
+        }
+        r = finalizer_handle => {
+            log::error!("Finalizer main loop ended with {r:?}");
+        }
+    }
 
     Ok(())
 }
