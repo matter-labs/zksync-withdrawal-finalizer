@@ -18,7 +18,8 @@ CREATE TABLE committed_l1_events
     l1_block_number BIGINT NOT NULL,
     l1_batch_number BIGINT NOT NULL,
     l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL
+    l2_range_end BIGINT NOT NULL,
+    PRIMARY KEY (l1_block_number)
 );
 CREATE INDEX committed_l1_events_batch_range_index ON committed_l1_events (l2_range_begin, l2_range_end);
 
@@ -28,7 +29,8 @@ CREATE TABLE verified_l1_events
     l2_previous_last_verified_block BIGINT NOT NULL,
     l2_current_last_verified_block BIGINT NOT NULL,
     l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL
+    l2_range_end BIGINT NOT NULL,
+    PRIMARY KEY (l1_block_number)
 );
 CREATE INDEX verified_l1_events_batch_range_index ON verified_l1_events (l2_range_begin, l2_range_end);
 
@@ -37,6 +39,7 @@ CREATE TABLE executed_l1_events
     l1_block_number BIGINT NOT NULL,
     l1_batch_number BIGINT NOT NULL,
     l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL
+    l2_range_end BIGINT NOT NULL,
+    PRIMARY KEY (l1_block_number)
 );
 CREATE INDEX executed_l1_events_batch_range_index ON executed_l1_events (l2_range_begin, l2_range_end);

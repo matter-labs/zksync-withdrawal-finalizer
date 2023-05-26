@@ -18,37 +18,6 @@
     },
     "query": "\n        SELECT MAX(block_number)\n        FROM withdrawals\n        "
   },
-  "5d7f730d647405c62955edef99ffa9ce44b14035c5742321437d3ea5ddcd7984": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO executed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        "
-  },
-  "5e5de8445de431a5679b48fb85160f3bdb42fef36411a09836781e19a109961a": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Bytea",
-          "Numeric",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            committed_in_block,\n            verified_in_block,\n            executed_in_block\n        )\n        VALUES (\n            $1, $2, $3, $4, $5,\n            (\n                SELECT l1_block_number\n                FROM committed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM verified_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM executed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            )\n        )\n        ON CONFLICT (tx_hash, block_number, event_index_in_tx) DO NOTHING\n        "
-  },
   "686a209d2042c63fb3d090bf1850a55a58a0286398ef62a2ac88556eaa172147": {
     "describe": {
       "columns": [],
@@ -91,7 +60,7 @@
     },
     "query": "\n        UPDATE withdrawals\n        SET committed_in_block=$1\n        WHERE block_number >= $2 AND block_number <= $3\n        "
   },
-  "cbfb7158a83875f43d8af13cf399696c2817a6bc09a989c66a58f356f556c691": {
+  "96006f4ea4cdd22b986a0cf64e40ea40750c750572db225f73813a7fc9a5a8da": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -104,9 +73,40 @@
         ]
       }
     },
-    "query": "\n        INSERT INTO committed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        "
+    "query": "\n        INSERT INTO committed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
   },
-  "dc77b2fecbdb274d92f4419c644433f418bdbdef6daa9450334347759c5419a5": {
+  "c3dd8ecc5a2e38f5d615b6d4f319b904307a7b91263559add64ecc69028697c2": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Int8",
+          "Bytea",
+          "Numeric",
+          "Int4"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            committed_in_block,\n            verified_in_block,\n            executed_in_block\n        )\n        VALUES (\n            $1, $2, $3, $4, $5,\n            (\n                SELECT l1_block_number\n                FROM committed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM verified_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM executed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            )\n        )\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
+  },
+  "edc3e5be0d9c201c85baef8f8be51773b3ba58fdafe463eb8f83d9a62ad63b58": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8",
+          "Int8",
+          "Int8",
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO executed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
+  },
+  "fd68352ad72d05753ea1859fbe784bbdbce3a0ba32cf1e5e07b87cd6c8c88295": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -120,6 +120,6 @@
         ]
       }
     },
-    "query": "\n        INSERT INTO verified_l1_events\n        (\n            l1_block_number,\n            l2_previous_last_verified_block,\n            l2_current_last_verified_block,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ($1, $2, $3, $4, $5)\n        "
+    "query": "\n        INSERT INTO verified_l1_events\n        (\n            l1_block_number,\n            l2_previous_last_verified_block,\n            l2_current_last_verified_block,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
   }
 }

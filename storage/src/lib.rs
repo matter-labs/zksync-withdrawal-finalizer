@@ -48,6 +48,7 @@ pub async fn committed_new_batch(
             l2_range_end
         )
         VALUES ( $1, $2, $3, $4 )
+        ON CONFLICT (l1_block_number) DO NOTHING
         ",
         l1_block_number as i64,
         l2_batch_number as i64,
@@ -97,6 +98,7 @@ pub async fn verified_new_batch(
             l2_range_end
         )
         VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (l1_block_number) DO NOTHING
         ",
         l1_block_number as i64,
         l2_prev_batch_number as i64,
@@ -144,6 +146,7 @@ pub async fn executed_new_batch(
             l2_range_end
         )
         VALUES ( $1, $2, $3, $4 )
+        ON CONFLICT (l1_block_number) DO NOTHING
         ",
         l1_block_number as i64,
         l2_batch_number as i64,
@@ -203,7 +206,7 @@ pub async fn add_withdrawal(
                 WHERE l2_range_begin <= $2 AND l2_range_end >= $2
             )
         )
-        ON CONFLICT (tx_hash, block_number, event_index_in_tx) DO NOTHING
+        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         event.tx_hash.0.to_vec(),
         event.block_number as i32,
