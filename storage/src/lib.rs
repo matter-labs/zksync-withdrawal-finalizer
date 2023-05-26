@@ -16,34 +16,43 @@ use utils::u256_to_big_decimal;
 
 pub use error::{Error, Result};
 
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "withdrawal_status")]
-enum WithdrawalStatus {
-    Seen,
-    Committed,
-    Verified,
-    Executed,
-    Finalized,
-}
-
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
 pub async fn committed_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
-    block_number: u64,
+    l1_block_number: u64,
+    l2_batch_number: u64,
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
-    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Committed)
-        .await?;
+    sqlx::query!(
+        "
+        UPDATE withdrawals
+        SET committed_in_block=$1
+        WHERE block_number >= $2 AND block_number <= $3
+        ",
+        l1_block_number as i64,
+        batch_start as i64,
+        batch_end as i64,
+    )
+    .execute(&mut tx)
+    .await?;
 
     sqlx::query!(
         "
-        INSERT INTO last_committed_block (block_number) VALUES ($1)
-        ON CONFLICT ON CONSTRAINT last_committed_block_pkey
-        DO UPDATE SET block_number = $1
+        INSERT INTO committed_l1_events
+        (
+            l1_block_number,
+            l1_batch_number,
+            l2_range_begin,
+            l2_range_end
+        )
+        VALUES ( $1, $2, $3, $4 )
         ",
-        block_number as i64,
+        l1_block_number as i64,
+        l2_batch_number as i64,
+        batch_start as i64,
+        batch_end as i64,
     )
     .execute(&mut tx)
     .await?;
@@ -58,19 +67,42 @@ pub async fn verified_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
-    block_number: u64,
+    l1_block_number: u64,
+    l2_prev_batch_number: u64,
+    l2_batch_number: u64,
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
-    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Verified)
-        .await?;
 
     sqlx::query!(
         "
-        INSERT INTO last_verified_block (block_number) VALUES ($1)
-        ON CONFLICT ON CONSTRAINT last_verified_block_pkey
-        DO UPDATE SET block_number = $1
+        UPDATE withdrawals
+        SET verified_in_block=$1
+        WHERE block_number >= $2 AND block_number <= $3
         ",
-        block_number as i64,
+        l1_block_number as i64,
+        batch_start as i64,
+        batch_end as i64,
+    )
+    .execute(&mut tx)
+    .await?;
+
+    sqlx::query!(
+        "
+        INSERT INTO verified_l1_events
+        (
+            l1_block_number,
+            l2_previous_last_verified_block,
+            l2_current_last_verified_block,
+            l2_range_begin,
+            l2_range_end
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        ",
+        l1_block_number as i64,
+        l2_prev_batch_number as i64,
+        l2_batch_number as i64,
+        batch_start as i64,
+        batch_end as i64,
     )
     .execute(&mut tx)
     .await?;
@@ -85,47 +117,43 @@ pub async fn executed_new_batch(
     conn: &mut PgConnection,
     batch_start: u64,
     batch_end: u64,
-    block_number: u64,
+    l1_block_number: u64,
+    l2_batch_number: u64,
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
-
-    update_status_for_block_range(&mut tx, batch_start, batch_end, WithdrawalStatus::Executed)
-        .await?;
+    sqlx::query!(
+        "
+        UPDATE withdrawals
+        SET executed_in_block=$1
+        WHERE block_number >= $2 AND block_number <= $3
+        ",
+        l1_block_number as i64,
+        batch_start as i64,
+        batch_end as i64,
+    )
+    .execute(&mut tx)
+    .await?;
 
     sqlx::query!(
         "
-        INSERT INTO last_executed_block (block_number) VALUES ($1)
-        ON CONFLICT ON CONSTRAINT last_executed_block_pkey
-        DO UPDATE SET block_number = $1
+        INSERT INTO executed_l1_events
+        (
+            l1_block_number,
+            l1_batch_number,
+            l2_range_begin,
+            l2_range_end
+        )
+        VALUES ( $1, $2, $3, $4 )
         ",
-        block_number as i64,
+        l1_block_number as i64,
+        l2_batch_number as i64,
+        batch_start as i64,
+        batch_end as i64,
     )
     .execute(&mut tx)
     .await?;
 
     tx.commit().await?;
-
-    Ok(())
-}
-
-async fn update_status_for_block_range(
-    conn: &mut PgConnection,
-    batch_start: u64,
-    batch_end: u64,
-    status: WithdrawalStatus,
-) -> Result<()> {
-    sqlx::query!(
-        "
-        UPDATE withdrawals
-        SET status=$1
-        WHERE block_number >= $2 AND block_number <= $3
-        ",
-        status as WithdrawalStatus,
-        batch_start as i64,
-        batch_end as i64
-    )
-    .execute(conn)
-    .await?;
 
     Ok(())
 }
@@ -153,10 +181,27 @@ pub async fn add_withdrawal(
             token,
             amount,
             event_index_in_tx,
-            status
+            committed_in_block,
+            verified_in_block,
+            executed_in_block
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6
+            $1, $2, $3, $4, $5,
+            (
+                SELECT l1_block_number
+                FROM committed_l1_events
+                WHERE l2_range_begin <= $2 AND l2_range_end >= $2
+            ),
+            (
+                SELECT l1_block_number
+                FROM verified_l1_events
+                WHERE l2_range_begin <= $2 AND l2_range_end >= $2
+            ),
+            (
+                SELECT l1_block_number
+                FROM executed_l1_events
+                WHERE l2_range_begin <= $2 AND l2_range_end >= $2
+            )
         )
         ON CONFLICT (tx_hash, block_number, event_index_in_tx) DO NOTHING
         ",
@@ -165,7 +210,6 @@ pub async fn add_withdrawal(
         event.token.0.to_vec(),
         amount,
         event_index_in_tx as i32,
-        WithdrawalStatus::Seen as WithdrawalStatus,
     )
     .execute(conn)
     .await?;

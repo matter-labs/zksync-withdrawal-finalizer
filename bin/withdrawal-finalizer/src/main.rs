@@ -112,7 +112,7 @@ async fn main() -> Result<()> {
     let from_l1_block = match config.start_from_l1_block {
         Some(l1_block) => l1_block,
         None => client_l1
-            .get_block(BlockNumber::Safe)
+            .get_block(BlockNumber::Finalized)
             .await?
             .expect("There is also a finalized block; qed")
             .number

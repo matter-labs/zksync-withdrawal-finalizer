@@ -90,6 +90,7 @@ where
                         range_begin.as_u64(),
                         range_end.as_u64(),
                         block_number,
+                        event.block_number.as_u64(),
                     )
                     .await?;
 
@@ -113,6 +114,8 @@ where
                         range_begin.as_u64(),
                         range_end.as_u64(),
                         block_number,
+                        event.previous_last_verified_block.as_u64(),
+                        event.current_last_verified_block.as_u64(),
                     )
                     .await?;
                     log::info!(
@@ -135,6 +138,7 @@ where
                         range_begin.as_u64(),
                         range_end.as_u64(),
                         block_number,
+                        event.block_number.as_u64(),
                     )
                     .await?;
 
