@@ -120,9 +120,6 @@ async fn main() -> Result<()> {
             .as_u64(),
     };
 
-    let block_events_handle =
-        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
-
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 
     log::info!("l1_tokens {l1_tokens:#?}");
@@ -136,10 +133,14 @@ async fn main() -> Result<()> {
         tokens.push(l2_token);
     }
 
-    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
 
+    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
+
     let finalizer_handle = tokio::spawn(wf.run(blocks_tx, we_tx, from_l2_block));
+
+    let block_events_handle =
+        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
 
     tokio::select! {
         r = block_events_handle => {
