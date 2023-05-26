@@ -47,6 +47,17 @@ where
         // While reading the stream of withdrawal events asyncronously
         // we may never be sure that we are currenly looking at the last
         // event from the given block.
+        //
+        // The following code asyncronously reads and accumulates events
+        // that happened within the single block (the exact number is tracked in
+        // `curr_block_number`) until it sees an event with a higher block number.
+        // Then the following vector is drained and all events within it are written
+        // into storage.
+        //
+        // TODO: investigate instead subscribing to whole blocks via `subcscribe_blocks()`
+        // method and pasring and sending all events at once so that this function WE type
+        // would change to `Stream<Vec<WithdrawalEvent>>` to handle a vector of all withdrawal
+        // events that have happened within a single block.
         let mut in_block_events = vec![];
 
         loop {
