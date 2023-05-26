@@ -9,7 +9,7 @@ CREATE TABLE withdrawals
     verified_in_block BIGINT DEFAULT NULL,
     executed_in_block BIGINT DEFAULT NULL,
     is_finalized BOOLEAN DEFAULT FALSE,
-    UNIQUE (tx_hash, block_number, event_index_in_tx)
+    PRIMARY KEY (tx_hash, event_index_in_tx)
 );
 CREATE INDEX withdrawals_block_number_index ON withdrawals (block_number);
 
