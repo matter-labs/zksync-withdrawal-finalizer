@@ -42,7 +42,7 @@ where
         pin!(block_events);
         pin!(withdrawal_events);
 
-        let mut curr_block_number = from_l2_block;
+        let mut curr_l2_block_number = from_l2_block;
 
         // While reading the stream of withdrawal events asyncronously
         // we may never be sure that we are currenly looking at the last
@@ -68,9 +68,9 @@ where
                 }
                 Some(event) = withdrawal_events.next() => {
                     log::info!("withdrawal event {event:?}");
-                    if event.block_number > curr_block_number {
+                    if event.block_number > curr_l2_block_number {
                         self.process_withdrawals_in_block(&mut in_block_events).await;
-                        curr_block_number = event.block_number;
+                        curr_l2_block_number = event.block_number;
                     }
                     in_block_events.push(event);
                 }
