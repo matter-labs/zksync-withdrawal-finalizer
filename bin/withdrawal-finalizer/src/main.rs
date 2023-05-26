@@ -11,7 +11,7 @@ use std::sync::Arc;
 use clap::Parser;
 use envconfig::Envconfig;
 use ethers::{
-    providers::{Middleware, Provider, Ws},
+    providers::{JsonRpcClient, Middleware, Provider, Ws},
     types::BlockNumber,
 };
 use eyre::{anyhow, Result};
@@ -19,7 +19,8 @@ use sqlx::{ConnectOptions, PgConnection};
 
 use cli::Args;
 use client::{
-    l2bridge::L2Bridge, l2standard_token::WithdrawalEventsStream, zksync_contract::BlockEvents,
+    get_block_details, l2bridge::L2Bridge, l2standard_token::WithdrawalEventsStream,
+    zksync_contract::BlockEvents,
 };
 use config::Config;
 
@@ -28,6 +29,37 @@ mod config;
 mod withdrawal_finalizer;
 
 const CHANNEL_CAPACITY: usize = 1024;
+
+async fn start_from_l1_block<M1, M2>(
+    client_l1: Arc<M1>,
+    client_l2: Arc<M2>,
+    l2_block_number: u32,
+) -> Result<u64>
+where
+    M1: Middleware,
+    <M1 as Middleware>::Provider: JsonRpcClient,
+    M2: Middleware,
+    <M2 as Middleware>::Provider: JsonRpcClient,
+{
+    let block_details = get_block_details(client_l2.provider().as_ref(), l2_block_number)
+        .await?
+        .expect("Always start from the block that there is info about; qed");
+
+    let commit_tx_hash = block_details
+        .commit_tx_hash
+        .expect("Expected to start from already committed block; qed");
+
+    let commit_tx = client_l1
+        .get_transaction(commit_tx_hash)
+        .await
+        .map_err(|e| anyhow!("{e}"))?
+        .expect("The corresponding L1 tx exists; qed");
+
+    Ok(commit_tx
+        .block_number
+        .expect("Already mined TX always has a block number; qed")
+        .as_u64())
+}
 
 // Determine an L2 block to start processing withdrawals from.
 //
@@ -109,16 +141,10 @@ async fn main() -> Result<()> {
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
     let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
-    let from_l1_block = match config.start_from_l1_block {
-        Some(l1_block) => l1_block,
-        None => client_l1
-            .get_block(BlockNumber::Finalized)
-            .await?
-            .expect("There is also a finalized block; qed")
-            .number
-            .expect("A finalized block number is always known; qed")
-            .as_u64(),
-    };
+    let from_l1_block =
+        start_from_l1_block(client_l1.clone(), client_l2.clone(), from_l2_block as u32).await?;
+
+    log::info!("Starting from L1 block number {from_l1_block}");
 
     let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
 

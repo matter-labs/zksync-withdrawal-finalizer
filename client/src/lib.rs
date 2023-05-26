@@ -16,7 +16,8 @@ use ethers::{
 };
 
 use zksync_types::{
-    L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, TransactionReceipt as ZKSTransactionReceipt,
+    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog,
+    TransactionReceipt as ZKSTransactionReceipt,
 };
 
 pub use zksync_contract::BlockEvent;
@@ -103,6 +104,24 @@ pub async fn get_withdrawal_l2_to_l1_log<J: JsonRpcClient>(
         .ok_or(Error::NoSuchIndex(index))?;
 
     Ok((log, Some(U64::from(index))))
+}
+
+/// Call `zks_getBlockDetails` RPC method.
+///
+/// # Arguments
+///
+/// * `client` - RPC client to make request with
+/// * `block_number` - Number of the block
+pub async fn get_block_details<J: JsonRpcClient>(
+    client: &J,
+    block_number: u32,
+) -> Result<Option<BlockDetails>> {
+    let block_details = client
+        .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
+        .await
+        .map_err(Into::<ProviderError>::into)?;
+
+    Ok(block_details)
 }
 
 /// Get the `zksync` withdrawal proof by tx hash

@@ -88,8 +88,6 @@ pub struct Config {
     #[envconfig(from = "DATABASE_URL")]
     pub database_url: Url,
 
-    pub start_from_l1_block: Option<u64>,
-
     pub start_from_l2_block: Option<u64>,
 }
 

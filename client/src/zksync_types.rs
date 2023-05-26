@@ -4,9 +4,17 @@
 //! These are strictly the types that are necessary for
 //! interacting with the RPC endpoints.
 
+use chrono::{DateTime, Utc};
 use ethers::types::{Address, Bloom, Bytes, H160, H256, U256, U64};
 
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
+#[allow(missing_docs)]
+pub struct BaseSystemContractsHashes {
+    pub bootloader: H256,
+    pub default_aa: H256,
+}
 
 /// A struct with the proof for the L2->L1 log in a specific block.
 #[derive(Debug, Serialize, Deserialize)]
@@ -171,4 +179,35 @@ pub struct WithdrawalEvent {
 
     /// The amount transfered.
     pub amount: U256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub enum BlockStatus {
+    Sealed,
+    Verified,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub struct BlockDetails {
+    pub number: u32,
+    pub l1_batch_number: u32,
+    pub timestamp: u64,
+    pub l1_tx_count: usize,
+    pub l2_tx_count: usize,
+    pub root_hash: Option<H256>,
+    pub status: BlockStatus,
+    pub commit_tx_hash: Option<H256>,
+    pub committed_at: Option<DateTime<Utc>>,
+    pub prove_tx_hash: Option<H256>,
+    pub proven_at: Option<DateTime<Utc>>,
+    pub execute_tx_hash: Option<H256>,
+    pub executed_at: Option<DateTime<Utc>>,
+    pub l1_gas_price: u64,
+    pub l2_fair_gas_price: u64,
+    pub base_system_contracts_hashes: BaseSystemContractsHashes,
+    pub operator_address: Address,
 }
