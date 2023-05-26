@@ -1,5 +1,18 @@
 {
   "db": "PostgreSQL",
+  "1393c97850021707104094f43ff5a31b5568fc2a7386bc654c42b4a6bf77d96a": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int8Array",
+          "Int8"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO l2_blocks (l2_block_number, commit_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET commit_l1_block_number = $2\n        "
+  },
   "376780edaa09ee456b49131bb1a390f67676c0a35f99879cf54b4082e6de5204": {
     "describe": {
       "columns": [
@@ -18,64 +31,93 @@
     },
     "query": "\n        SELECT MAX(block_number)\n        FROM withdrawals\n        "
   },
-  "686a209d2042c63fb3d090bf1850a55a58a0286398ef62a2ac88556eaa172147": {
+  "44a6fbefc021fd2225902a2cc3c56981a605223feea29e9a856d772768d1cf3d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "execute_l1_block_number",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n        SELECT l2_blocks.execute_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.block_number\n        WHERE withdrawals.tx_hash = $1\n        "
+  },
+  "72dce2d41f9e1de5ce572ba63b6b91e52c678ce0b1b4982c4b8a8161a77fc997": {
+    "describe": {
+      "columns": [
+        {
+          "name": "commit_l1_block_number",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n        SELECT l2_blocks.commit_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.block_number\n        WHERE withdrawals.tx_hash = $1\n        "
+  },
+  "88c6b2b25a3d085b5d5ecabca2592515d4c89158ee3de1c224127eb31857ddd6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "verify_l1_block_number",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n        SELECT l2_blocks.verify_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.block_number\n        WHERE withdrawals.tx_hash = $1\n        "
+  },
+  "b9e7914f5767d5cd4f78fcf85ff97288901fbd951153fc5ba433eee6232e6f3b": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
         "Left": [
-          "Int8",
-          "Int8",
+          "Int8Array",
           "Int8"
         ]
       }
     },
-    "query": "\n        UPDATE withdrawals\n        SET verified_in_block=$1\n        WHERE block_number >= $2 AND block_number <= $3\n        "
+    "query": "\n        INSERT INTO l2_blocks (l2_block_number, verify_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET verify_l1_block_number = $2\n        "
   },
-  "732df0c45d86aa9b015cf06fe890abf446d4a2bcb487b5fb0ac64854b16ca972": {
+  "ed5030bcee93fe8efa76096f88dd179408f8a0885ea36dd95e54fc877d36920d": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
         "Left": [
-          "Int8",
-          "Int8",
+          "Int8Array",
           "Int8"
         ]
       }
     },
-    "query": "\n        UPDATE withdrawals\n        SET executed_in_block=$1\n        WHERE block_number >= $2 AND block_number <= $3\n        "
+    "query": "\n        INSERT INTO l2_blocks (l2_block_number, execute_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET execute_l1_block_number = $2\n        "
   },
-  "842d82d56729ddcd0a3216e6dee5406148a0fc86550d3d7d49239be24108d06e": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n        UPDATE withdrawals\n        SET committed_in_block=$1\n        WHERE block_number >= $2 AND block_number <= $3\n        "
-  },
-  "96006f4ea4cdd22b986a0cf64e40ea40750c750572db225f73813a7fc9a5a8da": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO committed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
-  },
-  "c3dd8ecc5a2e38f5d615b6d4f319b904307a7b91263559add64ecc69028697c2": {
+  "efee76da278f812b5f6f94d4478f93d57b9ddebebcf4cfd2921d89bdf1015df7": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -89,37 +131,6 @@
         ]
       }
     },
-    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            committed_in_block,\n            verified_in_block,\n            executed_in_block\n        )\n        VALUES (\n            $1, $2, $3, $4, $5,\n            (\n                SELECT l1_block_number\n                FROM committed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM verified_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            ),\n            (\n                SELECT l1_block_number\n                FROM executed_l1_events\n                WHERE l2_range_begin <= $2 AND l2_range_end >= $2\n            )\n        )\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
-  },
-  "edc3e5be0d9c201c85baef8f8be51773b3ba58fdafe463eb8f83d9a62ad63b58": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO executed_l1_events\n        (\n            l1_block_number,\n            l1_batch_number,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ( $1, $2, $3, $4 )\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
-  },
-  "fd68352ad72d05753ea1859fbe784bbdbce3a0ba32cf1e5e07b87cd6c8c88295": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8",
-          "Int8"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO verified_l1_events\n        (\n            l1_block_number,\n            l2_previous_last_verified_block,\n            l2_current_last_verified_block,\n            l2_range_begin,\n            l2_range_end\n        )\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (l1_block_number) DO NOTHING\n        "
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx\n        )\n        VALUES (\n            $1, $2, $3, $4, $5\n        )\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
   }
 }

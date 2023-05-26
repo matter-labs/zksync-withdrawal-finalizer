@@ -5,41 +5,18 @@ CREATE TABLE withdrawals
     token BYTEA NOT NULL,
     amount NUMERIC(80) NOT NULL,
     event_index_in_tx INT NOT NULL,
-    committed_in_block BIGINT DEFAULT NULL,
-    verified_in_block BIGINT DEFAULT NULL,
-    executed_in_block BIGINT DEFAULT NULL,
     is_finalized BOOLEAN DEFAULT FALSE,
     PRIMARY KEY (tx_hash, event_index_in_tx)
 );
 CREATE INDEX withdrawals_block_number_index ON withdrawals (block_number);
 
-CREATE TABLE committed_l1_events
+CREATE TABLE l2_blocks
 (
-    l1_block_number BIGINT NOT NULL,
-    l1_batch_number BIGINT NOT NULL,
-    l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL,
-    PRIMARY KEY (l1_block_number)
+    l2_block_number BIGSERIAL NOT NULL,
+    commit_l1_block_number BIGINT DEFAULT NULL,
+    verify_l1_block_number BIGINT DEFAULT NULL,
+    execute_l1_block_number BIGINT DEFAULT NULL,
+    PRIMARY KEY (l2_block_number)
 );
-CREATE INDEX committed_l1_events_batch_range_index ON committed_l1_events (l2_range_begin, l2_range_end);
+CREATE INDEX l2_blocks_l2_block_number_index ON l2_blocks (l2_block_number);
 
-CREATE TABLE verified_l1_events
-(
-    l1_block_number BIGINT NOT NULL,
-    l2_previous_last_verified_block BIGINT NOT NULL,
-    l2_current_last_verified_block BIGINT NOT NULL,
-    l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL,
-    PRIMARY KEY (l1_block_number)
-);
-CREATE INDEX verified_l1_events_batch_range_index ON verified_l1_events (l2_range_begin, l2_range_end);
-
-CREATE TABLE executed_l1_events
-(
-    l1_block_number BIGINT NOT NULL,
-    l1_batch_number BIGINT NOT NULL,
-    l2_range_begin BIGINT NOT NULL,
-    l2_range_end BIGINT NOT NULL,
-    PRIMARY KEY (l1_block_number)
-);
-CREATE INDEX executed_l1_events_batch_range_index ON executed_l1_events (l2_range_begin, l2_range_end);
