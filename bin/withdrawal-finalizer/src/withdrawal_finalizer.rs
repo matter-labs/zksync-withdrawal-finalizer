@@ -110,21 +110,37 @@ where
                 block_number,
                 event,
             } => {
-                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
+                let current_first_verified_batch = event.previous_last_verified_block.as_u64() + 1;
+                let current_last_verified_batch = event.current_last_verified_block.as_u64();
+
+                let range_begin = get_l1_batch_block_range(
                     &self.l2_provider.provider().as_ref(),
-                    event.current_last_verified_block.as_u64() as u32,
+                    current_first_verified_batch as u32,
                 )
                 .await?
-                {
+                .map(|range| range.0.as_u64());
+
+                let range_end = get_l1_batch_block_range(
+                    &self.l2_provider.provider().as_ref(),
+                    current_last_verified_batch as u32,
+                )
+                .await?
+                .map(|range| range.1.as_u64());
+
+                if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
                     storage::verified_new_batch(
                         &mut self.pgpool,
-                        range_begin.as_u64(),
-                        range_end.as_u64(),
+                        range_begin,
+                        range_end,
                         block_number,
                     )
                     .await?;
                     log::info!(
                         "Changed withdrawals status to verified for range {range_begin}-{range_end}"
+                    );
+                } else {
+                    log::warn!(
+                        "One of the verified ranges not found: {range_begin:?}, {range_end:?}"
                     );
                 }
             }
