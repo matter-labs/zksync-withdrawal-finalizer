@@ -19,8 +19,8 @@ use sqlx::{ConnectOptions, PgConnection};
 
 use cli::Args;
 use client::{
-    get_block_details, l2bridge::L2Bridge, l2standard_token::WithdrawalEventsStream,
-    zksync_contract::BlockEvents,
+    get_block_details, get_confirmed_tokens, l2bridge::L2Bridge,
+    l2standard_token::WithdrawalEventsStream, zksync_contract::BlockEvents,
 };
 use config::Config;
 
@@ -149,16 +149,15 @@ async fn main() -> Result<()> {
 
     log::info!("Starting from L1 block number {from_l1_block}");
 
-    let l1_tokens = config.l1_tokens_to_process.as_ref().unwrap().0.clone();
-
-    log::info!("l1_tokens {l1_tokens:#?}");
+    let l1_tokens = get_confirmed_tokens(client_l2.provider().as_ref(), 0, u8::MAX).await?;
 
     let mut tokens = vec![];
 
     for l1_token in &l1_tokens {
-        let l2_token = l2_bridge.l2_token_address(*l1_token).await?;
+        let l2_token = l2_bridge.l2_token_address(l1_token.l1_address).await?;
 
-        log::info!("l1 token address {l1_token} on l2 is {l2_token}");
+        let l1_token_address = l1_token.l1_address;
+        log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
         tokens.push(l2_token);
     }
 

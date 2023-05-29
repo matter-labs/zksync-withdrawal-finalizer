@@ -34,10 +34,6 @@ impl FromStr for TokensToProcess {
 /// * TOML config file via [`Self::from_file()`]
 #[derive(Deserialize, Debug, Envconfig)]
 pub struct Config {
-    /// A list of L1 tokens to process.
-    #[envconfig(from = "WITHDRAWAL_FINALIZER_L1_TOKENS")]
-    pub l1_tokens_to_process: Option<TokensToProcess>,
-
     /// L1 WS url.
     pub l1_ws_url: Url,
 
@@ -82,35 +78,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn get_tokens(&mut self, network: &str) -> eyre::Result<()> {
-        let zksync_home = env::var("ZKSYNC_HOME")?;
-
-        let tokens = std::fs::read_to_string(format!("{zksync_home}/etc/tokens/{network}.json"))?;
-
-        let mut l1_tokens_to_process = self.l1_tokens_to_process.take().unwrap_or_default();
-
-        for addr in serde_json::from_str::<Vec<TokenConfig>>(&tokens)?
-            .into_iter()
-            .map(|t| t.address)
-        {
-            l1_tokens_to_process.0.push(addr);
-        }
-
-        self.l1_tokens_to_process = Some(l1_tokens_to_process);
-
-        Ok(())
-    }
-
     pub fn from_file<P: AsRef<Path>>(config_path: P) -> eyre::Result<Self> {
         let contents = fs::read_to_string(config_path)?;
 
         let config: Config = toml::from_str(&contents)?;
 
         Ok(config)
-    }
-
-    pub fn l1_tokens_to_process(&self) -> Option<&[H160]> {
-        self.l1_tokens_to_process.as_ref().map(|f| f.0.as_ref())
     }
 }
 

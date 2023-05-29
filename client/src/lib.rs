@@ -16,7 +16,7 @@ use ethers::{
 };
 
 use zksync_types::{
-    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog,
+    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
     TransactionReceipt as ZKSTransactionReceipt,
 };
 
@@ -159,6 +159,24 @@ pub async fn get_l1_batch_block_range<J: JsonRpcClient>(
         .map_err(Into::<ProviderError>::into)?;
 
     Ok(range)
+}
+
+/// Call `zks_getConfirmedTokens` RPC method.
+///
+/// # Arguments
+///
+/// * `client`: `JsonRpcClient` instance to perform the request with
+/// * `from`: beginning of the requested token interval
+/// * `limit: length of the requested token interval
+pub async fn get_confirmed_tokens<J: JsonRpcClient>(
+    client: &J,
+    from: u32,
+    limit: u8,
+) -> Result<Vec<Token>> {
+    Ok(client
+        .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
+        .await
+        .map_err(Into::<ProviderError>::into)?)
 }
 
 /// Withdrawal params

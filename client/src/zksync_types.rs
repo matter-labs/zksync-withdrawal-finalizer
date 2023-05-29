@@ -211,3 +211,15 @@ pub struct BlockDetails {
     pub base_system_contracts_hashes: BaseSystemContractsHashes,
     pub operator_address: Address,
 }
+
+/// Token in the zkSync network
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(missing_docs)]
+pub struct Token {
+    pub l1_address: Address,
+    pub l2_address: Address,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
