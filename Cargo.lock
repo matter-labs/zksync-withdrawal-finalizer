@@ -4193,6 +4193,7 @@ dependencies = [
  "clap",
  "client",
  "color-eyre",
+ "dotenvy",
  "envconfig",
  "ethers",
  "eyre",

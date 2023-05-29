@@ -99,6 +99,8 @@ async fn start_from_l2_block<M: Middleware>(
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
+    dotenvy::dotenv()?;
+
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();

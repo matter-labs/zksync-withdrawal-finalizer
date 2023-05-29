@@ -50,16 +50,16 @@ pub async fn committed_new_batch(
 /// Request the number of L1 block this withdrawal was commited in.
 pub async fn withdrawal_committed_in_block(
     conn: &mut PgConnection,
-    transaction: H256,
+    tx_hash: H256,
 ) -> Result<Option<i64>> {
     Ok(sqlx::query!(
         "
         SELECT l2_blocks.commit_l1_block_number from
         withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.block_number
+        l2_blocks.l2_block_number = withdrawals.l2_block_number
         WHERE withdrawals.tx_hash = $1
         ",
-        transaction.as_bytes(),
+        tx_hash.as_bytes(),
     )
     .fetch_optional(conn)
     .await?
@@ -69,16 +69,16 @@ pub async fn withdrawal_committed_in_block(
 /// Request the number of L1 block this withdrawal was verified in.
 pub async fn withdrawal_verified_in_block(
     conn: &mut PgConnection,
-    transaction: H256,
+    tx_hash: H256,
 ) -> Result<Option<i64>> {
     Ok(sqlx::query!(
         "
         SELECT l2_blocks.verify_l1_block_number from
         withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.block_number
+        l2_blocks.l2_block_number = withdrawals.l2_block_number
         WHERE withdrawals.tx_hash = $1
         ",
-        transaction.as_bytes(),
+        tx_hash.as_bytes(),
     )
     .fetch_optional(conn)
     .await?
@@ -88,16 +88,16 @@ pub async fn withdrawal_verified_in_block(
 /// Request the number of L1 block this withdrawal was executed in.
 pub async fn withdrawal_executed_in_block(
     conn: &mut PgConnection,
-    transaction: H256,
+    tx_hash: H256,
 ) -> Result<Option<i64>> {
     Ok(sqlx::query!(
         "
         SELECT l2_blocks.execute_l1_block_number from
         withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.block_number
+        l2_blocks.l2_block_number = withdrawals.l2_block_number
         WHERE withdrawals.tx_hash = $1
         ",
-        transaction.as_bytes(),
+        tx_hash.as_bytes(),
     )
     .fetch_optional(conn)
     .await?
@@ -181,7 +181,7 @@ pub async fn add_withdrawals(
 
     events.iter().for_each(|(event, index_in_tx)| {
         tx_hashes.push(event.tx_hash.0.to_vec());
-        block_numbers.push(event.block_number as i32);
+        block_numbers.push(event.block_number as i64);
         tokens.push(event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(event.amount));
         indices_in_tx.push(*index_in_tx as i32);
@@ -192,24 +192,24 @@ pub async fn add_withdrawals(
         INSERT INTO withdrawals
         (
             tx_hash,
-            block_number,
+            l2_block_number,
             token,
             amount,
             event_index_in_tx
         )
         SELECT
             u.tx_hash,
-            u.block_number,
+            u.l2_block_number,
             u.token,
             u.amount,
             u.index_in_tx
         FROM UNNEST(
             $1::bytea[],
-            $2::integer[],
+            $2::bigint[],
             $3::bytea[],
             $4::numeric[],
             $5::integer[]
-        ) AS u(tx_hash, block_number, token, amount, index_in_tx)
+        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
         ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         &tx_hashes,
@@ -228,7 +228,7 @@ pub async fn add_withdrawals(
 pub async fn last_block_processed(conn: &mut PgConnection) -> Result<Option<u64>> {
     let res = sqlx::query!(
         "
-        SELECT MAX(block_number)
+        SELECT MAX(l2_block_number)
         FROM withdrawals
         "
     )

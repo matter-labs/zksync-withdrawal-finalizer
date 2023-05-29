@@ -26,3 +26,4 @@ client = { path = "../../client" }
 storage = { path = "../../storage" }
 tracing-subscriber = { version = "0.3.17", features = ["fmt", "std"] }
 itertools = "0.10.5"
+dotenvy = "0.15.7"
