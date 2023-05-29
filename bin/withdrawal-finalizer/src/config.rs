@@ -38,10 +38,6 @@ pub struct Config {
     #[envconfig(from = "WITHDRAWAL_FINALIZER_L1_TOKENS")]
     pub l1_tokens_to_process: Option<TokensToProcess>,
 
-    /// Private key of the finalizer account.
-    #[envconfig(from = "WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY")]
-    pub account_private_key: String,
-
     /// L1 WS url.
     pub l1_ws_url: Url,
 
@@ -72,12 +68,6 @@ pub struct Config {
 
     #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
     pub zk_server_http_url: Option<Url>,
-
-    #[envconfig(from = "CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS")]
-    pub withdrawal_finalizer_contract: Address,
-
-    #[envconfig(from = "WITHDRAWAL_FINALIZER_ETH_ADDRESS")]
-    pub withdrawal_finalizer_eth_address: Address,
 
     #[envconfig(from = "GAS_LIMIT")]
     pub one_withdrawal_gas_limit: U256,
