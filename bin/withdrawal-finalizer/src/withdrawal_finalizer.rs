@@ -1,9 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use ethers::{
-    providers::{JsonRpcClient, Middleware, Provider},
-    types::H256,
-};
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgConnection;
 use tokio::pin;
@@ -69,7 +66,7 @@ where
                 Some(event) = withdrawal_events.next() => {
                     log::info!("withdrawal event {event:?}");
                     if event.block_number > curr_l2_block_number {
-                        self.process_withdrawals_in_block(&mut in_block_events).await;
+                        self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
                         curr_l2_block_number = event.block_number;
                     }
                     in_block_events.push(event);
@@ -160,20 +157,19 @@ where
         Ok(())
     }
 
-    async fn process_withdrawals_in_block(&mut self, events: &mut Vec<WithdrawalEvent>) {
-        let mut numbers_in_blocks: HashMap<H256, usize> = HashMap::new();
+    async fn process_withdrawals_in_block(&mut self, events: Vec<WithdrawalEvent>) -> Result<()> {
+        use itertools::Itertools;
 
-        for event in events.drain(..) {
-            let r = numbers_in_blocks.entry(event.tx_hash).or_default();
+        let group_by = events.into_iter().group_by(|event| event.tx_hash);
 
-            let index = *r;
-
-            *r += 1;
-
-            log::info!("withdrawal {event:?} index in transaction is {index}");
-            storage::add_withdrawal(&mut self.pgpool, &event, index)
-                .await
-                .unwrap();
+        let mut withdrawals_vec = vec![];
+        for (_tx_hash, group) in group_by.into_iter() {
+            for (index, event) in group.into_iter().enumerate() {
+                log::info!("withdrawal {event:?} index in transaction is {index}");
+                withdrawals_vec.push((event, index));
+            }
         }
+        storage::add_withdrawals(&mut self.pgpool, &withdrawals_vec).await?;
+        Ok(())
     }
 }

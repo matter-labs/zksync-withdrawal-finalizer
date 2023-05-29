@@ -13,6 +13,22 @@
     },
     "query": "\n        INSERT INTO l2_blocks (l2_block_number, commit_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET commit_l1_block_number = $2\n        "
   },
+  "2e08609421fbf982ca9ba29ee40df0d38f9591117738224fbcde5d8e5bac0fa7": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "Int4Array",
+          "ByteaArray",
+          "NumericArray",
+          "Int4Array"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx\n        )\n        SELECT\n            u.tx_hash,\n            u.block_number,\n            u.token,\n            u.amount,\n            u.index_in_tx\n        FROM UNNEST(\n            $1::bytea[],\n            $2::integer[],\n            $3::bytea[],\n            $4::numeric[],\n            $5::integer[]\n        ) AS u(tx_hash, block_number, token, amount, index_in_tx)\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
+  },
   "376780edaa09ee456b49131bb1a390f67676c0a35f99879cf54b4082e6de5204": {
     "describe": {
       "columns": [
@@ -116,21 +132,5 @@
       }
     },
     "query": "\n        INSERT INTO l2_blocks (l2_block_number, execute_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET execute_l1_block_number = $2\n        "
-  },
-  "efee76da278f812b5f6f94d4478f93d57b9ddebebcf4cfd2921d89bdf1015df7": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Bytea",
-          "Int8",
-          "Bytea",
-          "Numeric",
-          "Int4"
-        ]
-      }
-    },
-    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            block_number,\n            token,\n            amount,\n            event_index_in_tx\n        )\n        VALUES (\n            $1, $2, $3, $4, $5\n        )\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
   }
 }

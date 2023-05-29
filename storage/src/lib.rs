@@ -158,6 +158,8 @@ pub async fn executed_new_batch(
     .execute(&mut tx)
     .await?;
 
+    tx.commit().await?;
+
     Ok(())
 }
 
@@ -166,14 +168,24 @@ pub async fn executed_new_batch(
 /// # Arguments
 ///
 /// * `conn`: Connection to the Postgres DB
-/// * `event`: Withdrawal event itself
-/// * `event_index_in_tx`: Index of the given event in the transaction
-pub async fn add_withdrawal(
+/// * `events`: Withdrawal events grouped with their indices in transcation.
+pub async fn add_withdrawals(
     conn: &mut PgConnection,
-    event: &WithdrawalEvent,
-    event_index_in_tx: usize,
+    events: &[(WithdrawalEvent, usize)],
 ) -> Result<()> {
-    let amount = u256_to_big_decimal(event.amount);
+    let mut tx_hashes = Vec::with_capacity(events.len());
+    let mut block_numbers = Vec::with_capacity(events.len());
+    let mut tokens = Vec::with_capacity(events.len());
+    let mut amounts = Vec::with_capacity(events.len());
+    let mut indices_in_tx = Vec::with_capacity(events.len());
+
+    events.iter().for_each(|(event, index_in_tx)| {
+        tx_hashes.push(event.tx_hash.0.to_vec());
+        block_numbers.push(event.block_number as i32);
+        tokens.push(event.token.0.to_vec());
+        amounts.push(u256_to_big_decimal(event.amount));
+        indices_in_tx.push(*index_in_tx as i32);
+    });
 
     sqlx::query!(
         "
@@ -185,16 +197,26 @@ pub async fn add_withdrawal(
             amount,
             event_index_in_tx
         )
-        VALUES (
-            $1, $2, $3, $4, $5
-        )
+        SELECT
+            u.tx_hash,
+            u.block_number,
+            u.token,
+            u.amount,
+            u.index_in_tx
+        FROM UNNEST(
+            $1::bytea[],
+            $2::integer[],
+            $3::bytea[],
+            $4::numeric[],
+            $5::integer[]
+        ) AS u(tx_hash, block_number, token, amount, index_in_tx)
         ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
-        event.tx_hash.0.to_vec(),
-        event.block_number as i32,
-        event.token.0.to_vec(),
-        amount,
-        event_index_in_tx as i32,
+        &tx_hashes,
+        &block_numbers,
+        &tokens,
+        &amounts,
+        &indices_in_tx,
     )
     .execute(conn)
     .await?;

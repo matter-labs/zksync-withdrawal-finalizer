@@ -4197,6 +4197,7 @@ dependencies = [
  "ethers",
  "eyre",
  "futures",
+ "itertools",
  "log",
  "serde",
  "serde_json",
