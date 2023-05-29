@@ -99,8 +99,6 @@ async fn start_from_l2_block<M: Middleware>(
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    dotenvy::dotenv()?;
-
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
@@ -109,7 +107,10 @@ async fn main() -> Result<()> {
 
     let config = match args.config_path {
         Some(path) => Config::from_file(path)?,
-        None => Config::init_from_env()?,
+        None => {
+            dotenvy::dotenv()?;
+            Config::init_from_env()?
+        }
     };
 
     let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.l1_ws_url.as_ref(), 0)
