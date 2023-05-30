@@ -17,6 +17,6 @@ bigdecimal = "0.3.1"
 num = "0.4.0"
 
 client = { path = "../client" }
-ethers = "2.0.4"
+ethers = "2.0.6"
 thiserror = "1.0.40"
 
