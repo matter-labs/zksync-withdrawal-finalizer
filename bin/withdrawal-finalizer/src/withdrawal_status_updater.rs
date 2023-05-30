@@ -25,12 +25,10 @@ where
 {
     let mut conn = pool.acquire().await?;
 
-    log::warn!("running updater");
     loop {
         sleep(UPDATER_BACKOFF).await;
 
         let unfinalized_withdrawals = storage::unfinalized_withdrawals(&mut conn).await?;
-        log::warn!("tick");
 
         let mut tx_hashes_and_indices_in_tx = Vec::with_capacity(unfinalized_withdrawals.len());
         for withdrawal in unfinalized_withdrawals.into_iter() {
@@ -44,7 +42,7 @@ where
             )
             .await?
             {
-                log::warn!(
+                log::debug!(
                     "withdrawal {} with index in tx {} became finalized",
                     withdrawal.event.tx_hash,
                     withdrawal.index_in_tx
