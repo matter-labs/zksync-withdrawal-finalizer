@@ -131,11 +131,11 @@ async fn main() -> Result<()> {
     let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(client_l1.clone()).await?;
-    let (blocks_rx, blocks_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
+    let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
     let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
 
-    let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
-    let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
+    let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
+    let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
 
     let pgpool = PgPool::connect(config.database_url.as_str()).await?;
 
@@ -148,10 +148,10 @@ async fn main() -> Result<()> {
 
     log::info!("Starting from L2 block number {from_l2_block}");
 
-    let (we_rx, we_tx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
+    let (we_tx, we_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
-    let we_rx = tokio_util::sync::PollSender::new(we_rx);
-    let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
+    let we_tx = tokio_util::sync::PollSender::new(we_tx);
+    let we_rx = tokio_stream::wrappers::ReceiverStream::new(we_rx);
 
     let from_l1_block = start_from_l1_block(
         client_l1.clone(),
@@ -202,12 +202,12 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
+    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_tx));
 
-    let finalizer_handle = tokio::spawn(wf.run(blocks_tx, we_tx, from_l2_block));
+    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 
     let block_events_handle =
-        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_rx));
+        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_tx));
 
     tokio::select! {
         r = block_events_handle => {
