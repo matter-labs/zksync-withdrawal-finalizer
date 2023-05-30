@@ -5,7 +5,6 @@
 
 //! A withdraw-finalizer
 
-use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::Parser;
@@ -15,18 +14,22 @@ use ethers::{
     types::BlockNumber,
 };
 use eyre::{anyhow, Result};
-use sqlx::{ConnectOptions, PgConnection};
+use sqlx::{PgConnection, PgPool};
 
 use cli::Args;
 use client::{
-    get_block_details, get_confirmed_tokens, l2bridge::L2Bridge,
-    l2standard_token::WithdrawalEventsStream, zksync_contract::BlockEvents,
+    get_block_details, get_confirmed_tokens,
+    l1bridge::L1Bridge,
+    l2bridge::L2Bridge,
+    l2standard_token::WithdrawalEventsStream,
+    zksync_contract::{BlockEvents, ZkSync},
 };
 use config::Config;
 
 mod cli;
 mod config;
 mod withdrawal_finalizer;
+mod withdrawal_status_updater;
 
 const CHANNEL_CAPACITY: usize = 1024;
 
@@ -34,6 +37,7 @@ async fn start_from_l1_block<M1, M2>(
     client_l1: Arc<M1>,
     client_l2: Arc<M2>,
     l2_block_number: u32,
+    conn: &mut PgConnection,
 ) -> Result<u64>
 where
     M1: Middleware,
@@ -45,20 +49,21 @@ where
         .await?
         .expect("Always start from the block that there is info about; qed");
 
-    let commit_tx_hash = block_details
-        .commit_tx_hash
-        .expect("Expected to start from already committed block; qed");
+    match block_details.commit_tx_hash {
+        Some(commit_tx_hash) => {
+            let commit_tx = client_l1
+                .get_transaction(commit_tx_hash)
+                .await
+                .map_err(|e| anyhow!("{e}"))?
+                .expect("The corresponding L1 tx exists; qed");
 
-    let commit_tx = client_l1
-        .get_transaction(commit_tx_hash)
-        .await
-        .map_err(|e| anyhow!("{e}"))?
-        .expect("The corresponding L1 tx exists; qed");
-
-    Ok(commit_tx
-        .block_number
-        .expect("Already mined TX always has a block number; qed")
-        .as_u64())
+            Ok(commit_tx
+                .block_number
+                .expect("Already mined TX always has a block number; qed")
+                .as_u64())
+        }
+        None => Ok(storage::last_l1_block_seen(conn).await?.unwrap()),
+    }
 }
 
 // Determine an L2 block to start processing withdrawals from.
@@ -75,7 +80,7 @@ async fn start_from_l2_block<M: Middleware>(
     let res = match config.start_from_l2_block {
         Some(l2_block) => l2_block,
         None => {
-            if let Some(block_number) = storage::last_block_processed(conn).await? {
+            if let Some(block_number) = storage::last_l2_block_seen(conn).await? {
                 // May have stored not the last withdrawal event in `block_number`
                 // so to be sure, re-start from the previous block.
                 block_number - 1
@@ -132,10 +137,14 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_util::sync::PollSender::new(blocks_rx);
     let blocks_tx = tokio_stream::wrappers::ReceiverStream::new(blocks_tx);
 
-    let pgpool_opts = sqlx::postgres::PgConnectOptions::from_str(config.database_url.as_str())?;
-    let mut pgpool = pgpool_opts.connect().await?;
+    let pgpool = PgPool::connect(config.database_url.as_str()).await?;
 
-    let from_l2_block = start_from_l2_block(client_l2.clone(), &mut pgpool, &config).await?;
+    let from_l2_block = start_from_l2_block(
+        client_l2.clone(),
+        &mut pgpool.acquire().await?.detach(),
+        &config,
+    )
+    .await?;
 
     log::info!("Starting from L2 block number {from_l2_block}");
 
@@ -144,8 +153,13 @@ async fn main() -> Result<()> {
     let we_rx = tokio_util::sync::PollSender::new(we_rx);
     let we_tx = tokio_stream::wrappers::ReceiverStream::new(we_tx);
 
-    let from_l1_block =
-        start_from_l1_block(client_l1.clone(), client_l2.clone(), from_l2_block as u32).await?;
+    let from_l1_block = start_from_l1_block(
+        client_l1.clone(),
+        client_l2.clone(),
+        from_l2_block as u32,
+        &mut pgpool.acquire().await?.detach(),
+    )
+    .await?;
 
     log::info!("Starting from L1 block number {from_l1_block}");
 
@@ -160,8 +174,33 @@ async fn main() -> Result<()> {
         log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
         tokens.push(l2_token);
     }
+    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.l1_ws_url.as_ref(), 0)
+        .await
+        .unwrap();
+    let client_l1 = Arc::new(provider_l1);
 
-    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2, pgpool);
+    let l1_bridge = L1Bridge::new(config.l1_eth_bridge_addr, client_l1.clone());
+
+    let zksync_contract = ZkSync::new(config.main_zksync_contract, client_l1.clone());
+
+    let provider_l2 = Provider::<Ws>::connect_with_reconnects(config.zk_server_ws_url.as_str(), 0)
+        .await
+        .unwrap();
+    let client_l2 = Arc::new(provider_l2);
+
+    let updater_handle = tokio::spawn(withdrawal_status_updater::run(
+        pgpool.clone(),
+        zksync_contract.clone(),
+        l1_bridge.clone(),
+        client_l2.clone(),
+    ));
+
+    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
+        client_l2,
+        pgpool,
+        zksync_contract,
+        l1_bridge,
+    );
 
     let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_rx));
 
@@ -179,6 +218,9 @@ async fn main() -> Result<()> {
         }
         r = finalizer_handle => {
             log::error!("Finalizer main loop ended with {r:?}");
+        }
+        r = updater_handle => {
+            log::error!("Withdrawals updater ended with {r:?}");
         }
     }
 

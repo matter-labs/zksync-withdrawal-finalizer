@@ -1,28 +1,47 @@
 use std::sync::Arc;
 
-use ethers::providers::{JsonRpcClient, Middleware, Provider};
+use ethers::{
+    providers::{JsonRpcClient, Middleware},
+    types::{Address, H256},
+};
 use futures::{stream::StreamExt, Stream};
-use sqlx::PgConnection;
+use sqlx::PgPool;
+use storage::StoredWithdrawal;
 use tokio::pin;
 
-use client::{get_l1_batch_block_range, BlockEvent, WithdrawalEvent};
+use client::{
+    get_l1_batch_block_range, get_log_proof, get_withdrawal_l2_to_l1_log, get_withdrawal_log,
+    l1bridge::L1Bridge, zksync_contract::ZkSync, BlockEvent, WithdrawalEvent,
+};
 
 use crate::Result;
 
-pub struct WithdrawalFinalizer<M> {
-    l2_provider: Arc<Provider<M>>,
-    pgpool: PgConnection,
+pub struct WithdrawalFinalizer<M1, M2> {
+    l2_provider: Arc<M2>,
+    pgpool: PgPool,
+    l1_bridge: L1Bridge<M1>,
+    zksync_contract: ZkSync<M1>,
 }
 
-impl<M> WithdrawalFinalizer<M>
+impl<M1, M2> WithdrawalFinalizer<M1, M2>
 where
-    M: JsonRpcClient,
+    M1: Middleware,
+    <M1 as Middleware>::Provider: JsonRpcClient,
+    M2: Middleware,
+    <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(l2_provider: Arc<Provider<M>>, pgpool: PgConnection) -> Self {
+    pub fn new(
+        l2_provider: Arc<M2>,
+        pgpool: PgPool,
+        zksync_contract: ZkSync<M1>,
+        l1_bridge: L1Bridge<M1>,
+    ) -> Self {
         Self {
             l2_provider,
             pgpool,
+            zksync_contract,
+            l1_bridge,
         }
     }
 
@@ -82,6 +101,7 @@ where
     }
 
     async fn process_block_event(&mut self, event: BlockEvent) -> Result<()> {
+        let mut pgconn = self.pgpool.acquire().await?;
         match event {
             BlockEvent::BlockCommit {
                 block_number,
@@ -94,7 +114,7 @@ where
                 .await?
                 {
                     storage::committed_new_batch(
-                        &mut self.pgpool,
+                        &mut pgconn,
                         range_begin.as_u64(),
                         range_end.as_u64(),
                         block_number,
@@ -128,13 +148,8 @@ where
                 .map(|range| range.1.as_u64());
 
                 if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
-                    storage::verified_new_batch(
-                        &mut self.pgpool,
-                        range_begin,
-                        range_end,
-                        block_number,
-                    )
-                    .await?;
+                    storage::verified_new_batch(&mut pgconn, range_begin, range_end, block_number)
+                        .await?;
                     log::info!(
                         "Changed withdrawals status to verified for range {range_begin}-{range_end}"
                     );
@@ -155,7 +170,7 @@ where
                 .await?
                 {
                     storage::executed_new_batch(
-                        &mut self.pgpool,
+                        &mut pgconn,
                         range_begin.as_u64(),
                         range_end.as_u64(),
                         block_number,
@@ -182,10 +197,105 @@ where
         for (_tx_hash, group) in group_by.into_iter() {
             for (index, event) in group.into_iter().enumerate() {
                 log::info!("withdrawal {event:?} index in transaction is {index}");
+
                 withdrawals_vec.push((event, index));
             }
         }
-        storage::add_withdrawals(&mut self.pgpool, &withdrawals_vec).await?;
+
+        let mut stored_withdrawals = vec![];
+
+        for (event, index) in withdrawals_vec.into_iter() {
+            let is_finalized = self
+                .is_withdrawal_finalized(event.tx_hash, index, event.token)
+                .await?;
+
+            stored_withdrawals.push(StoredWithdrawal {
+                event,
+                index_in_tx: index,
+                is_finalized,
+            });
+        }
+
+        let mut pgconn = self.pgpool.acquire().await?;
+        storage::add_withdrawals(&mut pgconn, &stored_withdrawals).await?;
         Ok(())
+    }
+
+    async fn is_withdrawal_finalized(
+        &self,
+        withdrawal_hash: H256,
+        index: usize,
+        sender: Address,
+    ) -> Result<bool> {
+        is_withdrawal_finalized(
+            withdrawal_hash,
+            index,
+            sender,
+            &self.zksync_contract,
+            &self.l1_bridge,
+            &self.l2_provider,
+        )
+        .await
+    }
+}
+
+pub async fn is_withdrawal_finalized<M1, M2>(
+    withdrawal_hash: H256,
+    index: usize,
+    sender: Address,
+    zksync_contract: &ZkSync<M1>,
+    l1_bridge: &L1Bridge<M1>,
+    l2_middleware: &M2,
+) -> Result<bool>
+where
+    M1: Middleware,
+    <M1 as Middleware>::Provider: JsonRpcClient,
+    M2: Middleware,
+    <M2 as Middleware>::Provider: JsonRpcClient,
+{
+    let client_l2 = l2_middleware.provider().as_ref();
+
+    let log = get_withdrawal_log(client_l2, withdrawal_hash, index).await?;
+
+    let (_, l2_to_l1_log_index) =
+        get_withdrawal_l2_to_l1_log(client_l2, withdrawal_hash, index).await?;
+
+    let proof = match get_log_proof(
+        client_l2,
+        withdrawal_hash,
+        l2_to_l1_log_index
+            .expect("The L2ToL1LogIndex is always present in the trace. qed")
+            .as_usize(),
+    )
+    .await?
+    {
+        Some(proof) => proof,
+        None => return Ok(false),
+    };
+
+    let l2_message_index = proof.id;
+
+    if client::is_eth(sender) {
+        let is_finalized = zksync_contract
+            .is_eth_withdrawal_finalized(
+                log.0.l1_batch_number.unwrap().as_u64().into(),
+                l2_message_index.into(),
+            )
+            .await?;
+
+        log::debug!("eth withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
+
+        Ok(is_finalized)
+    } else {
+        let is_finalized = l1_bridge
+            .is_withdrawal_finalized(
+                log.0.l1_batch_number.unwrap().as_u64().into(),
+                l2_message_index.into(),
+            )
+            .await?;
+
+        log::debug!("withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
+
+        Ok(is_finalized)
     }
 }

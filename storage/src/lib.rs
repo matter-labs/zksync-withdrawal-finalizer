@@ -5,7 +5,7 @@
 
 //! Finalizer storage operations.
 
-use ethers::types::H256;
+use ethers::types::{H160, H256};
 use sqlx::{Connection, PgConnection};
 
 use client::WithdrawalEvent;
@@ -13,9 +13,23 @@ use client::WithdrawalEvent;
 mod error;
 mod utils;
 
-use utils::u256_to_big_decimal;
+use utils::{bigdecimal_to_u256, u256_to_big_decimal};
 
 pub use error::{Error, Result};
+
+/// A convenience struct that couples together [`WithdrawalEvent`]
+/// with index in tx and boolean is_finalized value
+#[derive(Debug)]
+pub struct StoredWithdrawal {
+    /// Withdrawal event
+    pub event: WithdrawalEvent,
+
+    /// Index of this event within the transaction
+    pub index_in_tx: usize,
+
+    /// If the event is finalized
+    pub is_finalized: bool,
+}
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
 pub async fn committed_new_batch(
@@ -169,22 +183,21 @@ pub async fn executed_new_batch(
 ///
 /// * `conn`: Connection to the Postgres DB
 /// * `events`: Withdrawal events grouped with their indices in transcation.
-pub async fn add_withdrawals(
-    conn: &mut PgConnection,
-    events: &[(WithdrawalEvent, usize)],
-) -> Result<()> {
+pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal]) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(events.len());
     let mut block_numbers = Vec::with_capacity(events.len());
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
+    let mut is_finalized = Vec::with_capacity(events.len());
 
-    events.iter().for_each(|(event, index_in_tx)| {
-        tx_hashes.push(event.tx_hash.0.to_vec());
-        block_numbers.push(event.block_number as i64);
-        tokens.push(event.token.0.to_vec());
-        amounts.push(u256_to_big_decimal(event.amount));
-        indices_in_tx.push(*index_in_tx as i32);
+    events.iter().for_each(|sw| {
+        tx_hashes.push(sw.event.tx_hash.0.to_vec());
+        block_numbers.push(sw.event.block_number as i64);
+        tokens.push(sw.event.token.0.to_vec());
+        amounts.push(u256_to_big_decimal(sw.event.amount));
+        indices_in_tx.push(sw.index_in_tx as i32);
+        is_finalized.push(sw.is_finalized);
     });
 
     sqlx::query!(
@@ -195,21 +208,24 @@ pub async fn add_withdrawals(
             l2_block_number,
             token,
             amount,
-            event_index_in_tx
+            event_index_in_tx,
+            is_finalized
         )
         SELECT
             u.tx_hash,
             u.l2_block_number,
             u.token,
             u.amount,
-            u.index_in_tx
+            u.index_in_tx,
+            u.is_finalized
         FROM UNNEST(
             $1::bytea[],
             $2::bigint[],
             $3::bytea[],
             $4::numeric[],
-            $5::integer[]
-        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
+            $5::integer[],
+            $6::boolean[]
+        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx, is_finalized)
         ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         &tx_hashes,
@@ -217,6 +233,7 @@ pub async fn add_withdrawals(
         &tokens,
         &amounts,
         &indices_in_tx,
+        &is_finalized,
     )
     .execute(conn)
     .await?;
@@ -225,7 +242,7 @@ pub async fn add_withdrawals(
 }
 
 /// Get the block number of the last L2 withdrawal the DB has record of.
-pub async fn last_block_processed(conn: &mut PgConnection) -> Result<Option<u64>> {
+pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
     let res = sqlx::query!(
         "
         SELECT MAX(l2_block_number)
@@ -238,4 +255,87 @@ pub async fn last_block_processed(conn: &mut PgConnection) -> Result<Option<u64>
     .map(|max| max as u64);
 
     Ok(res)
+}
+
+/// Get the block number of the last L1 block seen.
+pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
+    let res = sqlx::query!(
+        "
+        SELECT MAX(commit_l1_block_number)
+        FROM l2_blocks
+        "
+    )
+    .fetch_one(conn)
+    .await?
+    .max
+    .map(|max| max as u64);
+
+    Ok(res)
+}
+
+/// Get all withdrawals that are not finalized yet
+pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<StoredWithdrawal>> {
+    let res = sqlx::query!(
+        "
+        SELECT * FROM withdrawals
+        WHERE NOT is_finalized
+        ORDER BY l2_block_number ASC
+        LIMIT 30
+        "
+    )
+    .fetch_all(conn)
+    .await?
+    .into_iter()
+    .map(|r| StoredWithdrawal {
+        event: WithdrawalEvent {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            block_number: r.l2_block_number as u64,
+            token: H160::from_slice(&r.token),
+            amount: bigdecimal_to_u256(r.amount),
+        },
+        index_in_tx: r.event_index_in_tx as usize,
+        is_finalized: r.is_finalized,
+    })
+    .collect();
+
+    Ok(res)
+}
+
+/// Update the status of a set of withdrawals to finalized.
+pub async fn update_withdrawals_to_finalized(
+    conn: &mut PgConnection,
+    tx_hashes_and_indices_in_tx: &[(H256, usize)],
+) -> Result<()> {
+    let tx_hashes: Vec<_> = tx_hashes_and_indices_in_tx
+        .iter()
+        .map(|h| h.0 .0.to_vec())
+        .collect();
+
+    let event_indices_in_tx: Vec<_> = tx_hashes_and_indices_in_tx
+        .iter()
+        .map(|h| h.1 as i32)
+        .collect();
+
+    sqlx::query!(
+        "
+        UPDATE withdrawals
+            SET is_finalized = true
+        FROM
+            (
+                SELECT
+                    UNNEST($1::bytea[]) as tx_hash,
+                    UNNEST($2::integer[]) as event_index_in_tx
+            ) as u
+        WHERE
+            withdrawals.tx_hash = u.tx_hash
+        AND
+            withdrawals.event_index_in_tx = u.event_index_in_tx
+        ",
+        &tx_hashes,
+        &event_indices_in_tx,
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(())
 }

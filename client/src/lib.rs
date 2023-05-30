@@ -23,6 +23,12 @@ use zksync_types::{
 pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
 
+/// Eth token address
+pub const ETH_TOKEN_ADDRESS: &str = "0x000000000000000000000000000000000000800a";
+
+/// Eth address
+pub const ETH_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+
 pub mod ethtoken;
 pub mod l1bridge;
 pub mod l1messenger;
@@ -32,6 +38,10 @@ pub mod withdrawal_finalizer;
 pub mod zksync_contract;
 pub mod zksync_types;
 
+/// is this eth?
+pub fn is_eth(address: Address) -> bool {
+    address == ETH_TOKEN_ADDRESS.parse().unwrap() || address == ETH_ADDRESS.parse().unwrap()
+}
 /// Get the `zksync` transaction receipt by transaction hash
 ///
 /// # Arguments

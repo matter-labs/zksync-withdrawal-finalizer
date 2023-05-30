@@ -5,7 +5,7 @@ CREATE TABLE withdrawals
     token BYTEA NOT NULL,
     amount NUMERIC(80) NOT NULL,
     event_index_in_tx INT NOT NULL,
-    is_finalized BOOLEAN DEFAULT FALSE,
+    is_finalized BOOLEAN NOT NULL,
     PRIMARY KEY (tx_hash, event_index_in_tx)
 );
 CREATE INDEX withdrawals_l2_block_number_index ON withdrawals (l2_block_number);
@@ -18,4 +18,3 @@ CREATE TABLE l2_blocks
     execute_l1_block_number BIGINT DEFAULT NULL,
     PRIMARY KEY (l2_block_number)
 );
-CREATE INDEX l2_blocks_l2_block_number_index ON l2_blocks (l2_block_number);

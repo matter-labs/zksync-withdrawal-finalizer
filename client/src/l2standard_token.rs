@@ -10,7 +10,7 @@ use ethers::{
 };
 use futures::{Sink, SinkExt, StreamExt};
 
-use crate::{ethtoken::WithdrawalFilter, Error, Result, WithdrawalEvent};
+use crate::{ethtoken::WithdrawalFilter, Error, Result, WithdrawalEvent, ETH_TOKEN_ADDRESS};
 
 use self::codegen::BridgeBurnFilter;
 
@@ -27,8 +27,6 @@ mod codegen {
 pub struct L2StandardToken<M> {
     contract: codegen::L2StandardToken<M>,
 }
-
-const ETH_TOKEN_ADDRESS: &str = "0x000000000000000000000000000000000000800a";
 
 impl<M: Middleware> L2StandardToken<M> {
     /// Create a new instance of `L2StandardToken` contract.

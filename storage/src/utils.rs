@@ -25,3 +25,15 @@ fn round_precision_raw_no_div(num: &Ratio<BigUint>, precision: usize) -> BigUint
     let ten_pow = BigUint::from(10u32).pow(precision);
     (num * ten_pow).round().to_integer()
 }
+
+/// Converts `BigUint` value into the corresponding `U256` value.
+pub fn biguint_to_u256(value: BigUint) -> U256 {
+    let bytes = value.to_bytes_le();
+    U256::from_little_endian(&bytes)
+}
+
+/// Converts `BigDecimal` value into the corresponding `U256` value.
+pub fn bigdecimal_to_u256(value: BigDecimal) -> U256 {
+    let bigint = value.with_scale(0).into_bigint_and_exponent().0;
+    biguint_to_u256(bigint.to_biguint().unwrap())
+}

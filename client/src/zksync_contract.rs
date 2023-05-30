@@ -102,8 +102,10 @@ impl std::fmt::Display for BlockEvent {
 }
 
 /// A struct wrapper for interacting with `ZkSync` contract.
+#[derive(Clone)]
 pub struct ZkSync<M> {
-    contract: codegen::IZkSync<M>,
+    /// Cogedenerated contract wrapper.
+    pub contract: codegen::IZkSync<M>,
 }
 
 impl<M: Middleware> ZkSync<M> {

@@ -19,6 +19,7 @@ mod codegen {
 }
 
 /// A struct wrapper for interacting with the `L1Bridge` contract.
+#[derive(Clone)]
 pub struct L1Bridge<M> {
     contract: codegen::IL1Bridge<M>,
 }

@@ -33,7 +33,7 @@
     },
     "query": "\n        SELECT l2_blocks.commit_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.l2_block_number\n        WHERE withdrawals.tx_hash = $1\n        "
   },
-  "4450080a1e6671c353502f47a1f27de9d45cf9c383a6b737b6f1002a59a3fa78": {
+  "8139b55ad17e9a00b7a1161c709afca1daed7dbe2d4b3709f80dc4e2a87d1d9a": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -43,11 +43,91 @@
           "Int8Array",
           "ByteaArray",
           "NumericArray",
+          "Int4Array",
+          "BoolArray"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            l2_block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            is_finalized\n        )\n        SELECT\n            u.tx_hash,\n            u.l2_block_number,\n            u.token,\n            u.amount,\n            u.index_in_tx,\n            u.is_finalized\n        FROM UNNEST(\n            $1::bytea[],\n            $2::bigint[],\n            $3::bytea[],\n            $4::numeric[],\n            $5::integer[],\n            $6::boolean[]\n        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx, is_finalized)\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
+  },
+  "8cdba19d076f5a17ccac6a48b403b302da281afe8f2fcbfa98829228c748b4a9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT MAX(commit_l1_block_number)\n        FROM l2_blocks\n        "
+  },
+  "9aeab1b7706f4482a9484293ba5732d0170c47b34f733e38a152714d65619f8b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "tx_hash",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "l2_block_number",
+          "ordinal": 1,
+          "type_info": "Int8"
+        },
+        {
+          "name": "token",
+          "ordinal": 2,
+          "type_info": "Bytea"
+        },
+        {
+          "name": "amount",
+          "ordinal": 3,
+          "type_info": "Numeric"
+        },
+        {
+          "name": "event_index_in_tx",
+          "ordinal": 4,
+          "type_info": "Int4"
+        },
+        {
+          "name": "is_finalized",
+          "ordinal": 5,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT * FROM withdrawals\n        WHERE NOT is_finalized\n        ORDER BY l2_block_number ASC\n        LIMIT 30\n        "
+  },
+  "a93472664f5259af283d933f4a8fbc80ced5722cd64cc0cd96c61bf0e9c09335": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
           "Int4Array"
         ]
       }
     },
-    "query": "\n        INSERT INTO withdrawals\n        (\n            tx_hash,\n            l2_block_number,\n            token,\n            amount,\n            event_index_in_tx\n        )\n        SELECT\n            u.tx_hash,\n            u.l2_block_number,\n            u.token,\n            u.amount,\n            u.index_in_tx\n        FROM UNNEST(\n            $1::bytea[],\n            $2::bigint[],\n            $3::bytea[],\n            $4::numeric[],\n            $5::integer[]\n        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)\n        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING\n        "
+    "query": "\n        UPDATE withdrawals\n            SET is_finalized = true\n        FROM\n            (\n                SELECT\n                    UNNEST($1::bytea[]) as tx_hash,\n                    UNNEST($2::integer[]) as event_index_in_tx\n            ) as u\n        WHERE\n            withdrawals.tx_hash = u.tx_hash\n        AND\n            withdrawals.event_index_in_tx = u.event_index_in_tx\n        "
   },
   "b9e7914f5767d5cd4f78fcf85ff97288901fbd951153fc5ba433eee6232e6f3b": {
     "describe": {
