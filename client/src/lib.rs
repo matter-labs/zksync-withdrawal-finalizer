@@ -17,7 +17,7 @@ use ethers::{
 
 use zksync_types::{
     BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
-    TransactionReceipt as ZKSTransactionReceipt,
+    TransactionReceipt as ZksyncTransactionReceipt,
 };
 
 pub use zksync_contract::BlockEvent;
@@ -51,9 +51,9 @@ pub fn is_eth(address: Address) -> bool {
 pub async fn get_transaction_receipt<J: JsonRpcClient>(
     client: &J,
     tx_hash: H256,
-) -> Result<ZKSTransactionReceipt> {
+) -> Result<ZksyncTransactionReceipt> {
     let receipt = client
-        .request::<[H256; 1], ZKSTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
+        .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
         .await
         .map_err(Into::<ProviderError>::into)?;
 
