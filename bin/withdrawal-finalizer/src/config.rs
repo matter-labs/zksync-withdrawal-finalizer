@@ -6,27 +6,6 @@ use ethers::types::{Address, H160, U256};
 use serde::Deserialize;
 use url::Url;
 
-/// A list of tokens to process.
-///
-/// The sole purpose of this newtype is `FromStr` implementation that
-/// reads from a string of comma-separated addresses.
-#[derive(serde::Deserialize, Default, Debug)]
-pub struct TokensToProcess(pub Vec<Address>);
-
-impl FromStr for TokensToProcess {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut res = vec![];
-        for token in s.split(',') {
-            let address = Address::from_str(token).map_err(|_| ())?;
-            res.push(address);
-        }
-
-        Ok(TokensToProcess(res))
-    }
-}
-
 /// Withdrawal finalizer configuration.
 ///
 /// Can be read from
@@ -85,12 +64,4 @@ impl Config {
 
         Ok(config)
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct TokenConfig {
-    name: String,
-    symbol: String,
-    decimals: usize,
-    address: Address,
 }
