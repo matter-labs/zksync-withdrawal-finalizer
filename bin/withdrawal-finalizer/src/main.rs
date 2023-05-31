@@ -193,6 +193,7 @@ async fn main() -> Result<()> {
         zksync_contract.clone(),
         l1_bridge.clone(),
         client_l2.clone(),
+        config.updater_backoff,
     ));
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(

@@ -54,6 +54,9 @@ pub struct Config {
     pub database_url: Url,
 
     pub start_from_l2_block: Option<u64>,
+
+    #[envconfig(from = "UPDATER_BACKOFF")]
+    pub updater_backoff: Option<u64>,
 }
 
 impl Config {
