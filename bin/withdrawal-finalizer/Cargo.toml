@@ -1,0 +1,28 @@
+[package]
+name = "withdrawal-finalizer"
+version = "0.1.0"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.2.4", features = ["derive", "string"] }
+color-eyre = "0.6.2"
+ethers = { version = "2.0.6", default-features = false, features = ["ws", "rustls"] }
+serde = "1.0.160"
+tokio = { version = "1.28.0", features = ["full"] }
+toml = "0.7.3"
+url = { version = "2.3.1", features = ["serde"] }
+eyre = "0.6.8"
+tokio-stream = "0.1.14"
+log = "0.4.17"
+envconfig = "0.10.0"
+futures = "0.3.28"
+tokio-util = "0.7.8"
+sqlx = { version = "0.6.3", features = ["postgres", "runtime-tokio-rustls"] }
+
+client = { path = "../../client" }
+storage = { path = "../../storage" }
+tracing-subscriber = { version = "0.3.17", features = ["fmt", "std"] }
+itertools = "0.10.5"
+dotenvy = "0.15.7"

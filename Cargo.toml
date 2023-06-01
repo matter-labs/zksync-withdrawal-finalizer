@@ -1,0 +1,8 @@
+[workspace]
+resolver = "1"
+
+members = [
+    "bin/withdrawal-finalizer",
+    "client",
+    "storage",
+]
