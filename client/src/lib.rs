@@ -26,10 +26,19 @@ pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
 
 /// Eth token address
-pub const ETH_TOKEN_ADDRESS: &str = "0x000000000000000000000000000000000000800a";
+pub const ETH_TOKEN_ADDRESS: Address = H160([
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x80, 0x0a,
+]);
 
 /// Eth address
-pub const ETH_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+pub const ETH_ADDRESS: Address = Address::zero();
+
+/// Address of ethereum L1 messenger
+pub const L1_MESSENGER_ADDRESS: Address = H160([
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x80, 0x08,
+]);
 
 pub mod ethtoken;
 pub mod l1bridge;
@@ -42,14 +51,8 @@ pub mod zksync_types;
 
 /// is this eth?
 pub fn is_eth(address: Address) -> bool {
-    address == ETH_TOKEN_ADDRESS.parse().unwrap() || address == ETH_ADDRESS.parse().unwrap()
+    address == ETH_TOKEN_ADDRESS || address == ETH_ADDRESS
 }
-
-#[allow(missing_docs)]
-pub const L1_MESSENGER_ADDRESS: Address = H160([
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x80, 0x08,
-]);
 
 /// Withdrawal params
 pub struct WithdrawalParams {

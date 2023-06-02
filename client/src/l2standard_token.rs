@@ -117,11 +117,8 @@ where
         S: Sink<WithdrawalEvent> + Unpin,
         <S as Sink<WithdrawalEvent>>::Error: std::fmt::Debug,
     {
-        addresses.push(
-            ETH_TOKEN_ADDRESS
-                .parse()
-                .expect("eth token address constant is correct; qed"),
-        );
+        addresses.push(ETH_TOKEN_ADDRESS);
+
         let filter = Filter::new()
             .from_block(from_block)
             .address(addresses)
