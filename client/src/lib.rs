@@ -51,56 +51,6 @@ pub const L1_MESSENGER_ADDRESS: Address = H160([
     0x00, 0x00, 0x80, 0x08,
 ]);
 
-/// Get the `zksync` withdrawal logs by tx hash.
-///
-/// # Arguments
-///
-/// * `client`: `JsonRpcClient` instance to perform the request with
-/// * `tx_hash`: Hash of the transaction
-pub async fn get_withdrawal_log<M: ZksyncMiddleware>(
-    middleware: &M,
-    tx_hash: H256,
-    index: usize,
-) -> Result<(ZKSLog, Option<U64>)> {
-    let receipt = middleware.zks_get_transaction_receipt(tx_hash).await?;
-
-    let log = receipt
-        .logs
-        .into_iter()
-        .filter(|entry| {
-            entry.address == L1_MESSENGER_ADDRESS
-                && entry.topics[0] == l1messenger::L1MessageSentFilter::signature()
-        })
-        .nth(index)
-        .ok_or(Error::NoSuchIndex(index))?;
-
-    Ok((log, receipt.l1_batch_tx_index))
-}
-
-/// Get the `L2ToL1Log` by index.
-///
-/// # Arguments
-///
-/// * `client`: A `JsonRpcClient` to perform requests with
-/// * `tx_hash`: Hash of the transaction
-/// * `index`: Index of the `L2ToL1Log` from the transaction receipt.
-pub async fn get_withdrawal_l2_to_l1_log<M: ZksyncMiddleware>(
-    middleware: &M,
-    tx_hash: H256,
-    index: usize,
-) -> Result<(L2ToL1Log, Option<U64>)> {
-    let receipt = ZksyncMiddleware::zks_get_transaction_receipt(middleware, tx_hash).await?;
-
-    let log = receipt
-        .l2_to_l1_logs
-        .into_iter()
-        .filter(|entry| entry.sender == L1_MESSENGER_ADDRESS)
-        .nth(index)
-        .ok_or(Error::NoSuchIndex(index))?;
-
-    Ok((log, Some(U64::from(index))))
-}
-
 /// Withdrawal params
 pub struct WithdrawalParams {
     /// The number of batch on L1
@@ -120,44 +70,6 @@ pub struct WithdrawalParams {
 
     /// Proof
     pub proof: Vec<[u8; 32]>,
-}
-
-/// Get the parameters necessary to call `finalize_withdrawals`.
-pub async fn finalize_withdrawal_params<M: ZksyncMiddleware>(
-    middleware: &M,
-    withdrawal_hash: H256,
-    index: usize,
-) -> Result<WithdrawalParams> {
-    let (log, l1_batch_tx_id) = get_withdrawal_log(middleware, withdrawal_hash, index).await?;
-
-    let (_, l2_to_l1_log_index) =
-        get_withdrawal_l2_to_l1_log(middleware, withdrawal_hash, index).await?;
-
-    let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
-        .expect("H256 always has enough bytes to fill H160. qed")
-        .into();
-
-    let proof = middleware
-        .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
-        .await?
-        .expect("Log proof should be present. qed");
-
-    let message = log.data;
-    let l2_message_index = proof.id;
-    let proof: Vec<_> = proof
-        .proof
-        .iter()
-        .map(|hash| hash.to_fixed_bytes())
-        .collect();
-
-    Ok(WithdrawalParams {
-        l1_batch_number: log.l1_batch_number.unwrap(),
-        l2_message_index,
-        l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
-        message: message.0.into(),
-        sender,
-        proof,
-    })
 }
 
 /// A middleware for interacting with Zksync node.
@@ -208,6 +120,38 @@ pub trait ZksyncMiddleware: Middleware {
     /// * `client`: `JsonRpcClient` instance to perform the request with
     /// * `tx_hash`: Hash of the transaction
     async fn zks_get_transaction_receipt(&self, tx_hash: H256) -> Result<ZksyncTransactionReceipt>;
+
+    /// Get the parameters necessary to call `finalize_withdrawals`.
+    async fn finalize_withdrawal_params(
+        &self,
+        withdrawal_hash: H256,
+        index: usize,
+    ) -> Result<WithdrawalParams>;
+
+    /// Get the `zksync` withdrawal logs by tx hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: `JsonRpcClient` instance to perform the request with
+    /// * `tx_hash`: Hash of the transaction
+    async fn get_withdrawal_log(
+        &self,
+        tx_hash: H256,
+        index: usize,
+    ) -> Result<(ZKSLog, Option<U64>)>;
+
+    /// Get the `L2ToL1Log` by index.
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: A `JsonRpcClient` to perform requests with
+    /// * `tx_hash`: Hash of the transaction
+    /// * `index`: Index of the `L2ToL1Log` from the transaction receipt.
+    async fn get_withdrawal_l2_to_l1_log(
+        &self,
+        tx_hash: H256,
+        index: usize,
+    ) -> Result<(L2ToL1Log, Option<U64>)>;
 }
 
 #[async_trait]
@@ -258,5 +202,80 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .await?;
 
         Ok(res)
+    }
+
+    async fn finalize_withdrawal_params(
+        &self,
+        withdrawal_hash: H256,
+        index: usize,
+    ) -> Result<WithdrawalParams> {
+        let (log, l1_batch_tx_id) = self.get_withdrawal_log(withdrawal_hash, index).await?;
+
+        let (_, l2_to_l1_log_index) = self
+            .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
+            .await?;
+
+        let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
+            .expect("H256 always has enough bytes to fill H160. qed")
+            .into();
+
+        let proof = self
+            .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
+            .await?
+            .expect("Log proof should be present. qed");
+
+        let message = log.data;
+        let l2_message_index = proof.id;
+        let proof: Vec<_> = proof
+            .proof
+            .iter()
+            .map(|hash| hash.to_fixed_bytes())
+            .collect();
+
+        Ok(WithdrawalParams {
+            l1_batch_number: log.l1_batch_number.unwrap(),
+            l2_message_index,
+            l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
+            message: message.0.into(),
+            sender,
+            proof,
+        })
+    }
+
+    async fn get_withdrawal_log(
+        &self,
+        tx_hash: H256,
+        index: usize,
+    ) -> Result<(ZKSLog, Option<U64>)> {
+        let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
+
+        let log = receipt
+            .logs
+            .into_iter()
+            .filter(|entry| {
+                entry.address == L1_MESSENGER_ADDRESS
+                    && entry.topics[0] == l1messenger::L1MessageSentFilter::signature()
+            })
+            .nth(index)
+            .ok_or(Error::NoSuchIndex(index))?;
+
+        Ok((log, receipt.l1_batch_tx_index))
+    }
+
+    async fn get_withdrawal_l2_to_l1_log(
+        &self,
+        tx_hash: H256,
+        index: usize,
+    ) -> Result<(L2ToL1Log, Option<U64>)> {
+        let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
+
+        let log = receipt
+            .l2_to_l1_logs
+            .into_iter()
+            .filter(|entry| entry.sender == L1_MESSENGER_ADDRESS)
+            .nth(index)
+            .ok_or(Error::NoSuchIndex(index))?;
+
+        Ok((log, Some(U64::from(index))))
     }
 }

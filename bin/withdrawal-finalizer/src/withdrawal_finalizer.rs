@@ -10,8 +10,7 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    get_withdrawal_l2_to_l1_log, get_withdrawal_log, l1bridge::L1Bridge, zksync_contract::ZkSync,
-    BlockEvent, WithdrawalEvent, ZksyncMiddleware,
+    l1bridge::L1Bridge, zksync_contract::ZkSync, BlockEvent, WithdrawalEvent, ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -249,10 +248,13 @@ where
     M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    let log = get_withdrawal_log(l2_middleware, withdrawal_hash, index).await?;
+    let log = l2_middleware
+        .get_withdrawal_log(withdrawal_hash, index)
+        .await?;
 
-    let (_, l2_to_l1_log_index) =
-        get_withdrawal_l2_to_l1_log(l2_middleware, withdrawal_hash, index).await?;
+    let (_, l2_to_l1_log_index) = l2_middleware
+        .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
+        .await?;
 
     let proof = match l2_middleware
         .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
