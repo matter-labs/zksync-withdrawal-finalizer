@@ -17,6 +17,7 @@ use ethers::{
     types::{Address, Bytes, H160, H256, U64},
 };
 
+use l1messenger::codegen::L1MessageSentFilter;
 use zksync_types::{
     BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
     TransactionReceipt as ZksyncTransactionReceipt,
@@ -257,7 +258,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .into_iter()
             .filter(|entry| {
                 entry.address == L1_MESSENGER_ADDRESS
-                    && entry.topics[0] == l1messenger::L1MessageSentFilter::signature()
+                    && entry.topics[0] == L1MessageSentFilter::signature()
             })
             .nth(index)
             .ok_or(Error::NoSuchIndex(index))?;

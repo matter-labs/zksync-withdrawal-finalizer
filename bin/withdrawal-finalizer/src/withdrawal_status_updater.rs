@@ -4,7 +4,7 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use sqlx::PgPool;
 use tokio::time::sleep;
 
-use client::{l1bridge::L1Bridge, zksync_contract::ZkSync, ZksyncMiddleware};
+use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use storage::update_withdrawals_to_finalized;
 
 use crate::{withdrawal_finalizer::is_withdrawal_finalized, Result};
@@ -13,8 +13,8 @@ const DEFAULT_UPDATER_BACKOFF: u64 = 5;
 
 pub async fn run<M1, M2>(
     pool: PgPool,
-    zksync_contract: ZkSync<M1>,
-    l1_bridge: L1Bridge<M1>,
+    zksync_contract: IZkSync<M1>,
+    l1_bridge: IL1Bridge<M1>,
     l2_middleware: M2,
     backoff: Option<u64>,
 ) -> Result<()>

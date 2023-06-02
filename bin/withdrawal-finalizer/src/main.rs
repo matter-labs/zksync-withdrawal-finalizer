@@ -18,10 +18,10 @@ use sqlx::{PgConnection, PgPool};
 
 use cli::Args;
 use client::{
-    l1bridge::L1Bridge,
-    l2bridge::L2Bridge,
+    l1bridge::codegen::IL1Bridge,
+    l2bridge::codegen::IL2Bridge,
     l2standard_token::WithdrawalEventsStream,
-    zksync_contract::{BlockEvents, ZkSync},
+    zksync_contract::{codegen::IZkSync, BlockEvents},
     ZksyncMiddleware,
 };
 use config::Config;
@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
         .unwrap();
     let client_l2 = Arc::new(provider_l2);
 
-    let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
+    let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(client_l1.clone()).await?;
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
@@ -170,7 +170,7 @@ async fn main() -> Result<()> {
     let mut tokens = vec![];
 
     for l1_token in &l1_tokens {
-        let l2_token = l2_bridge.l2_token_address(l1_token.l1_address).await?;
+        let l2_token = l2_bridge.l_2_token_address(l1_token.l1_address).await?;
 
         let l1_token_address = l1_token.l1_address;
         log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
@@ -181,9 +181,9 @@ async fn main() -> Result<()> {
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let l1_bridge = L1Bridge::new(config.l1_eth_bridge_addr, client_l1.clone());
+    let l1_bridge = IL1Bridge::new(config.l1_eth_bridge_addr, client_l1.clone());
 
-    let zksync_contract = ZkSync::new(config.main_zksync_contract, client_l1.clone());
+    let zksync_contract = IZkSync::new(config.main_zksync_contract, client_l1.clone());
 
     let provider_l2 = Provider::<Ws>::connect_with_reconnects(config.zk_server_ws_url.as_str(), 0)
         .await

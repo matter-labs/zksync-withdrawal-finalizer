@@ -1,9 +1,7 @@
 //! ABI wrappers for `L1Messenger` contract.
 
-pub use codegen::L1MessageSentFilter;
-
 #[allow(missing_docs)]
-mod codegen {
+pub mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(

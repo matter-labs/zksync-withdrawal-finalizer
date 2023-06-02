@@ -4,13 +4,15 @@ use ethers::{
     providers::{JsonRpcClient, Middleware},
     types::{Address, H256},
 };
+use eyre::anyhow;
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    l1bridge::L1Bridge, zksync_contract::ZkSync, BlockEvent, WithdrawalEvent, ZksyncMiddleware,
+    l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, BlockEvent, WithdrawalEvent,
+    ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -18,8 +20,8 @@ use crate::Result;
 pub struct WithdrawalFinalizer<M1, M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
-    l1_bridge: L1Bridge<M1>,
-    zksync_contract: ZkSync<M1>,
+    l1_bridge: IL1Bridge<M1>,
+    zksync_contract: IZkSync<M1>,
 }
 
 impl<M1, M2> WithdrawalFinalizer<M1, M2>
@@ -33,8 +35,8 @@ where
     pub fn new(
         l2_provider: Arc<M2>,
         pgpool: PgPool,
-        zksync_contract: ZkSync<M1>,
-        l1_bridge: L1Bridge<M1>,
+        zksync_contract: IZkSync<M1>,
+        l1_bridge: IL1Bridge<M1>,
     ) -> Self {
         Self {
             l2_provider,
@@ -234,16 +236,16 @@ where
     }
 }
 
-pub async fn is_withdrawal_finalized<M1, M2>(
+pub async fn is_withdrawal_finalized<'a, M1, M2>(
     withdrawal_hash: H256,
     index: usize,
     sender: Address,
-    zksync_contract: &ZkSync<M1>,
-    l1_bridge: &L1Bridge<M1>,
-    l2_middleware: &M2,
+    zksync_contract: &'a IZkSync<M1>,
+    l1_bridge: &'a IL1Bridge<M1>,
+    l2_middleware: &'a M2,
 ) -> Result<bool>
 where
-    M1: Middleware,
+    M1: Middleware + 'a,
     <M1 as Middleware>::Provider: JsonRpcClient,
     M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
@@ -272,7 +274,9 @@ where
                 log.0.l1_batch_number.unwrap().as_u64().into(),
                 l2_message_index.into(),
             )
-            .await?;
+            .call()
+            .await
+            .map_err(|e| anyhow!("{e}"))?;
 
         log::debug!("eth withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
 
@@ -283,7 +287,9 @@ where
                 log.0.l1_batch_number.unwrap().as_u64().into(),
                 l2_message_index.into(),
             )
-            .await?;
+            .call()
+            .await
+            .map_err(|e| anyhow!("{e}"))?;
 
         log::debug!("withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
 

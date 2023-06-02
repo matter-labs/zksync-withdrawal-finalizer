@@ -4,24 +4,23 @@ use std::{fmt::Debug, sync::Arc};
 
 use ethers::{
     abi::RawLog,
-    prelude::{EthEvent, Event},
+    prelude::EthEvent,
     providers::{Middleware, PubsubClient},
-    types::{Address, BlockNumber, Bytes, Filter, ValueOrArray, H256, U256},
+    types::{Address, BlockNumber, Filter, ValueOrArray, H256},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
 use crate::Result;
 
 #[allow(missing_docs)]
-mod codegen {
+pub mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(IZkSync, "$CARGO_MANIFEST_DIR/src/contracts/IZkSync.json");
 }
 
-pub use codegen::{
+use codegen::{
     BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
-    FinalizeEthWithdrawalCall, IZkSyncEvents,
 };
 
 /// An `enum` wrapping different block `event`s
@@ -98,67 +97,6 @@ impl std::fmt::Display for BlockEvent {
                 .field("total_blocks_executed", &br.total_blocks_executed)
                 .finish(),
         }
-    }
-}
-
-/// A struct wrapper for interacting with `ZkSync` contract.
-#[derive(Clone)]
-pub struct ZkSync<M> {
-    /// Cogedenerated contract wrapper.
-    pub contract: codegen::IZkSync<M>,
-}
-
-impl<M: Middleware> ZkSync<M> {
-    /// Create a new instalce of `ZkSync` contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `address` - An address of the contract
-    /// * `provider` - A middleware to perform calls to the contract
-    pub fn new(address: Address, provider: Arc<M>) -> Self {
-        let contract = codegen::IZkSync::new(address, provider);
-
-        Self { contract }
-    }
-
-    /// Call `finalizeEthWithdrawal` method of `ZkSync` contract.
-    pub async fn finalize_eth_withdrawal(
-        &self,
-        l2_block_number: U256,
-        l2_message_index: U256,
-        l2_tx_number_in_block: u16,
-        message: Bytes,
-        merkle_proof: Vec<[u8; 32]>,
-    ) -> Result<()> {
-        self.contract
-            .finalize_eth_withdrawal(
-                l2_block_number,
-                l2_message_index,
-                l2_tx_number_in_block,
-                message,
-                merkle_proof,
-            )
-            .call()
-            .await
-            .map_err(Into::into)
-    }
-
-    /// Get the [`ethers::contract::Event`] from the contract.
-    pub fn event_of_type<D: EthEvent>(&self) -> Event<Arc<M>, M, D> {
-        self.contract.event::<D>()
-    }
-
-    /// Call `isEthWithdrawalFinalized` method from the contract.
-    pub async fn is_eth_withdrawal_finalized(
-        &self,
-        l2_block_number: U256,
-        l2_message_index: U256,
-    ) -> Result<bool> {
-        self.contract
-            .is_eth_withdrawal_finalized(l2_block_number, l2_message_index)
-            .call()
-            .await
-            .map_err(Into::into)
     }
 }
 
