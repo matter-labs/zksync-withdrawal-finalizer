@@ -497,8 +497,6 @@ dependencies = [
  "auto_impl",
  "chrono",
  "ethers",
- "futures",
- "log",
  "serde",
  "thiserror",
 ]

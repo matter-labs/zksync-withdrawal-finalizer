@@ -18,16 +18,15 @@ use sqlx::{PgConnection, PgPool};
 
 use cli::Args;
 use client::{
-    l1bridge::codegen::IL1Bridge,
-    l2bridge::codegen::IL2Bridge,
-    l2standard_token::WithdrawalEventsStream,
-    zksync_contract::{codegen::IZkSync, BlockEvents},
+    l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
     ZksyncMiddleware,
 };
 use config::Config;
+use subscriptions::{BlockEvents, WithdrawalEventsStream};
 
 mod cli;
 mod config;
+mod subscriptions;
 mod withdrawal_finalizer;
 mod withdrawal_status_updater;
 
@@ -132,7 +131,7 @@ async fn main() -> Result<()> {
 
     let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
-    let event_mux = BlockEvents::new(client_l1.clone()).await?;
+    let event_mux = BlockEvents::new(client_l1.clone())?;
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
     let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
 
