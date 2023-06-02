@@ -10,8 +10,8 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    get_l1_batch_block_range, get_log_proof, get_withdrawal_l2_to_l1_log, get_withdrawal_log,
-    l1bridge::L1Bridge, zksync_contract::ZkSync, BlockEvent, WithdrawalEvent,
+    get_withdrawal_l2_to_l1_log, get_withdrawal_log, l1bridge::L1Bridge, zksync_contract::ZkSync,
+    BlockEvent, WithdrawalEvent, ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -27,7 +27,7 @@ impl<M1, M2> WithdrawalFinalizer<M1, M2>
 where
     M1: Middleware,
     <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
+    M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
@@ -107,11 +107,10 @@ where
                 block_number,
                 event,
             } => {
-                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    event.block_number.as_u64() as u32,
-                )
-                .await?
+                if let Some((range_begin, range_end)) = self
+                    .l2_provider
+                    .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                    .await?
                 {
                     storage::committed_new_batch(
                         &mut pgconn,
@@ -133,19 +132,17 @@ where
                 let current_first_verified_batch = event.previous_last_verified_block.as_u64() + 1;
                 let current_last_verified_batch = event.current_last_verified_block.as_u64();
 
-                let range_begin = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    current_first_verified_batch as u32,
-                )
-                .await?
-                .map(|range| range.0.as_u64());
+                let range_begin = self
+                    .l2_provider
+                    .get_l1_batch_block_range(current_first_verified_batch as u32)
+                    .await?
+                    .map(|range| range.0.as_u64());
 
-                let range_end = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    current_last_verified_batch as u32,
-                )
-                .await?
-                .map(|range| range.1.as_u64());
+                let range_end = self
+                    .l2_provider
+                    .get_l1_batch_block_range(current_last_verified_batch as u32)
+                    .await?
+                    .map(|range| range.1.as_u64());
 
                 if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
                     storage::verified_new_batch(&mut pgconn, range_begin, range_end, block_number)
@@ -163,11 +160,10 @@ where
                 block_number,
                 event,
             } => {
-                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    event.block_number.as_u64() as u32,
-                )
-                .await?
+                if let Some((range_begin, range_end)) = self
+                    .l2_provider
+                    .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                    .await?
                 {
                     storage::executed_new_batch(
                         &mut pgconn,
@@ -250,24 +246,17 @@ pub async fn is_withdrawal_finalized<M1, M2>(
 where
     M1: Middleware,
     <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
+    M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    let client_l2 = l2_middleware.provider().as_ref();
-
-    let log = get_withdrawal_log(client_l2, withdrawal_hash, index).await?;
+    let log = get_withdrawal_log(l2_middleware, withdrawal_hash, index).await?;
 
     let (_, l2_to_l1_log_index) =
-        get_withdrawal_l2_to_l1_log(client_l2, withdrawal_hash, index).await?;
+        get_withdrawal_l2_to_l1_log(l2_middleware, withdrawal_hash, index).await?;
 
-    let proof = match get_log_proof(
-        client_l2,
-        withdrawal_hash,
-        l2_to_l1_log_index
-            .expect("The L2ToL1LogIndex is always present in the trace. qed")
-            .as_usize(),
-    )
-    .await?
+    let proof = match l2_middleware
+        .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
+        .await?
     {
         Some(proof) => proof,
         None => return Ok(false),

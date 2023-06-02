@@ -9,9 +9,11 @@ mod error;
 
 pub use error::{Error, Result};
 
+use async_trait::async_trait;
+use auto_impl::auto_impl;
 use ethers::{
     contract::EthEvent,
-    providers::{JsonRpcClient, ProviderError},
+    providers::{JsonRpcClient, Middleware, Provider},
     types::{Address, Bytes, H160, H256, U64},
 };
 
@@ -42,23 +44,6 @@ pub mod zksync_types;
 pub fn is_eth(address: Address) -> bool {
     address == ETH_TOKEN_ADDRESS.parse().unwrap() || address == ETH_ADDRESS.parse().unwrap()
 }
-/// Get the `zksync` transaction receipt by transaction hash
-///
-/// # Arguments
-///
-/// * `client`: `JsonRpcClient` instance to perform the request with
-/// * `tx_hash`: Hash of the transaction
-pub async fn get_transaction_receipt<J: JsonRpcClient>(
-    client: &J,
-    tx_hash: H256,
-) -> Result<ZksyncTransactionReceipt> {
-    let receipt = client
-        .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
-        .await
-        .map_err(Into::<ProviderError>::into)?;
-
-    Ok(receipt)
-}
 
 #[allow(missing_docs)]
 pub const L1_MESSENGER_ADDRESS: Address = H160([
@@ -72,12 +57,12 @@ pub const L1_MESSENGER_ADDRESS: Address = H160([
 ///
 /// * `client`: `JsonRpcClient` instance to perform the request with
 /// * `tx_hash`: Hash of the transaction
-pub async fn get_withdrawal_log<J: JsonRpcClient>(
-    client: &J,
+pub async fn get_withdrawal_log<M: ZksyncMiddleware>(
+    middleware: &M,
     tx_hash: H256,
     index: usize,
 ) -> Result<(ZKSLog, Option<U64>)> {
-    let receipt = get_transaction_receipt(client, tx_hash).await?;
+    let receipt = middleware.zks_get_transaction_receipt(tx_hash).await?;
 
     let log = receipt
         .logs
@@ -99,12 +84,12 @@ pub async fn get_withdrawal_log<J: JsonRpcClient>(
 /// * `client`: A `JsonRpcClient` to perform requests with
 /// * `tx_hash`: Hash of the transaction
 /// * `index`: Index of the `L2ToL1Log` from the transaction receipt.
-pub async fn get_withdrawal_l2_to_l1_log<J: JsonRpcClient>(
-    client: &J,
+pub async fn get_withdrawal_l2_to_l1_log<M: ZksyncMiddleware>(
+    middleware: &M,
     tx_hash: H256,
     index: usize,
 ) -> Result<(L2ToL1Log, Option<U64>)> {
-    let receipt = get_transaction_receipt(client, tx_hash).await?;
+    let receipt = ZksyncMiddleware::zks_get_transaction_receipt(middleware, tx_hash).await?;
 
     let log = receipt
         .l2_to_l1_logs
@@ -114,79 +99,6 @@ pub async fn get_withdrawal_l2_to_l1_log<J: JsonRpcClient>(
         .ok_or(Error::NoSuchIndex(index))?;
 
     Ok((log, Some(U64::from(index))))
-}
-
-/// Call `zks_getBlockDetails` RPC method.
-///
-/// # Arguments
-///
-/// * `client` - RPC client to make request with
-/// * `block_number` - Number of the block
-pub async fn get_block_details<J: JsonRpcClient>(
-    client: &J,
-    block_number: u32,
-) -> Result<Option<BlockDetails>> {
-    let block_details = client
-        .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
-        .await
-        .map_err(Into::<ProviderError>::into)?;
-
-    Ok(block_details)
-}
-
-/// Get the `zksync` withdrawal proof by tx hash
-///
-/// # Arguments
-///
-/// * `client`: `JsonRpcClient` instance to perform the request with
-/// * `tx_hash`: Hash of the withdrawal transaction
-pub async fn get_log_proof<J: JsonRpcClient>(
-    client: &J,
-    tx_hash: H256,
-    _index: usize,
-) -> Result<Option<L2ToL1LogProof>> {
-    let proof = client
-        .request::<[H256; 1], Option<L2ToL1LogProof>>("zks_getL2ToL1LogProof", [tx_hash])
-        .await
-        .map_err(Into::<ProviderError>::into)?;
-
-    Ok(proof)
-}
-
-/// Call `zks_getL1BatchBlockRange` RPC method.
-///
-/// # Arguments
-///
-/// * `client`: `JsonRpcCLient` instance to perform the request with
-/// * `batch_number`: the number of the batch
-pub async fn get_l1_batch_block_range<J: JsonRpcClient>(
-    client: &J,
-    batch_number: u32,
-) -> Result<Option<(U64, U64)>> {
-    let range = client
-        .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
-        .await
-        .map_err(Into::<ProviderError>::into)?;
-
-    Ok(range)
-}
-
-/// Call `zks_getConfirmedTokens` RPC method.
-///
-/// # Arguments
-///
-/// * `client`: `JsonRpcClient` instance to perform the request with
-/// * `from`: beginning of the requested token interval
-/// * `limit: length of the requested token interval
-pub async fn get_confirmed_tokens<J: JsonRpcClient>(
-    client: &J,
-    from: u32,
-    limit: u8,
-) -> Result<Vec<Token>> {
-    Ok(client
-        .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
-        .await
-        .map_err(Into::<ProviderError>::into)?)
 }
 
 /// Withdrawal params
@@ -211,28 +123,24 @@ pub struct WithdrawalParams {
 }
 
 /// Get the parameters necessary to call `finalize_withdrawals`.
-pub async fn finalize_withdrawal_params<J: JsonRpcClient>(
-    client: &J,
+pub async fn finalize_withdrawal_params<M: ZksyncMiddleware>(
+    middleware: &M,
     withdrawal_hash: H256,
     index: usize,
 ) -> Result<WithdrawalParams> {
-    let (log, l1_batch_tx_id) = get_withdrawal_log(client, withdrawal_hash, index).await?;
+    let (log, l1_batch_tx_id) = get_withdrawal_log(middleware, withdrawal_hash, index).await?;
+
     let (_, l2_to_l1_log_index) =
-        get_withdrawal_l2_to_l1_log(client, withdrawal_hash, index).await?;
+        get_withdrawal_l2_to_l1_log(middleware, withdrawal_hash, index).await?;
 
     let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
         .expect("H256 always has enough bytes to fill H160. qed")
         .into();
 
-    let proof = get_log_proof(
-        client,
-        withdrawal_hash,
-        l2_to_l1_log_index
-            .expect("The L2ToL2LogIndex is always present in the trace. qed")
-            .as_usize(),
-    )
-    .await?
-    .expect("Log proof should be present. qed");
+    let proof = middleware
+        .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
+        .await?
+        .expect("Log proof should be present. qed");
 
     let message = log.data;
     let l2_message_index = proof.id;
@@ -250,4 +158,105 @@ pub async fn finalize_withdrawal_params<J: JsonRpcClient>(
         sender,
         proof,
     })
+}
+
+/// A middleware for interacting with Zksync node.
+#[async_trait]
+#[auto_impl(&, Arc, Box)]
+pub trait ZksyncMiddleware: Middleware {
+    /// Call `zks_getBlockDetails` RPC method.
+    ///
+    /// # Arguments
+    ///
+    /// * `client` - RPC client to make request with
+    /// * `block_number` - Number of the block
+    async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>>;
+
+    /// Get the `zksync` withdrawal proof by tx hash
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: `JsonRpcClient` instance to perform the request with
+    /// * `tx_hash`: Hash of the withdrawal transaction
+    async fn get_log_proof(
+        &self,
+        tx_hash: H256,
+        l2_to_l1_index: Option<u64>,
+    ) -> Result<Option<L2ToL1LogProof>>;
+
+    /// Call `zks_getL1BatchBlockRange` RPC method.
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: `JsonRpcCLient` instance to perform the request with
+    /// * `batch_number`: the number of the batch
+    async fn get_l1_batch_block_range(&self, batch_number: u32) -> Result<Option<(U64, U64)>>;
+
+    /// Call `zks_getConfirmedTokens` RPC method.
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: `JsonRpcClient` instance to perform the request with
+    /// * `from`: beginning of the requested token interval
+    /// * `limit: length of the requested token interval
+    async fn get_confirmed_tokens(&self, from: u32, limit: u8) -> Result<Vec<Token>>;
+
+    /// Get the `zksync` transaction receipt by transaction hash
+    ///
+    /// # Arguments
+    ///
+    /// * `client`: `JsonRpcClient` instance to perform the request with
+    /// * `tx_hash`: Hash of the transaction
+    async fn zks_get_transaction_receipt(&self, tx_hash: H256) -> Result<ZksyncTransactionReceipt>;
+}
+
+#[async_trait]
+impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
+    async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>> {
+        let res = self
+            .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
+            .await?;
+
+        Ok(res)
+    }
+
+    async fn get_log_proof(
+        &self,
+        tx_hash: H256,
+        l2_to_l1_index: Option<u64>,
+    ) -> Result<Option<L2ToL1LogProof>> {
+        let params = match l2_to_l1_index {
+            Some(idx) => vec![
+                ethers::utils::serialize(&tx_hash),
+                ethers::utils::serialize(&idx),
+            ],
+            None => vec![ethers::utils::serialize(&tx_hash)],
+        };
+        let res = self.request("zks_getL2ToL1LogProof", params).await?;
+
+        Ok(res)
+    }
+
+    async fn get_l1_batch_block_range(&self, batch_number: u32) -> Result<Option<(U64, U64)>> {
+        let res = self
+            .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
+            .await?;
+        Ok(res)
+    }
+
+    async fn get_confirmed_tokens(&self, from: u32, limit: u8) -> Result<Vec<Token>> {
+        let res = self
+            .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
+            .await?;
+
+        Ok(res)
+    }
+
+    async fn zks_get_transaction_receipt(&self, tx_hash: H256) -> Result<ZksyncTransactionReceipt> {
+        let res = self
+            .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
+            .await?;
+
+        Ok(res)
+    }
 }

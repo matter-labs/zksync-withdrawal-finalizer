@@ -18,11 +18,11 @@ use sqlx::{PgConnection, PgPool};
 
 use cli::Args;
 use client::{
-    get_block_details, get_confirmed_tokens,
     l1bridge::L1Bridge,
     l2bridge::L2Bridge,
     l2standard_token::WithdrawalEventsStream,
     zksync_contract::{BlockEvents, ZkSync},
+    ZksyncMiddleware,
 };
 use config::Config;
 
@@ -45,7 +45,9 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    let block_details = get_block_details(client_l2.provider().as_ref(), l2_block_number)
+    let block_details = client_l2
+        .provider()
+        .get_block_details(l2_block_number)
         .await?
         .expect("Always start from the block that there is info about; qed");
 
@@ -163,7 +165,7 @@ async fn main() -> Result<()> {
 
     log::info!("Starting from L1 block number {from_l1_block}");
 
-    let l1_tokens = get_confirmed_tokens(client_l2.provider().as_ref(), 0, u8::MAX).await?;
+    let l1_tokens = client_l2.get_confirmed_tokens(0, u8::MAX).await?;
 
     let mut tokens = vec![];
 

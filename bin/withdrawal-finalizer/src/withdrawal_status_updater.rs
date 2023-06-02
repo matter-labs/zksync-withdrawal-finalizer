@@ -4,10 +4,10 @@ use ethers::providers::{JsonRpcClient, Middleware};
 use sqlx::PgPool;
 use tokio::time::sleep;
 
-use client::{l1bridge::L1Bridge, zksync_contract::ZkSync};
+use client::{l1bridge::L1Bridge, zksync_contract::ZkSync, ZksyncMiddleware};
 use storage::update_withdrawals_to_finalized;
 
-use crate::Result;
+use crate::{withdrawal_finalizer::is_withdrawal_finalized, Result};
 
 const DEFAULT_UPDATER_BACKOFF: u64 = 5;
 
@@ -21,7 +21,7 @@ pub async fn run<M1, M2>(
 where
     M1: Clone + Middleware,
     <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
+    M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     let mut conn = pool.acquire().await?;
@@ -34,7 +34,7 @@ where
 
         let mut tx_hashes_and_indices_in_tx = Vec::with_capacity(unfinalized_withdrawals.len());
         for withdrawal in unfinalized_withdrawals.into_iter() {
-            if crate::withdrawal_finalizer::is_withdrawal_finalized(
+            if is_withdrawal_finalized(
                 withdrawal.event.tx_hash,
                 withdrawal.index_in_tx,
                 withdrawal.event.token,
