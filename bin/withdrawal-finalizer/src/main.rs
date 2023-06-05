@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
     let config = match args.config_path {
         Some(path) => Config::from_file(path)?,
         None => {
-            dotenvy::dotenv()?;
+            dotenvy::dotenv().ok();
             Config::init_from_env()?
         }
     };
