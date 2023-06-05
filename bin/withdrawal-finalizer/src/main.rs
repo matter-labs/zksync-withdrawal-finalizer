@@ -138,6 +138,7 @@ async fn main() -> Result<()> {
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
 
     let pgpool = PgPool::connect(config.database_url.as_str()).await?;
+    storage::migrate(&pgpool).await?;
 
     let from_l2_block = start_from_l2_block(
         client_l2.clone(),

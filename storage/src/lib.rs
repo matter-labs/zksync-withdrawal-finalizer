@@ -6,7 +6,7 @@
 //! Finalizer storage operations.
 
 use ethers::types::{H160, H256};
-use sqlx::{Connection, PgConnection};
+use sqlx::{Connection, PgConnection, PgPool};
 
 use client::WithdrawalEvent;
 
@@ -29,6 +29,13 @@ pub struct StoredWithdrawal {
 
     /// If the event is finalized
     pub is_finalized: bool,
+}
+
+/// Run migrations
+pub async fn migrate(pool: &PgPool) -> Result<()> {
+    sqlx::migrate!("./migrations").run(pool).await?;
+
+    Ok(())
 }
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
