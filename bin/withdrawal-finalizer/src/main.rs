@@ -16,17 +16,16 @@ use ethers::{
 use eyre::{anyhow, Result};
 use sqlx::{PgConnection, PgPool};
 
+use chain_events::{BlockEvents, WithdrawalEvents};
 use cli::Args;
 use client::{
     l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
     ZksyncMiddleware,
 };
 use config::Config;
-use subscriptions::{BlockEvents, WithdrawalEventsStream};
 
 mod cli;
 mod config;
-mod subscriptions;
 mod withdrawal_finalizer;
 mod withdrawal_status_updater;
 
@@ -133,7 +132,7 @@ async fn main() -> Result<()> {
 
     let event_mux = BlockEvents::new(client_l1.clone())?;
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
+    let we_mux = WithdrawalEvents::new(client_l2.clone()).await?;
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
