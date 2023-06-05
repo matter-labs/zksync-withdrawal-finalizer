@@ -17,7 +17,9 @@ use ethers::{
     types::{Address, Bytes, H160, H256, U64},
 };
 
+use l1bridge::codegen::IL1Bridge;
 use l1messenger::codegen::L1MessageSentFilter;
+use zksync_contract::codegen::IZkSync;
 use zksync_types::{
     BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
     TransactionReceipt as ZksyncTransactionReceipt,
@@ -281,5 +283,61 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .ok_or(Error::NoSuchIndex(index))?;
 
         Ok((log, Some(U64::from(index))))
+    }
+}
+
+/// Check if the withdrawal is finalized on L1.
+pub async fn is_withdrawal_finalized<'a, M1, M2>(
+    withdrawal_hash: H256,
+    index: usize,
+    sender: Address,
+    zksync_contract: &'a IZkSync<M1>,
+    l1_bridge: &'a IL1Bridge<M1>,
+    l2_middleware: &'a M2,
+) -> Result<bool>
+where
+    M1: Middleware + 'a,
+    <M1 as Middleware>::Provider: JsonRpcClient,
+    M2: ZksyncMiddleware,
+    <M2 as Middleware>::Provider: JsonRpcClient,
+{
+    let log = l2_middleware
+        .get_withdrawal_log(withdrawal_hash, index)
+        .await?;
+
+    let (_, l2_to_l1_log_index) = l2_middleware
+        .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
+        .await?;
+
+    let proof = match l2_middleware
+        .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
+        .await?
+    {
+        Some(proof) => proof,
+        None => return Ok(false),
+    };
+
+    let l2_message_index = proof.id;
+
+    if is_eth(sender) {
+        let is_finalized = zksync_contract
+            .is_eth_withdrawal_finalized(
+                log.0.l1_batch_number.unwrap().as_u64().into(),
+                l2_message_index.into(),
+            )
+            .call()
+            .await?;
+
+        Ok(is_finalized)
+    } else {
+        let is_finalized = l1_bridge
+            .is_withdrawal_finalized(
+                log.0.l1_batch_number.unwrap().as_u64().into(),
+                l2_message_index.into(),
+            )
+            .call()
+            .await?;
+
+        Ok(is_finalized)
     }
 }

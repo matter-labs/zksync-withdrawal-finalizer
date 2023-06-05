@@ -4,7 +4,6 @@ use ethers::{
     providers::{JsonRpcClient, Middleware},
     types::{Address, H256},
 };
-use eyre::anyhow;
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
@@ -224,7 +223,7 @@ where
         index: usize,
         sender: Address,
     ) -> Result<bool> {
-        is_withdrawal_finalized(
+        Ok(client::is_withdrawal_finalized(
             withdrawal_hash,
             index,
             sender,
@@ -232,67 +231,6 @@ where
             &self.l1_bridge,
             &self.l2_provider,
         )
-        .await
-    }
-}
-
-pub async fn is_withdrawal_finalized<'a, M1, M2>(
-    withdrawal_hash: H256,
-    index: usize,
-    sender: Address,
-    zksync_contract: &'a IZkSync<M1>,
-    l1_bridge: &'a IL1Bridge<M1>,
-    l2_middleware: &'a M2,
-) -> Result<bool>
-where
-    M1: Middleware + 'a,
-    <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: ZksyncMiddleware,
-    <M2 as Middleware>::Provider: JsonRpcClient,
-{
-    let log = l2_middleware
-        .get_withdrawal_log(withdrawal_hash, index)
-        .await?;
-
-    let (_, l2_to_l1_log_index) = l2_middleware
-        .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
-        .await?;
-
-    let proof = match l2_middleware
-        .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
-        .await?
-    {
-        Some(proof) => proof,
-        None => return Ok(false),
-    };
-
-    let l2_message_index = proof.id;
-
-    if client::is_eth(sender) {
-        let is_finalized = zksync_contract
-            .is_eth_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
-            .call()
-            .await
-            .map_err(|e| anyhow!("{e}"))?;
-
-        log::debug!("eth withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
-
-        Ok(is_finalized)
-    } else {
-        let is_finalized = l1_bridge
-            .is_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
-            .call()
-            .await
-            .map_err(|e| anyhow!("{e}"))?;
-
-        log::debug!("withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
-
-        Ok(is_finalized)
+        .await?)
     }
 }

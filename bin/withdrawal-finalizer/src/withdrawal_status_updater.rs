@@ -7,7 +7,7 @@ use tokio::time::sleep;
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use storage::update_withdrawals_to_finalized;
 
-use crate::{withdrawal_finalizer::is_withdrawal_finalized, Result};
+use crate::Result;
 
 const DEFAULT_UPDATER_BACKOFF: u64 = 5;
 
@@ -34,7 +34,7 @@ where
 
         let mut tx_hashes_and_indices_in_tx = Vec::with_capacity(unfinalized_withdrawals.len());
         for withdrawal in unfinalized_withdrawals.into_iter() {
-            if is_withdrawal_finalized(
+            if client::is_withdrawal_finalized(
                 withdrawal.event.tx_hash,
                 withdrawal.index_in_tx,
                 withdrawal.event.token,
