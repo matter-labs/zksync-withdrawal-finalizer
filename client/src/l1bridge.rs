@@ -9,7 +9,8 @@ use ethers::{
 
 use crate::Result;
 
-mod codegen {
+#[allow(missing_docs)]
+pub mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(

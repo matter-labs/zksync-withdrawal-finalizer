@@ -37,6 +37,10 @@ pub struct Config {
     #[envconfig(from = "CONTRACTS_DIAMOND_PROXY_ADDR")]
     pub main_zksync_contract: Address,
 
+    /// The timelock address
+    #[envconfig(from = "VALIDATOR_TIMELOCK_ADDR")]
+    pub timelock_address: Address,
+
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub zk_server_ws_url: Url,

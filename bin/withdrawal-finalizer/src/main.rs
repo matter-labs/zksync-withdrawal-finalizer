@@ -26,8 +26,11 @@ use client::{
 };
 use config::Config;
 
+use crate::subscriptions::L2ToL1Events;
+
 mod cli;
 mod config;
+mod subscriptions;
 mod withdrawal_finalizer;
 mod withdrawal_status_updater;
 
@@ -131,6 +134,9 @@ async fn main() -> Result<()> {
     let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(client_l1.clone()).await?;
+
+    let l2tol1events = L2ToL1Events::new(client_l1.clone());
+
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
     let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
 
@@ -210,6 +216,8 @@ async fn main() -> Result<()> {
     let block_events_handle =
         tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_tx));
 
+    let l2tol1_handle = tokio::spawn(l2tol1events.run(config.timelock_address));
+
     tokio::select! {
         r = block_events_handle => {
             log::error!("Block Events stream ended with {r:?}");
@@ -222,6 +230,9 @@ async fn main() -> Result<()> {
         }
         r = updater_handle => {
             log::error!("Withdrawals updater ended with {r:?}");
+        }
+        r = l2tol1_handle => {
+            log::error!("L2ToL1 handle ended with {r:?}");
         }
     }
 

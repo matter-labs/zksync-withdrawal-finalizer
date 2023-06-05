@@ -3,17 +3,19 @@
 use std::{fmt::Debug, sync::Arc};
 
 use ethers::{
-    abi::RawLog,
-    prelude::{EthEvent, Event},
+    abi::{AbiDecode, AbiError, RawLog},
+    prelude::{EthCall, EthEvent, Event},
     providers::{Middleware, PubsubClient},
     types::{Address, BlockNumber, Bytes, Filter, ValueOrArray, H256, U256},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
-use crate::Result;
+use crate::{
+    l1bridge::codegen::FinalizeWithdrawalCall, Result, ETH_TOKEN_ADDRESS, L1_MESSENGER_ADDRESS,
+};
 
 #[allow(missing_docs)]
-mod codegen {
+pub mod codegen {
     use ethers::prelude::abigen;
 
     abigen!(IZkSync, "$CARGO_MANIFEST_DIR/src/contracts/IZkSync.json");
@@ -23,6 +25,8 @@ pub use codegen::{
     BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
     FinalizeEthWithdrawalCall, IZkSyncEvents,
 };
+
+use self::codegen::CommitBlocksCall;
 
 /// An `enum` wrapping different block `event`s
 #[derive(Debug)]
@@ -273,4 +277,117 @@ where
 
         Ok(())
     }
+}
+
+/// A wrapper to implement a conpressed ABI encoding used in the project.
+#[derive(Default, Debug)]
+pub struct L2LogCompresed(pub codegen::L2Log);
+
+impl AbiDecode for L2LogCompresed {
+    fn decode(bytes: impl AsRef<[u8]>) -> std::result::Result<Self, AbiError> {
+        if bytes.as_ref().len() < 88 {
+            return Err(AbiError::DecodingError(ethers::abi::Error::InvalidData));
+        }
+
+        let bytes = bytes.as_ref();
+
+        let inner = codegen::L2Log {
+            l_2_shard_id: bytes[0],
+            is_service: bytes[1] != 0,
+            tx_number_in_block: u16::from_be_bytes([bytes[2], bytes[3]]),
+            sender: Address::from_slice(&bytes[4..24]),
+            key: bytes[24..56]
+                .try_into()
+                .expect("length has been checked; qed"),
+            value: bytes[56..88]
+                .try_into()
+                .expect("length has been checked; qed"),
+        };
+
+        Ok(Self(inner))
+    }
+}
+
+const L2_TO_L1_LOG_SERIALIZED_SIZE: usize = 88;
+
+/// Information about withdrawals from L2ToL1 logs.
+#[derive(Debug)]
+pub struct WithdrawalInfo {
+    /// L1 address of the token
+    pub token: Address,
+
+    /// Recepient of the withdrawal.
+    pub to: Address,
+
+    /// Amount of the withdrawal.
+    pub amount: U256,
+
+    /// Block number in which the withdrawal was committed on L1.
+    pub block_number: u64,
+}
+
+/// Given a [`CommitBlocksCall`] parse all withdrawal events from L2ToL1 logs.
+// TODO: rewrite in `nom`.
+pub fn parse_withdrawal_events_l1(
+    call: &CommitBlocksCall,
+    block_number: u64,
+) -> Vec<WithdrawalInfo> {
+    let mut withdrawals = vec![];
+
+    for data in &call.new_blocks_data {
+        let logs = &data.l_2_logs;
+        let length_bytes = match logs.get(..4) {
+            Some(b) => b,
+            None => continue,
+        };
+
+        let length = u32::from_be_bytes(
+            length_bytes
+                .try_into()
+                .expect("bytes length checked by .get(); qed"),
+        );
+
+        let logs = &logs[4..];
+
+        let mut current_message = 0;
+
+        for i in 0..length as usize {
+            let offset = i * L2_TO_L1_LOG_SERIALIZED_SIZE;
+            let log_entry =
+                L2LogCompresed::decode(&logs[offset..(offset + L2_TO_L1_LOG_SERIALIZED_SIZE)])
+                    .unwrap();
+
+            if log_entry.0.sender != L1_MESSENGER_ADDRESS {
+                continue;
+            }
+
+            let message = &data.l_2_arbitrary_length_messages[current_message];
+            if FinalizeEthWithdrawalCall::selector() == message[..4] {
+                let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
+                let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[24..56]).unwrap());
+
+                withdrawals.push(WithdrawalInfo {
+                    token: ETH_TOKEN_ADDRESS.parse().unwrap(),
+                    to,
+                    amount,
+                    block_number,
+                });
+            }
+
+            if FinalizeWithdrawalCall::selector() == message[..4] {
+                let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
+                let token = Address::from(TryInto::<[u8; 20]>::try_into(&message[24..44]).unwrap());
+                let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[44..76]).unwrap());
+                withdrawals.push(WithdrawalInfo {
+                    token,
+                    to,
+                    amount,
+                    block_number,
+                });
+            }
+            current_message += 1;
+        }
+    }
+
+    withdrawals
 }
