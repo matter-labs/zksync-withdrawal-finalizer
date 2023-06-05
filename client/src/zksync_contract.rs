@@ -331,6 +331,7 @@ pub struct WithdrawalInfo {
 pub fn parse_withdrawal_events_l1(
     call: &CommitBlocksCall,
     block_number: u64,
+    l2_erc20_bridge_addr: Address,
 ) -> Vec<WithdrawalInfo> {
     let mut withdrawals = vec![];
 
@@ -362,7 +363,11 @@ pub fn parse_withdrawal_events_l1(
             }
 
             let message = &data.l_2_arbitrary_length_messages[current_message];
-            if FinalizeEthWithdrawalCall::selector() == message[..4] {
+            let message_sender: Address = H256::from(log_entry.0.key).into();
+
+            if message_sender == ETH_TOKEN_ADDRESS.parse().unwrap()
+                && FinalizeEthWithdrawalCall::selector() == message[..4]
+            {
                 let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
                 let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[24..56]).unwrap());
 
@@ -374,7 +379,9 @@ pub fn parse_withdrawal_events_l1(
                 });
             }
 
-            if FinalizeWithdrawalCall::selector() == message[..4] {
+            if message_sender == l2_erc20_bridge_addr
+                && FinalizeWithdrawalCall::selector() == message[..4]
+            {
                 let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
                 let token = Address::from(TryInto::<[u8; 20]>::try_into(&message[24..44]).unwrap());
                 let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[44..76]).unwrap());

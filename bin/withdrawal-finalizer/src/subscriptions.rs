@@ -26,7 +26,7 @@ where
 {
     // TODO: The `subscribe_blocks` is probably not the best subscription strategy,
     // consider polling blocks in from some point in the past until [`BlockNumber::Safe`].
-    pub async fn run(self, timelock_address: Address) -> Result<()>
+    pub async fn run(self, timelock_address: Address, l2_erc20_bridge_addr: Address) -> Result<()>
 where {
         let mut blocks = self
             .middleware
@@ -61,8 +61,11 @@ where {
                 }
 
                 if let Ok(commit_blocks) = CommitBlocksCall::decode(tx.input) {
-                    let withdrawals =
-                        parse_withdrawal_events_l1(&commit_blocks, block_number.as_u64());
+                    let withdrawals = parse_withdrawal_events_l1(
+                        &commit_blocks,
+                        block_number.as_u64(),
+                        l2_erc20_bridge_addr,
+                    );
 
                     // TODO: write to storage happens here.
                     log::info!("withdrawals {withdrawals:#?}");

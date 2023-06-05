@@ -216,7 +216,8 @@ async fn main() -> Result<()> {
     let block_events_handle =
         tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_tx));
 
-    let l2tol1_handle = tokio::spawn(l2tol1events.run(config.timelock_address));
+    let l2tol1_handle =
+        tokio::spawn(l2tol1events.run(config.timelock_address, config.l2_erc20_bridge_addr));
 
     tokio::select! {
         r = block_events_handle => {
