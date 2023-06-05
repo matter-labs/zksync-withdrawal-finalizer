@@ -367,9 +367,16 @@ pub fn parse_withdrawal_events_l1(
 
             if message_sender == ETH_TOKEN_ADDRESS.parse().unwrap()
                 && FinalizeEthWithdrawalCall::selector() == message[..4]
+                && message.len() >= 56
             {
-                let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
-                let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[24..56]).unwrap());
+                let to = Address::from(
+                    TryInto::<[u8; 20]>::try_into(&message[4..24])
+                        .expect("message length was checked; qed"),
+                );
+                let amount = U256::from(
+                    TryInto::<[u8; 32]>::try_into(&message[24..56])
+                        .expect("message length was checked; qed"),
+                );
 
                 withdrawals.push(WithdrawalInfo {
                     token: ETH_TOKEN_ADDRESS.parse().unwrap(),
@@ -381,10 +388,20 @@ pub fn parse_withdrawal_events_l1(
 
             if message_sender == l2_erc20_bridge_addr
                 && FinalizeWithdrawalCall::selector() == message[..4]
+                && message.len() >= 68
             {
-                let to = Address::from(TryInto::<[u8; 20]>::try_into(&message[4..24]).unwrap());
-                let token = Address::from(TryInto::<[u8; 20]>::try_into(&message[24..44]).unwrap());
-                let amount = U256::from(TryInto::<[u8; 32]>::try_into(&message[44..76]).unwrap());
+                let to = Address::from(
+                    TryInto::<[u8; 20]>::try_into(&message[4..24])
+                        .expect("message length was checked; qed"),
+                );
+                let token = Address::from(
+                    TryInto::<[u8; 20]>::try_into(&message[24..44])
+                        .expect("message length was checked; qed"),
+                );
+                let amount = U256::from(
+                    TryInto::<[u8; 32]>::try_into(&message[44..76])
+                        .expect("message length was checked; qed"),
+                );
                 withdrawals.push(WithdrawalInfo {
                     token,
                     to,
