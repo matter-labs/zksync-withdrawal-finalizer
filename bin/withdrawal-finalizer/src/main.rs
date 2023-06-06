@@ -16,13 +16,11 @@ use ethers::{
 use eyre::{anyhow, Result};
 use sqlx::{PgConnection, PgPool};
 
+use chain_events::{BlockEvents, WithdrawalEvents};
 use cli::Args;
 use client::{
-    get_block_details, get_confirmed_tokens,
-    l1bridge::L1Bridge,
-    l2bridge::L2Bridge,
-    l2standard_token::WithdrawalEventsStream,
-    zksync_contract::{BlockEvents, ZkSync},
+    l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
+    ZksyncMiddleware,
 };
 use config::Config;
 
@@ -45,7 +43,9 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    let block_details = get_block_details(client_l2.provider().as_ref(), l2_block_number)
+    let block_details = client_l2
+        .provider()
+        .get_block_details(l2_block_number)
         .await?
         .expect("Always start from the block that there is info about; qed");
 
@@ -129,11 +129,11 @@ async fn main() -> Result<()> {
             .unwrap();
     let client_l2 = Arc::new(provider_l2);
 
-    let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
+    let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
-    let event_mux = BlockEvents::new(client_l1.clone()).await?;
+    let event_mux = BlockEvents::new(client_l1.clone())?;
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEventsStream::new(client_l2.clone()).await?;
+    let we_mux = WithdrawalEvents::new(client_l2.clone()).await?;
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
@@ -164,12 +164,12 @@ async fn main() -> Result<()> {
 
     log::info!("Starting from L1 block number {from_l1_block}");
 
-    let l1_tokens = get_confirmed_tokens(client_l2.provider().as_ref(), 0, u8::MAX).await?;
+    let l1_tokens = client_l2.get_confirmed_tokens(0, u8::MAX).await?;
 
     let mut tokens = vec![];
 
     for l1_token in &l1_tokens {
-        let l2_token = l2_bridge.l2_token_address(l1_token.l1_address).await?;
+        let l2_token = l2_bridge.l_2_token_address(l1_token.l1_address).await?;
 
         let l1_token_address = l1_token.l1_address;
         log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
@@ -180,9 +180,9 @@ async fn main() -> Result<()> {
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let l1_bridge = L1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
+    let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
-    let zksync_contract = ZkSync::new(config.diamond_proxy_addr, client_l1.clone());
+    let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
     let provider_l2 =
         Provider::<Ws>::connect_with_reconnects(config.api_web3_json_rpc_ws_url.as_str(), 0)

@@ -20,9 +20,10 @@ envconfig = "0.10.0"
 futures = "0.3.28"
 tokio-util = "0.7.8"
 sqlx = { version = "0.6.3", features = ["postgres", "runtime-tokio-rustls"] }
-
-client = { path = "../../client" }
-storage = { path = "../../storage" }
 tracing-subscriber = { version = "0.3.17", features = ["fmt", "std"] }
 itertools = "0.10.5"
 dotenvy = "0.15.7"
+
+client = { path = "../../client" }
+storage = { path = "../../storage" }
+chain-events = { path = "../../chain-events" }
