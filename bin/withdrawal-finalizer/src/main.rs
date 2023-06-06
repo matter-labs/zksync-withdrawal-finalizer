@@ -118,14 +118,15 @@ async fn main() -> Result<()> {
         }
     };
 
-    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.l1_ws_url.as_ref(), 0)
+    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
         .await
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let provider_l2 = Provider::<Ws>::connect_with_reconnects(config.zk_server_ws_url.as_str(), 0)
-        .await
-        .unwrap();
+    let provider_l2 =
+        Provider::<Ws>::connect_with_reconnects(config.api_web3_json_rpc_ws_url.as_str(), 0)
+            .await
+            .unwrap();
     let client_l2 = Arc::new(provider_l2);
 
     let l2_bridge = L2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
@@ -174,18 +175,19 @@ async fn main() -> Result<()> {
         log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
         tokens.push(l2_token);
     }
-    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.l1_ws_url.as_ref(), 0)
+    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
         .await
         .unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let l1_bridge = L1Bridge::new(config.l1_eth_bridge_addr, client_l1.clone());
+    let l1_bridge = L1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
-    let zksync_contract = ZkSync::new(config.main_zksync_contract, client_l1.clone());
+    let zksync_contract = ZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let provider_l2 = Provider::<Ws>::connect_with_reconnects(config.zk_server_ws_url.as_str(), 0)
-        .await
-        .unwrap();
+    let provider_l2 =
+        Provider::<Ws>::connect_with_reconnects(config.api_web3_json_rpc_ws_url.as_str(), 0)
+            .await
+            .unwrap();
     let client_l2 = Arc::new(provider_l2);
 
     let updater_handle = tokio::spawn(withdrawal_status_updater::run(
@@ -208,7 +210,7 @@ async fn main() -> Result<()> {
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 
     let block_events_handle =
-        tokio::spawn(event_mux.run(config.main_zksync_contract, from_l1_block, blocks_tx));
+        tokio::spawn(event_mux.run(config.diamond_proxy_addr, from_l1_block, blocks_tx));
 
     tokio::select! {
         r = block_events_handle => {
