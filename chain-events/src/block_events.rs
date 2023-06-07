@@ -76,7 +76,7 @@ where
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
-            .address(address.clone())
+            .address(address)
             .topic0(vec![
                 BlockCommitFilter::signature(),
                 BlocksVerificationFilter::signature(),
@@ -99,7 +99,7 @@ where
             .await
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
-        let mut logs = past_logs.chain(current_logs.map(|r| Ok(r)));
+        let mut logs = past_logs.chain(current_logs.map(Ok));
 
         while let Some(log) = logs.next().await {
             let log = log?;

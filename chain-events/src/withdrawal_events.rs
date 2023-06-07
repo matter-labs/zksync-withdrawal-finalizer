@@ -95,7 +95,7 @@ where
             .await
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
-        let mut logs = past_logs.chain(current_logs.map(|r| Ok(r)));
+        let mut logs = past_logs.chain(current_logs.map(Ok));
 
         while let Some(log) = logs.next().await {
             let log = log?;
