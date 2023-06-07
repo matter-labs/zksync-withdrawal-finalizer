@@ -13,7 +13,7 @@ use ethers::{
 
 use futures::{Sink, SinkExt, StreamExt};
 
-use crate::Result;
+use crate::{Error, Result};
 
 /// A convenience multiplexer for withdrawal-related events.
 pub struct WithdrawalEvents<M> {
@@ -62,17 +62,43 @@ where
     {
         addresses.push(ETH_TOKEN_ADDRESS);
 
-        let filter = Filter::new()
+        let latest_block = self
+            .middleware
+            .get_block(BlockNumber::Latest)
+            .await
+            .map_err(|e| Error::Middleware(e.to_string()))?
+            .expect("last block number always exists in a live network; qed")
+            .number
+            .expect("last block always has a number; qed");
+
+        let past_filter = Filter::new()
             .from_block(from_block)
+            .to_block(latest_block)
+            .address(addresses.clone())
+            .topic0(vec![
+                BridgeBurnFilter::signature(),
+                WithdrawalFilter::signature(),
+            ]);
+
+        let filter = Filter::new()
+            .from_block(latest_block)
             .address(addresses)
             .topic0(vec![
                 BridgeBurnFilter::signature(),
                 WithdrawalFilter::signature(),
             ]);
 
-        let mut logs = self.middleware.subscribe_logs(&filter).await?;
+        let past_logs = self.middleware.get_logs_paginated(&past_filter, 256);
+        let current_logs = self
+            .middleware
+            .subscribe_logs(&filter)
+            .await
+            .map_err(|e| Error::Middleware(e.to_string()))?;
+
+        let mut logs = past_logs.chain(current_logs.map(|r| Ok(r)));
 
         while let Some(log) = logs.next().await {
+            let log = log?;
             let raw_log: RawLog = log.clone().into();
 
             if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {

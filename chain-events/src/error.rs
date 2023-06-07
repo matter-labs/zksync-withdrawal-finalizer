@@ -1,15 +1,20 @@
-use ethers::prelude::MiddlewareError;
+use std::fmt::{Debug, Display};
+
+use ethers::providers::LogQueryError;
 
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum Error {
     #[error("Middleware error {0}")]
     Middleware(String),
+
+    #[error("LogQuery error {0}")]
+    LogQuery(String),
 }
 
-impl<M: MiddlewareError> From<M> for Error {
-    fn from(value: M) -> Self {
-        Self::Middleware(value.to_string())
+impl<E: Debug + Display> From<LogQueryError<E>> for Error {
+    fn from(value: LogQueryError<E>) -> Self {
+        Self::LogQuery(value.to_string())
     }
 }
 
