@@ -13,7 +13,7 @@ use client::{
     BlockEvent,
 };
 
-use crate::Result;
+use crate::{Error, Result};
 
 // A convenience multiplexer for `Block`-related events.
 //
@@ -64,8 +64,27 @@ where
         S: Sink<BlockEvent> + Unpin,
         <S as Sink<BlockEvent>>::Error: std::fmt::Debug,
     {
-        let filter = Filter::new()
+        let latest_block = self
+            .middleware
+            .get_block(BlockNumber::Latest)
+            .await
+            .map_err(|e| Error::Middleware(e.to_string()))?
+            .expect("last block number always exists in a live network; qed")
+            .number
+            .expect("last block always has a number; qed");
+
+        let past_filter = Filter::new()
             .from_block(from_block)
+            .to_block(latest_block)
+            .address(address)
+            .topic0(vec![
+                BlockCommitFilter::signature(),
+                BlocksVerificationFilter::signature(),
+                BlockExecutionFilter::signature(),
+            ]);
+
+        let filter = Filter::new()
+            .from_block(latest_block)
             .address(Into::<ValueOrArray<Address>>::into(address))
             .topic0(vec![
                 BlockCommitFilter::signature(),
@@ -73,9 +92,17 @@ where
                 BlockExecutionFilter::signature(),
             ]);
 
-        let mut logs = self.middleware.subscribe_logs(&filter).await?;
+        let past_logs = self.middleware.get_logs_paginated(&past_filter, 256);
+        let current_logs = self
+            .middleware
+            .subscribe_logs(&filter)
+            .await
+            .map_err(|e| Error::Middleware(e.to_string()))?;
+
+        let mut logs = past_logs.chain(current_logs.map(Ok));
 
         while let Some(log) = logs.next().await {
+            let log = log?;
             let block_number = match log.block_number {
                 Some(b) => b.as_u64(),
                 None => {
