@@ -1,18 +1,7 @@
-l1_tokens_to_process = [
-    "0xCA063A2AB07491eE991dCecb456D1265f842b568",
-    "0x63bfb2118771bd0da7A6936667A7BB705A06c1bA",
-    "0xd35CCeEAD182dcee0F148EbaC9447DA2c4D449c4",
-    "0x5C221E77624690fff6dd741493D735a17716c26B"
-]
-l1_web3_url = "https://testnet.era.zksync.dev"
-l1_ws_url = "wss://goerli.infura.io/ws/v3/1f737de7e38a4f1c8c37437ada7a08d8"
-zksync_web3_url = "https://testnet.era.zksync.dev"
-l1_eth_bridge_addr = "0x927DdFcc55164a59E0F33918D13a2D559bC10ce7"
-l1_erc20_bridge_addr = "0x00ff932A6d70E2B8f1Eb4919e1e09C1923E7e57b"
+eth_client_ws_url = "wss://goerli.infura.io/ws/v3/1f737de7e38a4f1c8c37437ada7a08d8"
+l1_erc20_bridge_proxy_addr = "0x927DdFcc55164a59E0F33918D13a2D559bC10ce7"
 l2_erc20_bridge_addr = "0x00ff932A6d70E2B8f1Eb4919e1e09C1923E7e57b"
-main_zksync_contract = "0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319"
-zk_server_ws_url = "wss://testnet.era.zksync.dev/ws"
-one_withdrawal_gas_limit = "0"
-batch_finalization_gas_limit = "0"
+diamond_proxy_addr = "0x1908e2BF4a88F91E4eF0DC72f02b8Ea36BEa2319"
+api_web3_json_rpc_ws_url = "wss://testnet.era.zksync.dev/ws"
 database_url = "postgres://postgres@localhost/finalizer_local"
-start_from_l2_block = 6501690
+start_from_l2_block = 7000000
