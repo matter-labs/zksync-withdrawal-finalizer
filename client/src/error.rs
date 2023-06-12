@@ -12,9 +12,6 @@ pub enum Error {
     #[error("Middleware error {0}")]
     Middleware(String),
 
-    #[error("Index not found {0}")]
-    NoSuchIndex(usize),
-
     #[error("Channel is closed")]
     ChannelClosed,
 }
