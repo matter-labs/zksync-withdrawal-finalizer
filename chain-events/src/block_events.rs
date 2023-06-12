@@ -145,7 +145,7 @@ where
             }
         }
 
-        log::info!("all event streams have terminated, exiting...");
+        vlog::info!("all event streams have terminated, exiting...");
 
         Ok(())
     }

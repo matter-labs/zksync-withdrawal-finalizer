@@ -79,11 +79,11 @@ where
         loop {
             tokio::select! {
                 Some(event) = block_events.next() => {
-                    log::info!("block event {event}");
+                    vlog::info!("block event {event}");
                     self.process_block_event(event).await?;
                 }
                 Some(event) = withdrawal_events.next() => {
-                    log::info!("withdrawal event {event:?}");
+                    vlog::info!("withdrawal event {event:?}");
                     if event.block_number > curr_l2_block_number {
                         self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
                         curr_l2_block_number = event.block_number;
@@ -91,7 +91,7 @@ where
                     in_block_events.push(event);
                 }
                 else => {
-                    log::info!("terminating finalizer");
+                    vlog::info!("terminating finalizer");
                     break
                 }
             }
@@ -120,7 +120,7 @@ where
                     )
                     .await?;
 
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to committed for range {range_begin}-{range_end}"
                     );
                 }
@@ -147,11 +147,11 @@ where
                 if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
                     storage::verified_new_batch(&mut pgconn, range_begin, range_end, block_number)
                         .await?;
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to verified for range {range_begin}-{range_end}"
                     );
                 } else {
-                    log::warn!(
+                    vlog::warn!(
                         "One of the verified ranges not found: {range_begin:?}, {range_end:?}"
                     );
                 }
@@ -173,7 +173,7 @@ where
                     )
                     .await?;
 
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to executed for range {range_begin}-{range_end}"
                     );
                 }
@@ -192,7 +192,7 @@ where
         let mut withdrawals_vec = vec![];
         for (_tx_hash, group) in group_by.into_iter() {
             for (index, event) in group.into_iter().enumerate() {
-                log::info!("withdrawal {event:?} index in transaction is {index}");
+                vlog::info!("withdrawal {event:?} index in transaction is {index}");
 
                 withdrawals_vec.push((event, index));
             }

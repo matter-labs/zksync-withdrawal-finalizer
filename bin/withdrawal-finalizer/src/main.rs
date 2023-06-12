@@ -104,11 +104,7 @@ async fn start_from_l2_block<M: Middleware>(
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    tracing_subscriber::fmt::init();
-
     let args = Args::parse();
-
-    log::info!("starting withdrawal finalizer");
 
     let config = match args.config_path {
         Some(path) => Config::from_file(path)?,
@@ -117,6 +113,19 @@ async fn main() -> Result<()> {
             Config::init_from_env()?
         }
     };
+
+    let sentry_guard = vlog::init();
+
+    if sentry_guard.is_some() {
+        vlog::info!(
+            "Starting Sentry url: {}, l1_network: {}, l2_network {}",
+            std::env::var("MISC_SENTRY_URL").unwrap(),
+            std::env::var("CHAIN_ETH_NETWORK").unwrap(),
+            std::env::var("CHAIN_ETH_ZKSYNC_NETWORK").unwrap(),
+        );
+    } else {
+        vlog::info!("No sentry url configured");
+    }
 
     let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
         .await
@@ -150,7 +159,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    log::info!("Starting from L2 block number {from_l2_block}");
+    vlog::info!("Starting from L2 block number {from_l2_block}");
 
     let (we_tx, we_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
@@ -165,7 +174,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    log::info!("Starting from L1 block number {from_l1_block}");
+    vlog::info!("Starting from L1 block number {from_l1_block}");
 
     let l1_tokens = client_l2.get_confirmed_tokens(0, u8::MAX).await?;
 
@@ -175,7 +184,7 @@ async fn main() -> Result<()> {
         let l2_token = l2_bridge.l_2_token_address(l1_token.l1_address).await?;
 
         let l1_token_address = l1_token.l1_address;
-        log::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
+        vlog::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
         tokens.push(l2_token);
     }
     let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
@@ -217,16 +226,16 @@ async fn main() -> Result<()> {
 
     tokio::select! {
         r = block_events_handle => {
-            log::error!("Block Events stream ended with {r:?}");
+            vlog::error!("Block Events stream ended with {r:?}");
         }
         r = withdrawal_events_handle => {
-            log::error!("Withdrawals Events stream ended with {r:?}");
+            vlog::error!("Withdrawals Events stream ended with {r:?}");
         }
         r = finalizer_handle => {
-            log::error!("Finalizer main loop ended with {r:?}");
+            vlog::error!("Finalizer main loop ended with {r:?}");
         }
         r = updater_handle => {
-            log::error!("Withdrawals updater ended with {r:?}");
+            vlog::error!("Withdrawals updater ended with {r:?}");
         }
     }
 

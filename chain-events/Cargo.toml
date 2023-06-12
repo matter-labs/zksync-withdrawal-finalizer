@@ -9,5 +9,6 @@ edition = "2021"
 client = { path = "../client" }
 ethers = "2.0.7"
 futures = "0.3.28"
-log = "0.4.18"
 thiserror = "1.0.40"
+
+vlog = { path = "../vlog" }
