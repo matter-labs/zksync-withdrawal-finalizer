@@ -45,7 +45,7 @@ jobs:
         with:
           push: true
           tags: |
-            "us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/zksync-withdrawal-finalizer:latest"
-            "us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/zksync-withdrawal-finalizer:${{ steps.tag.outputs.BUILD_ID }}"
+            "us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/era-withdrawal-finalizer:latest"
+            "us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/era-withdrawal-finalizer:${{ steps.tag.outputs.BUILD_ID }}"
           file: Dockerfile
           no-cache: true
