@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 //! A set of logging macros that print not only timestamp and log level,
 //! but also filename, line and column.
 //!
@@ -14,25 +16,14 @@
 
 use std::{borrow::Cow, str::FromStr};
 
-use opentelemetry::sdk::{resource::Resource, trace::Sampler};
-use opentelemetry::trace::{TraceContextExt, TraceId};
-use opentelemetry::KeyValue;
-use opentelemetry_otlp::WithExportConfig;
-use sentry::protocol::Event;
-use sentry::{types::Dsn, ClientInitGuard, ClientOptions};
+use sentry::{types::Dsn, ClientInitGuard};
 use std::backtrace::Backtrace;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub use chrono as __chrono;
 pub use sentry as __sentry;
 pub use tracing as __tracing;
 pub use tracing::{debug, info, log, trace};
-
-fn get_trace_id() -> TraceId {
-    let span = tracing::span::Span::current();
-    span.context().span().span_context().trace_id()
-}
 
 #[macro_export]
 macro_rules! warn {
@@ -149,23 +140,7 @@ fn get_sentry_url() -> Option<Dsn> {
     None
 }
 
-fn get_otlp_url() -> Option<String> {
-    std::env::var("MISC_OTLP_URL").ok().and_then(|url| {
-        if url.to_lowercase() == "unset" {
-            None
-        } else {
-            Some(url)
-        }
-    })
-}
-
 pub const DEFAULT_SAMPLING_RATIO: f64 = 0.1;
-
-fn get_sampling_ratio() -> f64 {
-    std::env::var("MISC_SAMPLING_RATIO")
-        .map(|x| x.as_str().parse::<f64>().unwrap())
-        .unwrap_or(DEFAULT_SAMPLING_RATIO)
-}
 
 /// Initialize logging with tracing and set up log format
 ///
@@ -175,72 +150,23 @@ fn get_sampling_ratio() -> f64 {
 #[must_use]
 pub fn init() -> Option<ClientInitGuard> {
     let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());
-    let service_name =
-        std::env::var("SERVICE_NAME").unwrap_or_else(|_| "UNKNOWN_SERVICE".to_string());
-    let namespace_name =
-        std::env::var("POD_NAMESPACE").unwrap_or_else(|_| "UNKNOWN_NAMESPACE".to_string());
-    let pod_name = std::env::var("POD_NAME").unwrap_or_else(|_| "UNKNOWN_POD".to_string());
-    let opentelemetry = get_otlp_url().map(|url| {
-        let otlp_exporter = opentelemetry_otlp::new_exporter().http().with_endpoint(url);
-        // TODO (SMA-1421): use more complex sampler.
-        let sampler = Sampler::TraceIdRatioBased(get_sampling_ratio());
 
-        let tracer = opentelemetry_otlp::new_pipeline()
-            .tracing()
-            .with_exporter(otlp_exporter)
-            .with_trace_config(
-                opentelemetry::sdk::trace::config()
-                    .with_resource(Resource::new(vec![
-                        KeyValue::new(
-                            opentelemetry_semantic_conventions::resource::SERVICE_NAME,
-                            service_name,
-                        ),
-                        KeyValue::new(
-                            opentelemetry_semantic_conventions::resource::K8S_NAMESPACE_NAME,
-                            namespace_name,
-                        ),
-                        KeyValue::new(
-                            opentelemetry_semantic_conventions::resource::K8S_POD_NAME,
-                            pod_name,
-                        ),
-                    ]))
-                    .with_sampler(sampler),
-            )
-            .install_simple()
-            .unwrap();
-        tracing_opentelemetry::layer().with_tracer(tracer)
-    });
     match log_format.as_str() {
         "plain" => {
-            if let Some(opentelemetry) = opentelemetry {
-                tracing_subscriber::registry()
-                    .with(opentelemetry)
-                    .with(fmt::Layer::default())
-                    .with(tracing_subscriber::EnvFilter::from_default_env())
-                    .init();
-            } else {
-                tracing_subscriber::registry()
-                    .with(fmt::Layer::default())
-                    .with(tracing_subscriber::EnvFilter::from_default_env())
-                    .init();
-            }
+            tracing_subscriber::registry()
+                .with(fmt::Layer::default())
+                .with(tracing_subscriber::EnvFilter::from_default_env())
+                .init();
         }
         "json" => {
             let timer = tracing_subscriber::fmt::time::UtcTime::rfc_3339();
             // must be set before sentry hook for sentry to function
             install_pretty_panic_hook();
-            if let Some(opentelemetry) = opentelemetry {
-                tracing_subscriber::registry()
-                    .with(opentelemetry)
-                    .with(fmt::Layer::default().with_timer(timer).json())
-                    .with(tracing_subscriber::EnvFilter::from_default_env())
-                    .init();
-            } else {
-                tracing_subscriber::registry()
-                    .with(fmt::Layer::default().with_timer(timer).json())
-                    .with(tracing_subscriber::EnvFilter::from_default_env())
-                    .init();
-            }
+
+            tracing_subscriber::registry()
+                .with(fmt::Layer::default().with_timer(timer).json())
+                .with(tracing_subscriber::EnvFilter::from_default_env())
+                .init();
         }
         _ => panic!("MISC_LOG_FORMAT has an unexpected value {}", log_format),
     };
@@ -254,8 +180,7 @@ pub fn init() -> Option<ClientInitGuard> {
             environment: Some(Cow::from(format!("{} - {}", l1_network, l2_network))),
             attach_stacktrace: true,
             ..Default::default()
-        }
-        .add_integration(TraceIdToSentry);
+        };
 
         sentry::init((sentry_url, options))
     })
@@ -285,12 +210,10 @@ fn install_pretty_panic_hook() {
         let backtrace_str = format!("{}", backtrace);
         let timestamp_str = format!("{}", timestamp.format("%Y-%m-%dT%H:%M:%S%.fZ"));
 
-        let trace_id = get_trace_id();
         println!(
             "{}",
             serde_json::json!({
                 "timestamp": timestamp_str,
-                "trace_id": trace_id.to_string(),
                 "level": "CRITICAL",
                 "fields": {
                     "message": panic_message,
@@ -300,20 +223,4 @@ fn install_pretty_panic_hook() {
             })
         );
     }));
-}
-
-struct TraceIdToSentry;
-
-impl sentry::Integration for TraceIdToSentry {
-    fn process_event(
-        &self,
-        mut event: Event<'static>,
-        _options: &ClientOptions,
-    ) -> Option<Event<'static>> {
-        let trace_id = get_trace_id();
-        event
-            .extra
-            .insert("trace_id".to_string(), trace_id.to_string().into());
-        Some(event)
-    }
 }
