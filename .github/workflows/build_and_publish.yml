@@ -1,4 +1,4 @@
-name: Build and publish zksync-withdrawal-finalizer image
+name: Build and publish era-withdrawal-finalizer image
 
 on:
   push:
