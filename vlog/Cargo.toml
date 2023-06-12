@@ -14,7 +14,7 @@ publish = false # This is an utility crate, not to be used by libraries.
 chrono = "0.4"
 tracing = { version = "0.1.26", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "time", "json"] }
-sentry = "0"
+sentry = { version = "0", default-features = false, features = ["reqwest", "rustls", "backtrace", "contexts", "panic", "transport", "anyhow"] }
 opentelemetry = { version = "0.17" }
 opentelemetry-otlp = { version = "0.10", features = ["http-proto", "reqwest-blocking-client"] }
 opentelemetry-semantic-conventions = "0.9"
