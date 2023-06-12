@@ -44,7 +44,7 @@ where
             )
             .await?
             {
-                log::debug!(
+                vlog::debug!(
                     "withdrawal {} with index in tx {} became finalized",
                     withdrawal.event.tx_hash,
                     withdrawal.index_in_tx

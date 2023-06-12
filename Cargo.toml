@@ -6,4 +6,5 @@ members = [
     "client",
     "chain-events",
     "storage",
+    "vlog",
 ]

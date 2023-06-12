@@ -130,7 +130,7 @@ where
                 }
             }
         }
-        log::info!("withdrawal streams being closed");
+        vlog::info!("withdrawal streams being closed");
 
         Ok(())
     }
