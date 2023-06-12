@@ -132,7 +132,7 @@ pub trait ZksyncMiddleware: Middleware {
         &self,
         withdrawal_hash: H256,
         index: usize,
-    ) -> Result<WithdrawalParams>;
+    ) -> Result<Option<WithdrawalParams>>;
 
     /// Get the `zksync` withdrawal logs by tx hash.
     ///
@@ -144,7 +144,7 @@ pub trait ZksyncMiddleware: Middleware {
         &self,
         tx_hash: H256,
         index: usize,
-    ) -> Result<(ZKSLog, Option<U64>)>;
+    ) -> Result<Option<(ZKSLog, Option<U64>)>>;
 
     /// Get the `L2ToL1Log` by index.
     ///
@@ -157,7 +157,7 @@ pub trait ZksyncMiddleware: Middleware {
         &self,
         tx_hash: H256,
         index: usize,
-    ) -> Result<(L2ToL1Log, Option<U64>)>;
+    ) -> Result<Option<(L2ToL1Log, Option<U64>)>>;
 }
 
 #[async_trait]
@@ -214,12 +214,19 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         &self,
         withdrawal_hash: H256,
         index: usize,
-    ) -> Result<WithdrawalParams> {
-        let (log, l1_batch_tx_id) = self.get_withdrawal_log(withdrawal_hash, index).await?;
+    ) -> Result<Option<WithdrawalParams>> {
+        let (log, l1_batch_tx_id) = match self.get_withdrawal_log(withdrawal_hash, index).await? {
+            Some(l) => l,
+            None => return Ok(None),
+        };
 
-        let (_, l2_to_l1_log_index) = self
+        let (_, l2_to_l1_log_index) = match self
             .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
-            .await?;
+            .await?
+        {
+            Some(l) => l,
+            None => return Ok(None),
+        };
 
         let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
             .expect("H256 always has enough bytes to fill H160. qed")
@@ -238,21 +245,21 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .map(|hash| hash.to_fixed_bytes())
             .collect();
 
-        Ok(WithdrawalParams {
+        Ok(Some(WithdrawalParams {
             l1_batch_number: log.l1_batch_number.unwrap(),
             l2_message_index,
             l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
             message: message.0.into(),
             sender,
             proof,
-        })
+        }))
     }
 
     async fn get_withdrawal_log(
         &self,
         tx_hash: H256,
         index: usize,
-    ) -> Result<(ZKSLog, Option<U64>)> {
+    ) -> Result<Option<(ZKSLog, Option<U64>)>> {
         let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
 
         let log = receipt
@@ -262,27 +269,35 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                 entry.address == L1_MESSENGER_ADDRESS
                     && entry.topics[0] == L1MessageSentFilter::signature()
             })
-            .nth(index)
-            .ok_or(Error::NoSuchIndex(index))?;
+            .nth(index);
 
-        Ok((log, receipt.l1_batch_tx_index))
+        let log = match log {
+            Some(log) => log,
+            None => return Ok(None),
+        };
+
+        Ok(Some((log, receipt.l1_batch_tx_index)))
     }
 
     async fn get_withdrawal_l2_to_l1_log(
         &self,
         tx_hash: H256,
         index: usize,
-    ) -> Result<(L2ToL1Log, Option<U64>)> {
+    ) -> Result<Option<(L2ToL1Log, Option<U64>)>> {
         let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
 
         let log = receipt
             .l2_to_l1_logs
             .into_iter()
             .filter(|entry| entry.sender == L1_MESSENGER_ADDRESS)
-            .nth(index)
-            .ok_or(Error::NoSuchIndex(index))?;
+            .nth(index);
 
-        Ok((log, Some(U64::from(index))))
+        let log = match log {
+            Some(log) => log,
+            None => return Ok(None),
+        };
+
+        Ok(Some((log, Some(U64::from(index)))))
     }
 }
 
@@ -301,13 +316,21 @@ where
     M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    let log = l2_middleware
+    let log = match l2_middleware
         .get_withdrawal_log(withdrawal_hash, index)
-        .await?;
+        .await?
+    {
+        Some(log) => log,
+        None => return Ok(false),
+    };
 
-    let (_, l2_to_l1_log_index) = l2_middleware
+    let (_, l2_to_l1_log_index) = match l2_middleware
         .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
-        .await?;
+        .await?
+    {
+        Some(log) => log,
+        None => return Ok(false),
+    };
 
     let proof = match l2_middleware
         .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
@@ -318,23 +341,21 @@ where
     };
 
     let l2_message_index = proof.id;
+    let l1_batch_number = match log.0.l1_batch_number {
+        Some(b) => b.as_u64().into(),
+        None => return Ok(false),
+    };
 
     if is_eth(sender) {
         let is_finalized = zksync_contract
-            .is_eth_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
+            .is_eth_withdrawal_finalized(l1_batch_number, l2_message_index.into())
             .call()
             .await?;
 
         Ok(is_finalized)
     } else {
         let is_finalized = l1_bridge
-            .is_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
+            .is_withdrawal_finalized(l1_batch_number, l2_message_index.into())
             .call()
             .await?;
 
