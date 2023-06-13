@@ -5,6 +5,8 @@
 
 //! Finalizer storage operations.
 
+use std::time::Instant;
+
 use ethers::types::{H160, H256};
 use sqlx::{Connection, PgConnection};
 
@@ -40,6 +42,7 @@ pub async fn committed_new_batch(
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
+    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -58,6 +61,11 @@ pub async fn committed_new_batch(
 
     tx.commit().await?;
 
+    metrics::histogram!(
+        "storage.transactions.commited_new_batch",
+        started_at.elapsed()
+    );
+
     Ok(())
 }
 
@@ -66,7 +74,9 @@ pub async fn withdrawal_committed_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    Ok(sqlx::query!(
+    let started_at = Instant::now();
+
+    let res = sqlx::query!(
         "
         SELECT l2_blocks.commit_l1_block_number from
         withdrawals JOIN l2_blocks ON
@@ -77,7 +87,11 @@ pub async fn withdrawal_committed_in_block(
     )
     .fetch_optional(conn)
     .await?
-    .and_then(|r| r.commit_l1_block_number))
+    .and_then(|r| r.commit_l1_block_number);
+
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_committed_in_block");
+
+    Ok(res)
 }
 
 /// Request the number of L1 block this withdrawal was verified in.
@@ -85,7 +99,9 @@ pub async fn withdrawal_verified_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    Ok(sqlx::query!(
+    let started_at = Instant::now();
+
+    let res = sqlx::query!(
         "
         SELECT l2_blocks.verify_l1_block_number from
         withdrawals JOIN l2_blocks ON
@@ -96,7 +112,11 @@ pub async fn withdrawal_verified_in_block(
     )
     .fetch_optional(conn)
     .await?
-    .and_then(|r| r.verify_l1_block_number))
+    .and_then(|r| r.verify_l1_block_number);
+
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_verified_in_block");
+
+    Ok(res)
 }
 
 /// Request the number of L1 block this withdrawal was executed in.
@@ -104,7 +124,9 @@ pub async fn withdrawal_executed_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    Ok(sqlx::query!(
+    let started_at = Instant::now();
+
+    let res = sqlx::query!(
         "
         SELECT l2_blocks.execute_l1_block_number from
         withdrawals JOIN l2_blocks ON
@@ -115,7 +137,11 @@ pub async fn withdrawal_executed_in_block(
     )
     .fetch_optional(conn)
     .await?
-    .and_then(|r| r.execute_l1_block_number))
+    .and_then(|r| r.execute_l1_block_number);
+
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_executed_in_block");
+
+    Ok(res)
 }
 /// A new batch with a given range has been verified, update statuses of withdrawal records.
 pub async fn verified_new_batch(
@@ -126,6 +152,8 @@ pub async fn verified_new_batch(
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
+
+    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -144,6 +172,11 @@ pub async fn verified_new_batch(
 
     tx.commit().await?;
 
+    metrics::histogram!(
+        "storage.transactions.verified_new_batch",
+        started_at.elapsed()
+    );
+
     Ok(())
 }
 
@@ -156,6 +189,7 @@ pub async fn executed_new_batch(
 ) -> Result<()> {
     let mut tx = conn.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
+    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -173,6 +207,11 @@ pub async fn executed_new_batch(
     .await?;
 
     tx.commit().await?;
+
+    metrics::histogram!(
+        "storage.transactions.executed_new_batch",
+        started_at.elapsed(),
+    );
 
     Ok(())
 }
@@ -199,6 +238,8 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         indices_in_tx.push(sw.index_in_tx as i32);
         is_finalized.push(sw.is_finalized);
     });
+
+    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -238,11 +279,15 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
     .execute(conn)
     .await?;
 
+    metrics::histogram!("storage.transactions.add_withdrawals", started_at.elapsed());
+
     Ok(())
 }
 
 /// Get the block number of the last L2 withdrawal the DB has record of.
 pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
+    let started_at = Instant::now();
+
     let res = sqlx::query!(
         "
         SELECT MAX(l2_block_number)
@@ -254,11 +299,15 @@ pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "last_l2_block_seen");
+
     Ok(res)
 }
 
 /// Get the block number of the last L1 block seen.
 pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
+    let started_at = Instant::now();
+
     let res = sqlx::query!(
         "
         SELECT MAX(commit_l1_block_number)
@@ -270,11 +319,15 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "last_l1_block_seen");
+
     Ok(res)
 }
 
 /// Get all withdrawals that are not finalized yet
 pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<StoredWithdrawal>> {
+    let started_at = Instant::now();
+
     let res = sqlx::query!(
         "
         SELECT * FROM withdrawals
@@ -298,6 +351,8 @@ pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<Stor
     })
     .collect();
 
+    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "unfinalized_withdrawals");
+
     Ok(res)
 }
 
@@ -315,6 +370,8 @@ pub async fn update_withdrawals_to_finalized(
         .iter()
         .map(|h| h.1 as i32)
         .collect();
+
+    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -336,6 +393,11 @@ pub async fn update_withdrawals_to_finalized(
     )
     .execute(conn)
     .await?;
+
+    metrics::histogram!(
+        "storage.transactions.update_withdrawals_to_finalized",
+        started_at.elapsed()
+    );
 
     Ok(())
 }
