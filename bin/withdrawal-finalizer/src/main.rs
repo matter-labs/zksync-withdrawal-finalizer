@@ -88,7 +88,7 @@ async fn start_from_l2_block<M: Middleware>(
                     .map_err(|err| anyhow!("{err}"))?
                     .expect("The genesis block always exists; qed")
                     .number
-                    .expect("A genesis block number is always known; qed")
+                    .expect("The genesis block number is always known; qed")
                     .as_u64()
             }
         }
