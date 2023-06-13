@@ -83,7 +83,7 @@ async fn start_from_l2_block<M: Middleware>(
                 block_number - 1
             } else {
                 client
-                    .get_block(0)
+                    .get_block(1)
                     .await
                     .map_err(|err| anyhow!("{err}"))?
                     .expect("The genesis block always exists; qed")
