@@ -9,10 +9,7 @@ use std::{str::FromStr, sync::Arc};
 
 use clap::Parser;
 use envconfig::Envconfig;
-use ethers::{
-    providers::{JsonRpcClient, Middleware, Provider, Ws},
-    types::BlockNumber,
-};
+use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
@@ -108,12 +105,12 @@ async fn start_from_l2_block<M: Middleware>(
                 block_number - 1
             } else {
                 client
-                    .get_block(BlockNumber::Finalized)
+                    .get_block(1)
                     .await
                     .map_err(|err| anyhow!("{err}"))?
-                    .expect("There is also a finalized block; qed")
+                    .expect("The genesis block always exists; qed")
                     .number
-                    .expect("A finalized block number is always known; qed")
+                    .expect("The genesis block number is always known; qed")
                     .as_u64()
             }
         }
