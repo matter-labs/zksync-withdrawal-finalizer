@@ -7,6 +7,8 @@
 
 mod error;
 
+use std::time::Instant;
+
 pub use error::{Error, Result};
 
 use async_trait::async_trait;
@@ -163,9 +165,12 @@ pub trait ZksyncMiddleware: Middleware {
 #[async_trait]
 impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
     async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>> {
+        let start = Instant::now();
         let res = self
             .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
             .await?;
+
+        metrics::histogram!("zks_client.get_block_details", start.elapsed());
 
         Ok(res)
     }
@@ -175,6 +180,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         tx_hash: H256,
         l2_to_l1_index: Option<u64>,
     ) -> Result<Option<L2ToL1LogProof>> {
+        let start = Instant::now();
         let params = match l2_to_l1_index {
             Some(idx) => vec![
                 ethers::utils::serialize(&tx_hash),
@@ -184,28 +190,40 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         };
         let res = self.request("zks_getL2ToL1LogProof", params).await?;
 
+        metrics::histogram!("zks_client.get_log_proof", start.elapsed());
+
         Ok(res)
     }
 
     async fn get_l1_batch_block_range(&self, batch_number: u32) -> Result<Option<(U64, U64)>> {
+        let start = Instant::now();
         let res = self
             .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
             .await?;
+
+        metrics::histogram!("zks_client.get_l1_batch_block_range", start.elapsed());
+
         Ok(res)
     }
 
     async fn get_confirmed_tokens(&self, from: u32, limit: u8) -> Result<Vec<Token>> {
+        let start = Instant::now();
         let res = self
             .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
             .await?;
+
+        metrics::histogram!("zks_client.get_confirmed_tokens", start.elapsed());
 
         Ok(res)
     }
 
     async fn zks_get_transaction_receipt(&self, tx_hash: H256) -> Result<ZksyncTransactionReceipt> {
+        let start = Instant::now();
         let res = self
             .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
             .await?;
+
+        metrics::histogram!("zks_client.get_transaction_receipt", start.elapsed());
 
         Ok(res)
     }
