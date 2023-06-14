@@ -437,6 +437,7 @@ dependencies = [
  "client",
  "ethers",
  "futures",
+ "metrics",
  "thiserror",
  "vlog",
 ]
