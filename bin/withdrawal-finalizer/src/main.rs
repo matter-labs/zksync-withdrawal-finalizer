@@ -75,11 +75,24 @@ where
                 .await
                 .map_err(|e| anyhow!("{e}"))?
                 .expect("The corresponding L1 tx exists; qed");
-
-            Ok(commit_tx
+            let commit_tx_block_number = commit_tx
                 .block_number
                 .expect("Already mined TX always has a block number; qed")
-                .as_u64())
+                .as_u64();
+
+            let last_seen_l1_block = storage::last_l1_block_seen(conn)
+                .await?
+                .map(|b| b.saturating_sub(1));
+
+            // If some blocks from l1 have already been seen the minumum value
+            // of the last seen block and the l1 block that corresponds to `l2_block_number`
+            // have to be taken since syncing l1 and l2 events is not synchronous
+            // and simply relying on `commit_tx_block_number` may lead to gaps in
+            // the l1 block history.
+            match last_seen_l1_block {
+                Some(l1_block) => Ok(std::cmp::min(l1_block, commit_tx_block_number)),
+                None => Ok(commit_tx_block_number),
+            }
         }
         None => Ok(storage::last_l1_block_seen(conn).await?.unwrap()),
     }
