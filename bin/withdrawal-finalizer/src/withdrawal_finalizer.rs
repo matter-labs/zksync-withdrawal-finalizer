@@ -112,6 +112,8 @@ where
                     .get_l1_batch_block_range(event.block_number.as_u64() as u32)
                     .await?
                 {
+                    metrics::gauge!("watcher.l2_last_committed_block", range_end.as_u64() as f64);
+
                     storage::committed_new_batch(
                         &mut pgconn,
                         range_begin.as_u64(),
@@ -131,7 +133,6 @@ where
             } => {
                 let current_first_verified_batch = event.previous_last_verified_block.as_u64() + 1;
                 let current_last_verified_batch = event.current_last_verified_block.as_u64();
-
                 let range_begin = self
                     .l2_provider
                     .get_l1_batch_block_range(current_first_verified_batch as u32)
@@ -145,6 +146,7 @@ where
                     .map(|range| range.1.as_u64());
 
                 if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
+                    metrics::gauge!("watcher.l2_last_verified_block", range_end as f64);
                     storage::verified_new_batch(&mut pgconn, range_begin, range_end, block_number)
                         .await?;
                     vlog::info!(
@@ -165,6 +167,8 @@ where
                     .get_l1_batch_block_range(event.block_number.as_u64() as u32)
                     .await?
                 {
+                    metrics::gauge!("watcher.l2_last_executed_block", range_end.as_u64() as f64);
+
                     storage::executed_new_batch(
                         &mut pgconn,
                         range_begin.as_u64(),

@@ -101,10 +101,13 @@ where
             let log = log?;
             let raw_log: RawLog = log.clone().into();
 
+            metrics::increment_counter!("watcher.chain_events.l2_logs_received");
+
             if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
                 if let (Some(tx_hash), Some(block_number)) =
                     (log.transaction_hash, log.block_number)
                 {
+                    metrics::increment_counter!("watcher.chain_events.bridge_burn_events");
                     let we = WithdrawalEvent {
                         tx_hash,
                         block_number: block_number.as_u64(),
@@ -120,6 +123,7 @@ where
                 if let (Some(tx_hash), Some(block_number)) =
                     (log.transaction_hash, log.block_number)
                 {
+                    metrics::increment_counter!("watcher.chain_events.withdrawal_events");
                     let we = WithdrawalEvent {
                         tx_hash,
                         block_number: block_number.as_u64(),

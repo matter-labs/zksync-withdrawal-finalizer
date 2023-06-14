@@ -20,6 +20,8 @@ use client::{
     ZksyncMiddleware,
 };
 use config::Config;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use tokio::task::JoinHandle;
 
 mod cli;
 mod config;
@@ -27,6 +29,26 @@ mod withdrawal_finalizer;
 mod withdrawal_status_updater;
 
 const CHANNEL_CAPACITY: usize = 1024;
+
+fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
+    let builder = {
+        let addr = ([0, 0, 0, 0], 3312);
+        PrometheusBuilder::new().with_http_listener(addr)
+    };
+
+    let (recorder, exporter) = builder.build()?;
+
+    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set the metrics recorder");
+
+    Ok(tokio::spawn(async move {
+        tokio::pin!(exporter);
+        loop {
+            tokio::select! {
+                _ = &mut exporter => {}
+            }
+        }
+    }))
+}
 
 async fn start_from_l1_block<M1, M2>(
     client_l1: Arc<M1>,
@@ -137,6 +159,8 @@ async fn main() -> Result<()> {
         vlog::info!("No sentry url configured");
     }
 
+    let prometheus_exporter_handle = run_prometheus_exporter()?;
+
     let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
         .await
         .unwrap();
@@ -246,6 +270,9 @@ async fn main() -> Result<()> {
         }
         r = updater_handle => {
             vlog::error!("Withdrawals updater ended with {r:?}");
+        }
+        r = prometheus_exporter_handle => {
+            vlog::error!("Prometheus exporter ended with {r:?}");
         }
     }
 
