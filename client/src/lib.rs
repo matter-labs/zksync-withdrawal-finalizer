@@ -170,7 +170,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
             .await?;
 
-        metrics::histogram!("zks_client.get_block_details", start.elapsed());
+        metrics::histogram!("watcher.zks_client.get_block_details", start.elapsed());
 
         Ok(res)
     }
@@ -190,7 +190,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         };
         let res = self.request("zks_getL2ToL1LogProof", params).await?;
 
-        metrics::histogram!("zks_client.get_log_proof", start.elapsed());
+        metrics::histogram!("watcher.zks_client.get_log_proof", start.elapsed());
 
         Ok(res)
     }
@@ -201,7 +201,10 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
             .await?;
 
-        metrics::histogram!("zks_client.get_l1_batch_block_range", start.elapsed());
+        metrics::histogram!(
+            "watcher.zks_client.get_l1_batch_block_range",
+            start.elapsed()
+        );
 
         Ok(res)
     }
@@ -212,7 +215,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
             .await?;
 
-        metrics::histogram!("zks_client.get_confirmed_tokens", start.elapsed());
+        metrics::histogram!("watcher.zks_client.get_confirmed_tokens", start.elapsed());
 
         Ok(res)
     }
@@ -223,7 +226,10 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
             .await?;
 
-        metrics::histogram!("zks_client.get_transaction_receipt", start.elapsed());
+        metrics::histogram!(
+            "watcher.zks_client.get_transaction_receipt",
+            start.elapsed()
+        );
 
         Ok(res)
     }

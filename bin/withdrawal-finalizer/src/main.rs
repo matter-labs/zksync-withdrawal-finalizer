@@ -32,7 +32,7 @@ const CHANNEL_CAPACITY: usize = 1024;
 
 fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
     let builder = {
-        let addr = ([0, 0, 0, 0], 8080);
+        let addr = ([0, 0, 0, 0], 3312);
         PrometheusBuilder::new().with_http_listener(addr)
     };
 

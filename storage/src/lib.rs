@@ -3,7 +3,7 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_imports)]
 
-//! Finalizer storage operations.
+//! Finalizer watcher.storage.operations.
 
 use std::time::Instant;
 
@@ -62,7 +62,7 @@ pub async fn committed_new_batch(
     tx.commit().await?;
 
     metrics::histogram!(
-        "storage.transactions.commited_new_batch",
+        "watcher.storage.transactions.commited_new_batch",
         started_at.elapsed()
     );
 
@@ -89,7 +89,7 @@ pub async fn withdrawal_committed_in_block(
     .await?
     .and_then(|r| r.commit_l1_block_number);
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_committed_in_block");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_committed_in_block");
 
     Ok(res)
 }
@@ -114,7 +114,7 @@ pub async fn withdrawal_verified_in_block(
     .await?
     .and_then(|r| r.verify_l1_block_number);
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_verified_in_block");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_verified_in_block");
 
     Ok(res)
 }
@@ -139,7 +139,7 @@ pub async fn withdrawal_executed_in_block(
     .await?
     .and_then(|r| r.execute_l1_block_number);
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "withdrawal_executed_in_block");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_executed_in_block");
 
     Ok(res)
 }
@@ -173,7 +173,7 @@ pub async fn verified_new_batch(
     tx.commit().await?;
 
     metrics::histogram!(
-        "storage.transactions.verified_new_batch",
+        "watcher.storage.transactions.verified_new_batch",
         started_at.elapsed()
     );
 
@@ -209,7 +209,7 @@ pub async fn executed_new_batch(
     tx.commit().await?;
 
     metrics::histogram!(
-        "storage.transactions.executed_new_batch",
+        "watcher.storage.transactions.executed_new_batch",
         started_at.elapsed(),
     );
 
@@ -279,7 +279,10 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
     .execute(conn)
     .await?;
 
-    metrics::histogram!("storage.transactions.add_withdrawals", started_at.elapsed());
+    metrics::histogram!(
+        "watcher.storage.transactions.add_withdrawals",
+        started_at.elapsed()
+    );
 
     Ok(())
 }
@@ -299,7 +302,7 @@ pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "last_l2_block_seen");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "last_l2_block_seen");
 
     Ok(res)
 }
@@ -319,7 +322,7 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "last_l1_block_seen");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "last_l1_block_seen");
 
     Ok(res)
 }
@@ -351,7 +354,7 @@ pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<Stor
     })
     .collect();
 
-    metrics::histogram!("storage.request", started_at.elapsed(), "method" => "unfinalized_withdrawals");
+    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "unfinalized_withdrawals");
 
     Ok(res)
 }
@@ -395,7 +398,7 @@ pub async fn update_withdrawals_to_finalized(
     .await?;
 
     metrics::histogram!(
-        "storage.transactions.update_withdrawals_to_finalized",
+        "watcher.storage.transactions.update_withdrawals_to_finalized",
         started_at.elapsed()
     );
 

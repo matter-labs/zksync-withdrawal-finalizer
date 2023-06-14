@@ -103,7 +103,7 @@ where
 
         while let Some(log) = logs.next().await {
             let log = log?;
-            metrics::increment_counter!("chain_events.l1_logs_received");
+            metrics::increment_counter!("watcher.chain_events.l1_logs_received");
             let block_number = match log.block_number {
                 Some(b) => b.as_u64(),
                 None => {
@@ -113,7 +113,7 @@ where
             let raw_log: RawLog = log.clone().into();
 
             if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
-                metrics::increment_counter!("chain_events.block_commit_events");
+                metrics::increment_counter!("watcher.chain_events.block_commit_events");
                 sender
                     .send(BlockEvent::BlockCommit {
                         block_number,
@@ -125,7 +125,7 @@ where
             }
 
             if let Ok(event) = BlocksVerificationFilter::decode_log(&raw_log) {
-                metrics::increment_counter!("chain_events.block_verification_events");
+                metrics::increment_counter!("watcher.chain_events.block_verification_events");
                 sender
                     .send(BlockEvent::BlocksVerification {
                         block_number,
@@ -137,7 +137,7 @@ where
             }
 
             if let Ok(event) = BlockExecutionFilter::decode_log(&raw_log) {
-                metrics::increment_counter!("chain_events.block_execution_events");
+                metrics::increment_counter!("watcher.chain_events.block_execution_events");
                 sender
                     .send(BlockEvent::BlockExecution {
                         block_number,
