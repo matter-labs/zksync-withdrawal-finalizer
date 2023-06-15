@@ -7,7 +7,7 @@ use client::{
 use ethers::{
     abi::{Address, RawLog},
     contract::EthEvent,
-    providers::{Middleware, PubsubClient},
+    providers::{Middleware, Provider, PubsubClient, Ws},
     types::{BlockNumber, Filter},
 };
 
@@ -16,29 +16,70 @@ use futures::{Sink, SinkExt, StreamExt};
 use crate::{Error, Result};
 
 /// A convenience multiplexer for withdrawal-related events.
-pub struct WithdrawalEvents<M> {
-    middleware: Arc<M>,
+pub struct WithdrawalEvents {
+    url: String,
 }
 
-impl<M> WithdrawalEvents<M>
-where
-    M: Middleware,
-{
+impl WithdrawalEvents {
     /// Create a new `WithdrawalEvents` structure.
     ///
     /// # Arguments
     ///
     /// * `middleware`: THe middleware to perform requests with.
-    pub async fn new(middleware: Arc<M>) -> Result<Self> {
-        Ok(Self { middleware })
+    pub fn new(url: &str) -> Self {
+        Self {
+            url: url.to_string(),
+        }
+    }
+
+    /// Run the main loop with re-connecting on websocket disconnects
+    //
+    // Websocket subscriptions do not work well with reconnections
+    // in `ethers-rs`: https://github.com/gakonst/ethers-rs/issues/2418
+    // This function is a workaround for that and implements manual re-connecting.
+    pub async fn run_with_reconnects<B, S>(
+        self,
+        addresses: Vec<Address>,
+        from_block: B,
+        sender: S,
+    ) -> Result<()>
+    where
+        B: Into<BlockNumber> + Copy,
+        S: Sink<WithdrawalEvent> + Unpin + Clone,
+        <S as Sink<WithdrawalEvent>>::Error: std::fmt::Debug,
+    {
+        let mut from_block: BlockNumber = from_block.into();
+
+        loop {
+            let provider_l1 = match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
+                Ok(p) => {
+                    metrics::increment_counter!(
+                        "watcher.chain_events.withdrawal_events.successful_reconnects"
+                    );
+                    p
+                }
+                Err(e) => {
+                    vlog::warn!("Withdrawal events stream reconnect attempt failed: {e}");
+                    metrics::increment_counter!(
+                        "watcher.chain_events.withdrawal_events.failed_reconnects"
+                    );
+                    continue;
+                }
+            };
+
+            let middleware = Arc::new(provider_l1);
+
+            match Self::run(addresses.clone(), from_block, sender.clone(), middleware).await {
+                Ok(block) => from_block = block,
+                Err(e) => {
+                    vlog::warn!("Withdrawal events worker failed with {e}");
+                }
+            }
+        }
     }
 }
 
-impl<M> WithdrawalEvents<M>
-where
-    M: Middleware,
-    <M as Middleware>::Provider: PubsubClient,
-{
+impl WithdrawalEvents {
     /// A convenience function that listens for all withdrawal events on L2
     ///
     /// For more reasoning about the necessity of this function
@@ -49,21 +90,24 @@ where
     /// * `addresses`: The address of the ERC20 tokens on L1 to monitor
     /// * `from_block`: Query the chain from this particular block
     /// * `sender`: The `Sink` to send received events into.
-    pub async fn run<B, S>(
-        self,
+    async fn run<B, S, M>(
         mut addresses: Vec<Address>,
         from_block: B,
         mut sender: S,
-    ) -> Result<()>
+        middleware: M,
+    ) -> Result<BlockNumber>
     where
         B: Into<BlockNumber> + Copy,
+        M: Middleware,
+        <M as Middleware>::Provider: PubsubClient,
         S: Sink<WithdrawalEvent> + Unpin,
         <S as Sink<WithdrawalEvent>>::Error: std::fmt::Debug,
     {
+        let mut last_seen_block: BlockNumber = from_block.into();
+
         addresses.push(ETH_TOKEN_ADDRESS);
 
-        let latest_block = self
-            .middleware
+        let latest_block = middleware
             .get_block(BlockNumber::Latest)
             .await
             .map_err(|e| Error::Middleware(e.to_string()))?
@@ -88,9 +132,8 @@ where
                 WithdrawalFilter::signature(),
             ]);
 
-        let past_logs = self.middleware.get_logs_paginated(&past_filter, 256);
-        let current_logs = self
-            .middleware
+        let past_logs = middleware.get_logs_paginated(&past_filter, 256);
+        let current_logs = middleware
             .subscribe_logs(&filter)
             .await
             .map_err(|e| Error::Middleware(e.to_string()))?;
@@ -98,10 +141,19 @@ where
         let mut logs = past_logs.chain(current_logs.map(Ok));
 
         while let Some(log) = logs.next().await {
-            let log = log?;
+            let log = match log {
+                Err(e) => {
+                    vlog::warn!("L2 withdrawal events stream ended with {e}");
+                    break;
+                }
+                Ok(log) => log,
+            };
             let raw_log: RawLog = log.clone().into();
-
             metrics::increment_counter!("watcher.chain_events.l2_logs_received");
+
+            if let Some(block_number) = log.block_number {
+                last_seen_block = block_number.into();
+            }
 
             if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
                 if let (Some(tx_hash), Some(block_number)) =
@@ -136,6 +188,6 @@ where
         }
         vlog::info!("withdrawal streams being closed");
 
-        Ok(())
+        Ok(last_seen_block)
     }
 }

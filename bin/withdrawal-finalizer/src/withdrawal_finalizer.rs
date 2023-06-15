@@ -196,6 +196,7 @@ where
         let mut withdrawals_vec = vec![];
         for (_tx_hash, group) in group_by.into_iter() {
             for (index, event) in group.into_iter().enumerate() {
+                metrics::gauge!("watcher.l2_last_seen_block", event.block_number as f64);
                 vlog::info!("withdrawal {event:?} index in transaction is {index}");
 
                 withdrawals_vec.push((event, index));
