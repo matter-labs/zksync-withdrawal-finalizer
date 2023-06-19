@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
 
     let prometheus_exporter_handle = run_prometheus_exporter()?;
 
-    // reconnections do not reset the reconnection count trackers in the
+    // Successful reconnections do not reset the reconnection count trackers in the
     // `ethers-rs`. In the logic of reconnections have to happen as long
     // as the application exists; below code configures that number to
     // be `usize::MAX` as such.
