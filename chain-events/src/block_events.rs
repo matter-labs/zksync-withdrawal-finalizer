@@ -180,23 +180,25 @@ impl BlockEvents {
 
             if let Ok(event) = BlocksVerificationFilter::decode_log(&raw_log) {
                 metrics::increment_counter!("watcher.chain_events.block_verification_events");
-                let _ = sender
+                sender
                     .send(BlockEvent::BlocksVerification {
                         block_number,
                         event,
                     })
-                    .await;
+                    .await
+                    .unwrap();
                 continue;
             }
 
             if let Ok(event) = BlockExecutionFilter::decode_log(&raw_log) {
                 metrics::increment_counter!("watcher.chain_events.block_execution_events");
-                let _ = sender
+                sender
                     .send(BlockEvent::BlockExecution {
                         block_number,
                         event,
                     })
-                    .await;
+                    .await
+                    .unwrap();
                 continue;
             }
         }
