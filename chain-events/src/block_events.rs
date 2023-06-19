@@ -66,7 +66,7 @@ impl BlockEvents {
                 Err(e) => {
                     vlog::warn!("Block events stream reconnect attempt failed: {e}");
                     metrics::increment_counter!(
-                        "watcher.chain_events.block_events.reconnects_on_error)"
+                        "watcher.chain_events.block_events.reconnects_on_error"
                     );
                     continue;
                 }
