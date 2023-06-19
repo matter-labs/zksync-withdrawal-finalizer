@@ -37,6 +37,24 @@ impl BlockEvents {
         }
     }
 
+    async fn connect(&self) -> Option<Provider<Ws>> {
+        match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
+            Ok(p) => {
+                metrics::increment_counter!(
+                    "watcher.chain_events.block_events.successful_reconnects"
+                );
+                Some(p)
+            }
+            Err(e) => {
+                vlog::warn!("Block events stream reconnect attempt failed: {e}");
+                metrics::increment_counter!(
+                    "watcher.chain_events.block_events.reconnects_on_error"
+                );
+                None
+            }
+        }
+    }
+
     /// Run the main loop with re-connecting on websocket disconnects
     //
     // Websocket subscriptions do not work well with reconnections
@@ -56,21 +74,7 @@ impl BlockEvents {
         let mut from_block: BlockNumber = from_block.into();
 
         loop {
-            let provider_l1 = match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
-                Ok(p) => {
-                    metrics::increment_counter!(
-                        "watcher.chain_events.block_events.successful_reconnects"
-                    );
-                    p
-                }
-                Err(e) => {
-                    vlog::warn!("Block events stream reconnect attempt failed: {e}");
-                    metrics::increment_counter!(
-                        "watcher.chain_events.block_events.reconnects_on_error"
-                    );
-                    continue;
-                }
-            };
+            let Some(provider_l1) = self.connect().await else { continue };
 
             let middleware = Arc::new(provider_l1);
 
