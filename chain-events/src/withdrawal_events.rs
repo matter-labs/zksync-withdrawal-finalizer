@@ -13,7 +13,7 @@ use ethers::{
 
 use futures::{Sink, SinkExt, StreamExt};
 
-use crate::{Error, Result};
+use crate::{Error, Result, RECONNECT_BACKOFF};
 
 /// A convenience multiplexer for withdrawal-related events.
 pub struct WithdrawalEvents {
@@ -79,6 +79,7 @@ impl WithdrawalEvents {
                     vlog::warn!("Withdrawal events worker failed with {e}");
                 }
             }
+            tokio::time::sleep(RECONNECT_BACKOFF).await;
         }
     }
 }

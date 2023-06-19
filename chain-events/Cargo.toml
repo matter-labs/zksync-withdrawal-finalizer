@@ -11,5 +11,6 @@ ethers = "2.0.7"
 futures = "0.3.28"
 metrics = "0.21.0"
 thiserror = "1.0.40"
+tokio = { version = "1.28.2", features = ["time"] }
 
 vlog = { path = "../vlog" }

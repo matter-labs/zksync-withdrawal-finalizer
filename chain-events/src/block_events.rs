@@ -13,7 +13,7 @@ use client::{
     BlockEvent,
 };
 
-use crate::{Error, Result};
+use crate::{Error, Result, RECONNECT_BACKOFF};
 
 // A convenience multiplexer for `Block`-related events.
 //
@@ -84,6 +84,7 @@ impl BlockEvents {
                 }
                 Ok(block) => from_block = block,
             }
+            tokio::time::sleep(RECONNECT_BACKOFF).await;
         }
     }
 }
