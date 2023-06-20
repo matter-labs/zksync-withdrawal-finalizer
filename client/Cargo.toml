@@ -1,6 +1,6 @@
 [package]
 name = "client"
-version = "0.1.1"
+version = "0.1.7"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 homepage = "https://zksync.io/"
 edition = "2021"
