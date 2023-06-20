@@ -74,7 +74,10 @@ impl BlockEvents {
         let mut from_block: BlockNumber = from_block.into();
 
         loop {
-            let Some(provider_l1) = self.connect().await else { continue };
+            let Some(provider_l1) = self.connect().await else {
+                tokio::time::sleep(RECONNECT_BACKOFF).await;
+                continue
+            };
 
             let middleware = Arc::new(provider_l1);
 
@@ -84,7 +87,6 @@ impl BlockEvents {
                 }
                 Ok(block) => from_block = block,
             }
-            tokio::time::sleep(RECONNECT_BACKOFF).await;
         }
     }
 }
