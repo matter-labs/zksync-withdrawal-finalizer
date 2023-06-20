@@ -151,22 +151,30 @@ async fn main() -> Result<()> {
 
     let prometheus_exporter_handle = run_prometheus_exporter()?;
 
-    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
-        .await
-        .unwrap();
-    let client_l1 = Arc::new(provider_l1);
-
-    let provider_l2 =
-        Provider::<Ws>::connect_with_reconnects(config.api_web3_json_rpc_ws_url.as_str(), 0)
+    // Successful reconnections do not reset the reconnection count trackers in the
+    // `ethers-rs`. In the logic of reconnections have to happen as long
+    // as the application exists; below code configures that number to
+    // be `usize::MAX` as such.
+    let provider_l1 =
+        Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), usize::MAX)
             .await
             .unwrap();
+    let client_l1 = Arc::new(provider_l1);
+
+    let provider_l2 = Provider::<Ws>::connect_with_reconnects(
+        config.api_web3_json_rpc_ws_url.as_str(),
+        usize::MAX,
+    )
+    .await
+    .unwrap();
+
     let client_l2 = Arc::new(provider_l2);
 
     let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
-    let event_mux = BlockEvents::new(client_l1.clone())?;
+    let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEvents::new(client_l2.clone()).await?;
+    let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
@@ -211,20 +219,9 @@ async fn main() -> Result<()> {
         vlog::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
         tokens.push(l2_token);
     }
-    let provider_l1 = Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), 0)
-        .await
-        .unwrap();
-    let client_l1 = Arc::new(provider_l1);
-
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
-
-    let provider_l2 =
-        Provider::<Ws>::connect_with_reconnects(config.api_web3_json_rpc_ws_url.as_str(), 0)
-            .await
-            .unwrap();
-    let client_l2 = Arc::new(provider_l2);
 
     let updater_handle = tokio::spawn(withdrawal_status_updater::run(
         pgpool.clone(),
@@ -241,12 +238,16 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let withdrawal_events_handle = tokio::spawn(we_mux.run(tokens, from_l2_block, we_tx));
+    let withdrawal_events_handle =
+        tokio::spawn(we_mux.run_with_reconnects(tokens, from_l2_block, we_tx));
 
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 
-    let block_events_handle =
-        tokio::spawn(event_mux.run(config.diamond_proxy_addr, from_l1_block, blocks_tx));
+    let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
+        config.diamond_proxy_addr,
+        from_l1_block,
+        blocks_tx,
+    ));
 
     tokio::select! {
         r = block_events_handle => {
