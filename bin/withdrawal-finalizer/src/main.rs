@@ -26,7 +26,6 @@ use tokio::task::JoinHandle;
 mod cli;
 mod config;
 mod withdrawal_finalizer;
-mod withdrawal_status_updater;
 
 const CHANNEL_CAPACITY: usize = 1024;
 
@@ -223,14 +222,6 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let updater_handle = tokio::spawn(withdrawal_status_updater::run(
-        pgpool.clone(),
-        zksync_contract.clone(),
-        l1_bridge.clone(),
-        client_l2.clone(),
-        config.updater_backoff,
-    ));
-
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
         client_l2,
         pgpool,
@@ -258,9 +249,6 @@ async fn main() -> Result<()> {
         }
         r = finalizer_handle => {
             vlog::error!("Finalizer main loop ended with {r:?}");
-        }
-        r = updater_handle => {
-            vlog::error!("Withdrawals updater ended with {r:?}");
         }
         r = prometheus_exporter_handle => {
             vlog::error!("Prometheus exporter ended with {r:?}");
