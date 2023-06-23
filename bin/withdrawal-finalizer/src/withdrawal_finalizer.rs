@@ -10,8 +10,8 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    get_l1_batch_block_range, get_log_proof, get_withdrawal_l2_to_l1_log, get_withdrawal_log,
-    l1bridge::L1Bridge, zksync_contract::ZkSync, BlockEvent, WithdrawalEvent,
+    l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, BlockEvent, WithdrawalEvent,
+    ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -19,23 +19,23 @@ use crate::Result;
 pub struct WithdrawalFinalizer<M1, M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
-    l1_bridge: L1Bridge<M1>,
-    zksync_contract: ZkSync<M1>,
+    l1_bridge: IL1Bridge<M1>,
+    zksync_contract: IZkSync<M1>,
 }
 
 impl<M1, M2> WithdrawalFinalizer<M1, M2>
 where
     M1: Middleware,
     <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
+    M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         l2_provider: Arc<M2>,
         pgpool: PgPool,
-        zksync_contract: ZkSync<M1>,
-        l1_bridge: L1Bridge<M1>,
+        zksync_contract: IZkSync<M1>,
+        l1_bridge: IL1Bridge<M1>,
     ) -> Self {
         Self {
             l2_provider,
@@ -79,11 +79,11 @@ where
         loop {
             tokio::select! {
                 Some(event) = block_events.next() => {
-                    log::info!("block event {event}");
+                    vlog::info!("block event {event}");
                     self.process_block_event(event).await?;
                 }
                 Some(event) = withdrawal_events.next() => {
-                    log::info!("withdrawal event {event:?}");
+                    vlog::info!("withdrawal event {event:?}");
                     if event.block_number > curr_l2_block_number {
                         self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
                         curr_l2_block_number = event.block_number;
@@ -91,7 +91,7 @@ where
                     in_block_events.push(event);
                 }
                 else => {
-                    log::info!("terminating finalizer");
+                    vlog::info!("terminating finalizer");
                     break
                 }
             }
@@ -107,12 +107,13 @@ where
                 block_number,
                 event,
             } => {
-                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    event.block_number.as_u64() as u32,
-                )
-                .await?
+                if let Some((range_begin, range_end)) = self
+                    .l2_provider
+                    .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                    .await?
                 {
+                    metrics::gauge!("watcher.l2_last_committed_block", range_end.as_u64() as f64);
+
                     storage::committed_new_batch(
                         &mut pgconn,
                         range_begin.as_u64(),
@@ -121,7 +122,7 @@ where
                     )
                     .await?;
 
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to committed for range {range_begin}-{range_end}"
                     );
                 }
@@ -132,29 +133,27 @@ where
             } => {
                 let current_first_verified_batch = event.previous_last_verified_block.as_u64() + 1;
                 let current_last_verified_batch = event.current_last_verified_block.as_u64();
+                let range_begin = self
+                    .l2_provider
+                    .get_l1_batch_block_range(current_first_verified_batch as u32)
+                    .await?
+                    .map(|range| range.0.as_u64());
 
-                let range_begin = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    current_first_verified_batch as u32,
-                )
-                .await?
-                .map(|range| range.0.as_u64());
-
-                let range_end = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    current_last_verified_batch as u32,
-                )
-                .await?
-                .map(|range| range.1.as_u64());
+                let range_end = self
+                    .l2_provider
+                    .get_l1_batch_block_range(current_last_verified_batch as u32)
+                    .await?
+                    .map(|range| range.1.as_u64());
 
                 if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
+                    metrics::gauge!("watcher.l2_last_verified_block", range_end as f64);
                     storage::verified_new_batch(&mut pgconn, range_begin, range_end, block_number)
                         .await?;
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to verified for range {range_begin}-{range_end}"
                     );
                 } else {
-                    log::warn!(
+                    vlog::warn!(
                         "One of the verified ranges not found: {range_begin:?}, {range_end:?}"
                     );
                 }
@@ -163,12 +162,13 @@ where
                 block_number,
                 event,
             } => {
-                if let Some((range_begin, range_end)) = get_l1_batch_block_range(
-                    &self.l2_provider.provider().as_ref(),
-                    event.block_number.as_u64() as u32,
-                )
-                .await?
+                if let Some((range_begin, range_end)) = self
+                    .l2_provider
+                    .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                    .await?
                 {
+                    metrics::gauge!("watcher.l2_last_executed_block", range_end.as_u64() as f64);
+
                     storage::executed_new_batch(
                         &mut pgconn,
                         range_begin.as_u64(),
@@ -177,7 +177,7 @@ where
                     )
                     .await?;
 
-                    log::info!(
+                    vlog::info!(
                         "Changed withdrawals status to executed for range {range_begin}-{range_end}"
                     );
                 }
@@ -196,7 +196,8 @@ where
         let mut withdrawals_vec = vec![];
         for (_tx_hash, group) in group_by.into_iter() {
             for (index, event) in group.into_iter().enumerate() {
-                log::info!("withdrawal {event:?} index in transaction is {index}");
+                metrics::gauge!("watcher.l2_last_seen_block", event.block_number as f64);
+                vlog::info!("withdrawal {event:?} index in transaction is {index}");
 
                 withdrawals_vec.push((event, index));
             }
@@ -227,7 +228,7 @@ where
         index: usize,
         sender: Address,
     ) -> Result<bool> {
-        is_withdrawal_finalized(
+        Ok(client::is_withdrawal_finalized(
             withdrawal_hash,
             index,
             sender,
@@ -235,67 +236,6 @@ where
             &self.l1_bridge,
             &self.l2_provider,
         )
-        .await
-    }
-}
-
-pub async fn is_withdrawal_finalized<M1, M2>(
-    withdrawal_hash: H256,
-    index: usize,
-    sender: Address,
-    zksync_contract: &ZkSync<M1>,
-    l1_bridge: &L1Bridge<M1>,
-    l2_middleware: &M2,
-) -> Result<bool>
-where
-    M1: Middleware,
-    <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
-    <M2 as Middleware>::Provider: JsonRpcClient,
-{
-    let client_l2 = l2_middleware.provider().as_ref();
-
-    let log = get_withdrawal_log(client_l2, withdrawal_hash, index).await?;
-
-    let (_, l2_to_l1_log_index) =
-        get_withdrawal_l2_to_l1_log(client_l2, withdrawal_hash, index).await?;
-
-    let proof = match get_log_proof(
-        client_l2,
-        withdrawal_hash,
-        l2_to_l1_log_index
-            .expect("The L2ToL1LogIndex is always present in the trace. qed")
-            .as_usize(),
-    )
-    .await?
-    {
-        Some(proof) => proof,
-        None => return Ok(false),
-    };
-
-    let l2_message_index = proof.id;
-
-    if client::is_eth(sender) {
-        let is_finalized = zksync_contract
-            .is_eth_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
-            .await?;
-
-        log::debug!("eth withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
-
-        Ok(is_finalized)
-    } else {
-        let is_finalized = l1_bridge
-            .is_withdrawal_finalized(
-                log.0.l1_batch_number.unwrap().as_u64().into(),
-                l2_message_index.into(),
-            )
-            .await?;
-
-        log::debug!("withdrawal {withdrawal_hash} is_finalized: {is_finalized}");
-
-        Ok(is_finalized)
+        .await?)
     }
 }

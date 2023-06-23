@@ -68,7 +68,7 @@ where {
                     );
 
                     // TODO: write to storage happens here.
-                    log::info!("withdrawals {withdrawals:#?}");
+                    vlog::info!("withdrawals {withdrawals:#?}");
                 }
             }
         }

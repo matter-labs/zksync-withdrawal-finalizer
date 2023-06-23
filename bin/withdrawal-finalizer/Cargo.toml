@@ -1,6 +1,6 @@
 [package]
 name = "withdrawal-finalizer"
-version = "0.1.0"
+version = "0.1.8"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 homepage = "https://zksync.io/"
 edition = "2021"
@@ -15,13 +15,15 @@ toml = "0.7.3"
 url = { version = "2.3.1", features = ["serde"] }
 eyre = "0.6.8"
 tokio-stream = "0.1.14"
-log = "0.4.17"
 envconfig = "0.10.0"
 futures = "0.3.28"
 tokio-util = "0.7.8"
 sqlx = { version = "0.6.3", features = ["postgres", "runtime-tokio-rustls"] }
-client = { path = "../../client" }
-storage = { path = "../../storage" }
-tracing-subscriber = { version = "0.3.17", features = ["fmt", "std"] }
 itertools = "0.10.5"
 dotenvy = "0.15.7"
+client = { path = "../../client" }
+storage = { path = "../../storage" }
+chain-events = { path = "../../chain-events" }
+vlog = { path = "../../vlog" }
+metrics-exporter-prometheus = "0.12.1"
+metrics = "0.21.0"

@@ -21,12 +21,11 @@ pub mod codegen {
     abigen!(IZkSync, "$CARGO_MANIFEST_DIR/src/contracts/IZkSync.json");
 }
 
-pub use codegen::{
+use codegen::{
     BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
-    FinalizeEthWithdrawalCall, IZkSyncEvents,
 };
 
-use self::codegen::CommitBlocksCall;
+use self::codegen::{CommitBlocksCall, FinalizeEthWithdrawalCall};
 
 /// An `enum` wrapping different block `event`s
 #[derive(Debug)]
@@ -273,7 +272,7 @@ where
             }
         }
 
-        log::info!("all event streams have terminated, exiting...");
+        vlog::info!("all event streams have terminated, exiting...");
 
         Ok(())
     }
@@ -365,7 +364,7 @@ pub fn parse_withdrawal_events_l1(
             let message = &data.l_2_arbitrary_length_messages[current_message];
             let message_sender: Address = H256::from(log_entry.0.key).into();
 
-            if message_sender == ETH_TOKEN_ADDRESS.parse().unwrap()
+            if message_sender == ETH_TOKEN_ADDRESS
                 && FinalizeEthWithdrawalCall::selector() == message[..4]
                 && message.len() >= 56
             {
@@ -379,7 +378,7 @@ pub fn parse_withdrawal_events_l1(
                 );
 
                 withdrawals.push(WithdrawalInfo {
-                    token: ETH_TOKEN_ADDRESS.parse().unwrap(),
+                    token: ETH_TOKEN_ADDRESS,
                     to,
                     amount,
                     block_number,
