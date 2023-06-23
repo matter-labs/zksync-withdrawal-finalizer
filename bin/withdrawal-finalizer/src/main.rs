@@ -175,13 +175,11 @@ async fn main() -> Result<()> {
     let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
+    let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let l2tol1events = L2ToL1Events::new(client_l1.clone());
 
-    let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
-
-    let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);

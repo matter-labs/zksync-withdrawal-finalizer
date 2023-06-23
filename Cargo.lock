@@ -519,11 +519,9 @@ dependencies = [
  "auto_impl",
  "chrono",
  "ethers",
- "futures",
  "metrics",
  "serde",
  "thiserror",
- "vlog",
 ]
 
 [[package]]
