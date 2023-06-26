@@ -5,9 +5,7 @@
 //! interacting with the RPC endpoints.
 
 use chrono::{DateTime, Utc};
-use ethers::types::{
-    transaction::eip2930::AccessList, Address, Bloom, Bytes, H160, H256, U256, U64,
-};
+use ethers::types::{Address, Bloom, Bytes, H160, H256, U256, U64};
 
 use serde::{Deserialize, Serialize};
 
@@ -28,86 +26,6 @@ pub struct L2ToL1LogProof {
     pub id: u32,
     /// The root of the tree.
     pub root: H256,
-}
-
-/// Description of a Transaction, pending or in the chain.
-#[derive(Debug, Default, Clone, PartialEq, Deserialize, Serialize)]
-pub struct Transaction {
-    /// Hash
-    pub hash: H256,
-    /// Nonce
-    pub nonce: U256,
-    /// Block hash. None when pending.
-    #[serde(rename = "blockHash")]
-    pub block_hash: Option<H256>,
-    /// Block number. None when pending.
-    #[serde(rename = "blockNumber")]
-    pub block_number: Option<U64>,
-    /// Transaction Index. None when pending.
-    #[serde(rename = "transactionIndex")]
-    pub transaction_index: Option<Index>,
-    /// Sender
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub from: Option<Address>,
-    /// Recipient (None when contract creation)
-    pub to: Option<Address>,
-    /// Transfered value
-    pub value: U256,
-    /// Gas Price
-    #[serde(rename = "gasPrice")]
-    pub gas_price: Option<U256>,
-    /// Gas amount
-    pub gas: U256,
-    /// Input data
-    pub input: Bytes,
-    /// ECDSA recovery id
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub v: Option<U64>,
-    /// ECDSA signature r, 32 bytes
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r: Option<U256>,
-    /// ECDSA signature s, 32 bytes
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub s: Option<U256>,
-    /// Raw transaction data
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub raw: Option<Bytes>,
-    /// Transaction type, Some(1) for AccessList transaction, None for Legacy
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub transaction_type: Option<U64>,
-    /// Access list
-    #[serde(
-        rename = "accessList",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub access_list: Option<AccessList>,
-    /// Max fee per gas
-    #[serde(rename = "maxFeePerGas", skip_serializing_if = "Option::is_none")]
-    pub max_fee_per_gas: Option<U256>,
-    /// Miner bribe
-    #[serde(
-        rename = "maxPriorityFeePerGas",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub max_priority_fee_per_gas: Option<U256>,
-    /// Id of the current chain
-    #[serde(rename = "chainId")]
-    pub chain_id: U256,
-    /// Number of the l1 batch this transaction was included within.
-    #[serde(
-        rename = "l1BatchNumber",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub l1_batch_number: Option<U64>,
-    /// Index of transaction in l1 batch
-    #[serde(
-        rename = "l1BatchTxIndex",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub l1_batch_tx_index: Option<U64>,
 }
 
 /// A transaction receipt in `zksync` network.
