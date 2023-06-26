@@ -9,11 +9,14 @@ use std::{str::FromStr, sync::Arc};
 
 use clap::Parser;
 use envconfig::Envconfig;
-use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
+use ethers::{
+    providers::{JsonRpcClient, Middleware, Provider, Ws},
+    types::Chain,
+};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
-use chain_events::{BlockEvents, WithdrawalEvents};
+use chain_events::{BlockEvents, L2ToL1Events, WithdrawalEvents};
 use cli::Args;
 use client::{
     l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
@@ -23,11 +26,8 @@ use config::Config;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::task::JoinHandle;
 
-use crate::subscriptions::L2ToL1Events;
-
 mod cli;
 mod config;
-mod subscriptions;
 mod withdrawal_finalizer;
 
 const CHANNEL_CAPACITY: usize = 1024;
@@ -89,7 +89,22 @@ where
         }
     }
 }
-
+async fn start_from_l2_to_l1_block<M1, M2>(
+    client_l1: Arc<M1>,
+    client_l2: Arc<M2>,
+    conn: &mut PgConnection,
+) -> Result<u64>
+where
+    M1: Middleware,
+    <M1 as Middleware>::Provider: JsonRpcClient,
+    M2: Middleware,
+    <M2 as Middleware>::Provider: JsonRpcClient,
+{
+    match storage::last_l2_to_l1_events_block_seen(conn).await? {
+        Some(block) => Ok(block - 1),
+        None => start_from_l1_block(client_l1, client_l2, 1, conn).await,
+    }
+}
 // Determine an L2 block to start processing withdrawals from.
 //
 // The priority is:
@@ -177,7 +192,14 @@ async fn main() -> Result<()> {
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
-    let l2tol1events = L2ToL1Events::new(client_l1.clone());
+    let chain = Chain::from_str(&config.chain_eth_network)?;
+    let etherscan_client = ethers::etherscan::Client::new(chain, &config.etherscan_token)?;
+    let l2tol1events = L2ToL1Events::new(
+        etherscan_client,
+        config.timelock_addr,
+        config.l2_erc20_bridge_addr,
+        config.operator_addr,
+    );
 
     let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
 
@@ -229,8 +251,8 @@ async fn main() -> Result<()> {
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l2,
-        pgpool,
+        client_l2.clone(),
+        pgpool.clone(),
         zksync_contract,
         l1_bridge,
     );
@@ -238,7 +260,11 @@ async fn main() -> Result<()> {
     let withdrawal_events_handle =
         tokio::spawn(we_mux.run_with_reconnects(tokens, from_l2_block, we_tx));
 
-    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
+    let (l2_to_l1_tx, l2_to_l1_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
+
+    let l2_to_l1_tx = tokio_util::sync::PollSender::new(l2_to_l1_tx);
+    let l2_to_l1_rx = tokio_stream::wrappers::ReceiverStream::new(l2_to_l1_rx);
+    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, l2_to_l1_rx, from_l2_block));
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,
@@ -246,8 +272,17 @@ async fn main() -> Result<()> {
         blocks_tx,
     ));
 
+    let from_l1_block_l2_to_l1 = start_from_l2_to_l1_block(
+        client_l1.clone(),
+        client_l2,
+        &mut pgpool.acquire().await?.detach(),
+    )
+    .await?;
+
+    vlog::info!("Starting L2 to L1 events from block {from_l1_block_l2_to_l1}");
+
     let l2tol1_handle =
-        tokio::spawn(l2tol1events.run(config.timelock_address, config.l2_erc20_bridge_addr));
+        tokio::spawn(l2tol1events.run(client_l1, from_l1_block_l2_to_l1, l2_to_l1_tx));
 
     tokio::select! {
         r = block_events_handle => {

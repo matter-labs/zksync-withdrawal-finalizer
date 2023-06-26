@@ -33,6 +33,24 @@
     },
     "query": "\n        SELECT l2_blocks.commit_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.l2_block_number\n        WHERE withdrawals.tx_hash = $1\n        "
   },
+  "6a733fb8a5a93dac84d027e2475a46802d7de85d729c0a10bbb0c24a467cef30": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT MAX(l1_block_number)\n        FROM l2_to_l1_events\n        "
+  },
   "8139b55ad17e9a00b7a1161c709afca1daed7dbe2d4b3709f80dc4e2a87d1d9a": {
     "describe": {
       "columns": [],
@@ -141,6 +159,23 @@
       }
     },
     "query": "\n        INSERT INTO l2_blocks (l2_block_number, verify_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET verify_l1_block_number = $2\n        "
+  },
+  "bacb1181ef51a39e465d53caa681ee329d215545eec3c07accfc78befdc9c6b9": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "ByteaArray",
+          "ByteaArray",
+          "NumericArray",
+          "Int8Array",
+          "Int8Array",
+          "Int4Array"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO l2_to_l1_events\n        (\n            l1_token_addr,\n            to_address,\n            amount,\n            l1_block_number,\n            l2_block_number,\n            tx_number_in_block\n        )\n        SELECT\n            u.l1_token_addr,\n            u.to_address,\n            u.amount,\n            u.l1_block_number,\n            u.l2_block_number,\n            u.tx_number_in_block\n        FROM UNNEST(\n            $1::bytea[],\n            $2::bytea[],\n            $3::numeric[],\n            $4::bigint[],\n            $5::bigint[],\n            $6::integer[]\n        ) AS u(\n            l1_token_addr,\n            to_address,\n            amount,\n            l1_block_number,\n            l2_block_number,\n            tx_number_in_block\n        )\n        ON CONFLICT (l1_block_number, l2_block_number, tx_number_in_block) DO NOTHING\n        "
   },
   "c7f92ac405cba0f7d91ec691600d2321e78277dbe0f6267d04bbd7c1f4923601": {
     "describe": {

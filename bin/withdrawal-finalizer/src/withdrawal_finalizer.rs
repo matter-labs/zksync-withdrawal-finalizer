@@ -10,8 +10,9 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, BlockEvent, WithdrawalEvent,
-    ZksyncMiddleware,
+    l1bridge::codegen::IL1Bridge,
+    zksync_contract::{codegen::IZkSync, L2ToL1Event},
+    BlockEvent, WithdrawalEvent, ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -45,18 +46,21 @@ where
         }
     }
 
-    pub async fn run<BE, WE>(
+    pub async fn run<BE, WE, L2L1E>(
         mut self,
         block_events: BE,
         withdrawal_events: WE,
+        l2_to_l1_events: L2L1E,
         from_l2_block: u64,
     ) -> Result<()>
     where
         BE: Stream<Item = BlockEvent>,
         WE: Stream<Item = WithdrawalEvent>,
+        L2L1E: Stream<Item = Vec<L2ToL1Event>>,
     {
         pin!(block_events);
         pin!(withdrawal_events);
+        pin!(l2_to_l1_events);
 
         let mut curr_l2_block_number = from_l2_block;
 
@@ -90,12 +94,23 @@ where
                     }
                     in_block_events.push(event);
                 }
+                Some(event) = l2_to_l1_events.next() => {
+                    self.process_l2_to_l1_events(event).await?;
+                }
                 else => {
                     vlog::info!("terminating finalizer");
                     break
                 }
             }
         }
+
+        Ok(())
+    }
+
+    async fn process_l2_to_l1_events(&mut self, events: Vec<L2ToL1Event>) -> Result<()> {
+        let mut pgconn = self.pgpool.acquire().await?;
+
+        storage::l2_to_l1_events(&mut pgconn, &events).await?;
 
         Ok(())
     }
