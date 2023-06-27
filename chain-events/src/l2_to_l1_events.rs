@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ethers::{
     abi::{AbiDecode, Address},
@@ -22,6 +22,7 @@ const OFFSET_SIZE: u64 = 1024;
 // query backoff
 const QUERY_BACKOFF: Duration = Duration::from_secs(15);
 
+/// Query L2ToL1Events from etherscan.
 pub struct L2ToL1Events {
     client: Client,
     timelock_address: Address,
@@ -30,6 +31,7 @@ pub struct L2ToL1Events {
 }
 
 impl L2ToL1Events {
+    /// Creates a new [`L2ToL1Events`].
     pub fn new(
         client: Client,
         timelock_address: Address,
@@ -58,6 +60,8 @@ impl L2ToL1Events {
     {
         let mut page = 1;
         loop {
+            let started_at = Instant::now();
+
             let transactions = self
                 .client
                 .get_transactions(
@@ -72,6 +76,11 @@ impl L2ToL1Events {
                 )
                 .await
                 .unwrap();
+
+            metrics::histogram!(
+                "watcher.chain_events.l2_to_l1_events.etherscan_get_transactions",
+                started_at.elapsed(),
+            );
 
             if transactions.is_empty() {
                 break;
@@ -96,11 +105,16 @@ impl L2ToL1Events {
                     withdrawals.append(&mut res);
                 }
             }
+            metrics::counter!(
+                "watcher.chain_events.l2_to_l1_events.withdrawal_events",
+                withdrawals.len() as u64
+            );
             sender.send(withdrawals).await.unwrap();
         }
         Ok(())
     }
 
+    /// Run querying Etherscan for l2 to l1 events.
     pub async fn run<B, S, M>(self, client_l1: M, from_block: B, mut sender: S) -> Result<()>
     where
         B: Into<BlockNumber> + Copy,
