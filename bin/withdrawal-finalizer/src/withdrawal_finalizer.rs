@@ -46,21 +46,18 @@ where
         }
     }
 
-    pub async fn run<BE, WE, L2L1E>(
+    pub async fn run<BE, WE>(
         mut self,
         block_events: BE,
         withdrawal_events: WE,
-        l2_to_l1_events: L2L1E,
         from_l2_block: u64,
     ) -> Result<()>
     where
         BE: Stream<Item = BlockEvent>,
         WE: Stream<Item = WithdrawalEvent>,
-        L2L1E: Stream<Item = Vec<L2ToL1Event>>,
     {
         pin!(block_events);
         pin!(withdrawal_events);
-        pin!(l2_to_l1_events);
 
         let mut curr_l2_block_number = from_l2_block;
 
@@ -93,9 +90,6 @@ where
                         curr_l2_block_number = event.block_number;
                     }
                     in_block_events.push(event);
-                }
-                Some(event) = l2_to_l1_events.next() => {
-                    self.process_l2_to_l1_events(event).await?;
                 }
                 else => {
                     vlog::info!("terminating finalizer");
@@ -198,6 +192,7 @@ where
                 }
             }
             BlockEvent::BlocksRevert { .. } => todo!(),
+            BlockEvent::L2ToL1Events { events } => self.process_l2_to_l1_events(events).await?,
         }
 
         Ok(())

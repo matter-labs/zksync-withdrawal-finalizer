@@ -61,6 +61,12 @@ pub enum BlockEvent {
         /// Event itself.
         event: BlocksRevertFilter,
     },
+
+    /// `L2ToL1Event`s.
+    L2ToL1Events {
+        ///events
+        events: Vec<L2ToL1Event>,
+    },
 }
 
 // This custom impl sole purpose is pretty hash display instead of [u8; 32]
@@ -95,6 +101,10 @@ impl std::fmt::Display for BlockEvent {
                 .field("total_blocks_commited", &br.total_blocks_committed)
                 .field("total_blocks_verified", &br.total_blocks_verified)
                 .field("total_blocks_executed", &br.total_blocks_executed)
+                .finish(),
+            Self::L2ToL1Events { events } => f
+                .debug_struct("L2ToL1Events")
+                .field("events", &events)
                 .finish(),
         }
     }

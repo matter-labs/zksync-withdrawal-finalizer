@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ethers::{
-    abi::{Address, RawLog},
+    abi::{AbiDecode, Address, RawLog},
     contract::EthEvent,
     providers::{Middleware, Provider, PubsubClient, Ws},
     types::{BlockNumber, Filter, ValueOrArray},
@@ -9,7 +9,12 @@ use ethers::{
 use futures::{Sink, SinkExt, StreamExt};
 
 use client::{
-    zksync_contract::codegen::{BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter},
+    zksync_contract::{
+        codegen::{
+            BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter, CommitBlocksCall,
+        },
+        parse_withdrawal_events_l1,
+    },
     BlockEvent,
 };
 
@@ -174,6 +179,27 @@ impl BlockEvents {
             let raw_log: RawLog = log.clone().into();
 
             if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
+                let tx = middleware
+                    .get_transaction(log.transaction_hash.unwrap())
+                    .await
+                    .unwrap()
+                    .expect("mined transaction exists; qed");
+
+                let mut events = vec![];
+
+                if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
+                    let mut res = parse_withdrawal_events_l1(
+                        &commit_blocks,
+                        tx.block_number.unwrap().as_u64(),
+                        address,
+                    );
+                    events.append(&mut res);
+                }
+                sender
+                    .send(BlockEvent::L2ToL1Events { events })
+                    .await
+                    .unwrap();
+
                 metrics::increment_counter!("watcher.chain_events.block_commit_events");
                 sender
                     .send(BlockEvent::BlockCommit {

@@ -33,10 +33,6 @@ pub struct Config {
     #[envconfig(from = "VALIDATOR_TIMELOCK_ADDR")]
     pub timelock_addr: Address,
 
-    /// The Operator address
-    #[envconfig(from = "OPERATOR_ADDR")]
-    pub operator_addr: Address,
-
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub api_web3_json_rpc_ws_url: Url,
@@ -49,12 +45,6 @@ pub struct Config {
 
     #[envconfig(from = "UPDATER_BACKOFF")]
     pub updater_backoff: Option<u64>,
-
-    #[envconfig(from = "ETHERSCAN_TOKEN")]
-    pub etherscan_token: String,
-
-    #[envconfig(from = "CHAIN_ETH_NETWORK")]
-    pub chain_eth_network: String,
 }
 
 impl Config {

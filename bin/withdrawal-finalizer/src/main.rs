@@ -9,14 +9,11 @@ use std::{str::FromStr, sync::Arc};
 
 use clap::Parser;
 use envconfig::Envconfig;
-use ethers::{
-    providers::{JsonRpcClient, Middleware, Provider, Ws},
-    types::Chain,
-};
+use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
-use chain_events::{BlockEvents, L2ToL1Events, WithdrawalEvents};
+use chain_events::{BlockEvents, WithdrawalEvents};
 use cli::Args;
 use client::{
     l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
@@ -192,15 +189,6 @@ async fn main() -> Result<()> {
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
-    let chain = Chain::from_str(&config.chain_eth_network)?;
-    let etherscan_client = ethers::etherscan::Client::new(chain, &config.etherscan_token)?;
-    let l2tol1events = L2ToL1Events::new(
-        etherscan_client,
-        config.timelock_addr,
-        config.l2_erc20_bridge_addr,
-        config.operator_addr,
-    );
-
     let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
@@ -260,11 +248,7 @@ async fn main() -> Result<()> {
     let withdrawal_events_handle =
         tokio::spawn(we_mux.run_with_reconnects(tokens, from_l2_block, we_tx));
 
-    let (l2_to_l1_tx, l2_to_l1_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-
-    let l2_to_l1_tx = tokio_util::sync::PollSender::new(l2_to_l1_tx);
-    let l2_to_l1_rx = tokio_stream::wrappers::ReceiverStream::new(l2_to_l1_rx);
-    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, l2_to_l1_rx, from_l2_block));
+    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,
@@ -281,9 +265,6 @@ async fn main() -> Result<()> {
 
     vlog::info!("Starting L2 to L1 events from block {from_l1_block_l2_to_l1}");
 
-    let l2tol1_handle =
-        tokio::spawn(l2tol1events.run(client_l1, from_l1_block_l2_to_l1, l2_to_l1_tx));
-
     tokio::select! {
         r = block_events_handle => {
             vlog::error!("Block Events stream ended with {r:?}");
@@ -296,9 +277,6 @@ async fn main() -> Result<()> {
         }
         r = prometheus_exporter_handle => {
             vlog::error!("Prometheus exporter ended with {r:?}");
-        }
-        r = l2tol1_handle => {
-            vlog::error!("L2ToL1 handle ended with {r:?}");
         }
     }
 
