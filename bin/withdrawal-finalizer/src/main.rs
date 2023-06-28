@@ -226,8 +226,8 @@ async fn main() -> Result<()> {
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l2.clone(),
-        pgpool.clone(),
+        client_l2,
+        pgpool,
         zksync_contract,
         l1_bridge,
     );
