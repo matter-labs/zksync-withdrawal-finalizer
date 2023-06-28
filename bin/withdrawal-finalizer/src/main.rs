@@ -61,9 +61,12 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    match storage::last_l1_block_seen(conn).await? {
-        Some(last_l1_block_seen) => Ok(last_l1_block_seen),
-        None => {
+    match (
+        storage::last_l2_to_l1_events_block_seen(conn).await?,
+        storage::last_l1_block_seen(conn).await?,
+    ) {
+        (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
+        _ => {
             let block_details = client_l2
                 .provider()
                 .get_block_details(l2_block_number)
@@ -86,22 +89,7 @@ where
         }
     }
 }
-async fn start_from_l2_to_l1_block<M1, M2>(
-    client_l1: Arc<M1>,
-    client_l2: Arc<M2>,
-    conn: &mut PgConnection,
-) -> Result<u64>
-where
-    M1: Middleware,
-    <M1 as Middleware>::Provider: JsonRpcClient,
-    M2: Middleware,
-    <M2 as Middleware>::Provider: JsonRpcClient,
-{
-    match storage::last_l2_to_l1_events_block_seen(conn).await? {
-        Some(block) => Ok(block - 1),
-        None => start_from_l1_block(client_l1, client_l2, 1, conn).await,
-    }
-}
+
 // Determine an L2 block to start processing withdrawals from.
 //
 // The priority is:
@@ -188,7 +176,6 @@ async fn main() -> Result<()> {
 
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-
     let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
@@ -255,15 +242,6 @@ async fn main() -> Result<()> {
         from_l1_block,
         blocks_tx,
     ));
-
-    let from_l1_block_l2_to_l1 = start_from_l2_to_l1_block(
-        client_l1.clone(),
-        client_l2,
-        &mut pgpool.acquire().await?.detach(),
-    )
-    .await?;
-
-    vlog::info!("Starting L2 to L1 events from block {from_l1_block_l2_to_l1}");
 
     tokio::select! {
         r = block_events_handle => {

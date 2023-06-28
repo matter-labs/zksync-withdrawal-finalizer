@@ -29,10 +29,6 @@ pub struct Config {
     #[envconfig(from = "CONTRACTS_DIAMOND_PROXY_ADDR")]
     pub diamond_proxy_addr: Address,
 
-    /// The timelock address
-    #[envconfig(from = "VALIDATOR_TIMELOCK_ADDR")]
-    pub timelock_addr: Address,
-
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub api_web3_json_rpc_ws_url: Url,

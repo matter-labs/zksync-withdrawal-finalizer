@@ -179,18 +179,23 @@ impl BlockEvents {
             let raw_log: RawLog = log.clone().into();
 
             if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
-                let tx = middleware
-                    .get_transaction(log.transaction_hash.unwrap())
-                    .await
-                    .unwrap()
-                    .expect("mined transaction exists; qed");
+                let Ok(tx) = middleware
+                    .get_transaction(
+                        log.transaction_hash
+                            .expect("log always has a related transaction; qed"),
+                    )
+                    .await else { break };
+
+                let tx = tx.expect("mined transaction exists; qed");
 
                 let mut events = vec![];
 
                 if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
                     let mut res = parse_withdrawal_events_l1(
                         &commit_blocks,
-                        tx.block_number.unwrap().as_u64(),
+                        tx.block_number
+                            .expect("a mined transaction has a block number; qed")
+                            .as_u64(),
                         address,
                     );
                     events.append(&mut res);
