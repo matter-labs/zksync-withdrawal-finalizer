@@ -67,7 +67,8 @@ impl BlockEvents {
     // This function is a workaround for that and implements manual re-connecting.
     pub async fn run_with_reconnects<B, S>(
         self,
-        address: Address,
+        diamond_proxy_addr: Address,
+        l2_erc20_bridge_addr: Address,
         from_block: B,
         sender: S,
     ) -> Result<()>
@@ -86,7 +87,15 @@ impl BlockEvents {
 
             let middleware = Arc::new(provider_l1);
 
-            match Self::run(address, from_block, sender.clone(), middleware).await {
+            match Self::run(
+                diamond_proxy_addr,
+                l2_erc20_bridge_addr,
+                from_block,
+                sender.clone(),
+                middleware,
+            )
+            .await
+            {
                 Err(e) => {
                     vlog::warn!("Block events worker failed with {e}");
                 }
@@ -112,7 +121,8 @@ impl BlockEvents {
     /// lifetimes making it practically impossible to decouple
     /// `Event` and `EventStream` types from each other.
     async fn run<B, S, M>(
-        address: Address,
+        diamond_proxy_addr: Address,
+        l2_erc20_bridge_addr: Address,
         from_block: B,
         mut sender: S,
         middleware: M,
@@ -136,7 +146,7 @@ impl BlockEvents {
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
-            .address(address)
+            .address(diamond_proxy_addr)
             .topic0(vec![
                 BlockCommitFilter::signature(),
                 BlocksVerificationFilter::signature(),
@@ -145,7 +155,7 @@ impl BlockEvents {
 
         let filter = Filter::new()
             .from_block(latest_block)
-            .address(Into::<ValueOrArray<Address>>::into(address))
+            .address(Into::<ValueOrArray<Address>>::into(diamond_proxy_addr))
             .topic0(vec![
                 BlockCommitFilter::signature(),
                 BlocksVerificationFilter::signature(),
@@ -196,7 +206,7 @@ impl BlockEvents {
                         tx.block_number
                             .expect("a mined transaction has a block number; qed")
                             .as_u64(),
-                        address,
+                        l2_erc20_bridge_addr,
                     );
                     events.append(&mut res);
                 }

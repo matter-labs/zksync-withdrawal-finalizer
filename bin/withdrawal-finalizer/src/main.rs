@@ -239,6 +239,7 @@ async fn main() -> Result<()> {
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,
+        config.l2_erc20_bridge_addr,
         from_l1_block,
         blocks_tx,
     ));
