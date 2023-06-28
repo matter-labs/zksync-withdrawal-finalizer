@@ -10,7 +10,7 @@ use std::time::Instant;
 use ethers::types::{H160, H256};
 use sqlx::{Connection, PgConnection};
 
-use client::WithdrawalEvent;
+use client::{zksync_contract::L2ToL1Event, WithdrawalEvent};
 
 mod error;
 mod utils;
@@ -327,6 +327,30 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     Ok(res)
 }
 
+/// Get the last block seen for the l2_to_l1_events set
+pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
+    let started_at = Instant::now();
+
+    let res = sqlx::query!(
+        "
+        SELECT MAX(l1_block_number)
+        FROM l2_to_l1_events
+        "
+    )
+    .fetch_one(conn)
+    .await?
+    .max
+    .map(|max| max as u64);
+
+    metrics::histogram!(
+        "watcher.storage.request",
+        started_at.elapsed(),
+        "method" => "last_l2_to_l1_events_block_seen",
+    );
+
+    Ok(res)
+}
+
 /// Get all withdrawals that are not finalized yet
 pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<StoredWithdrawal>> {
     let started_at = Instant::now();
@@ -402,5 +426,82 @@ pub async fn update_withdrawals_to_finalized(
         started_at.elapsed()
     );
 
+    Ok(())
+}
+
+/// Adds a `L2ToL1Event` set to the DB.
+///
+/// # Arguments
+///
+/// * `conn`: Connection to the Postgres DB
+/// * `events`: The `L2ToL1Event`s
+pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) -> Result<()> {
+    let mut l1_token_addrs = Vec::with_capacity(events.len());
+    let mut to_addrs = Vec::with_capacity(events.len());
+    let mut amounts = Vec::with_capacity(events.len());
+    let mut l1_block_numbers = Vec::with_capacity(events.len());
+    let mut l2_block_numbers = Vec::with_capacity(events.len());
+    let mut tx_numbers_in_block = Vec::with_capacity(events.len());
+
+    events.iter().for_each(|e| {
+        l1_token_addrs.push(e.token.0.to_vec());
+        to_addrs.push(e.to.0.to_vec());
+        amounts.push(u256_to_big_decimal(e.amount));
+        l1_block_numbers.push(e.l1_block_number as i64);
+        l2_block_numbers.push(e.l2_block_number as i64);
+        tx_numbers_in_block.push(e.tx_number_in_block as i32);
+    });
+
+    let started_at = Instant::now();
+
+    sqlx::query!(
+        "
+        INSERT INTO l2_to_l1_events
+        (
+            l1_token_addr,
+            to_address,
+            amount,
+            l1_block_number,
+            l2_block_number,
+            tx_number_in_block
+        )
+        SELECT
+            u.l1_token_addr,
+            u.to_address,
+            u.amount,
+            u.l1_block_number,
+            u.l2_block_number,
+            u.tx_number_in_block
+        FROM UNNEST(
+            $1::bytea[],
+            $2::bytea[],
+            $3::numeric[],
+            $4::bigint[],
+            $5::bigint[],
+            $6::integer[]
+        ) AS u(
+            l1_token_addr,
+            to_address,
+            amount,
+            l1_block_number,
+            l2_block_number,
+            tx_number_in_block
+        )
+        ON CONFLICT (l1_block_number, l2_block_number, tx_number_in_block) DO NOTHING
+        ",
+        &l1_token_addrs,
+        &to_addrs,
+        &amounts,
+        &l1_block_numbers,
+        &l2_block_numbers,
+        &tx_numbers_in_block,
+    )
+    .execute(conn)
+    .await?;
+
+    metrics::histogram!(
+        "watcher.storage.transactions.add_l2_to_l1_event",
+        started_at.elapsed()
+    );
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ethers::{
-    abi::{Address, RawLog},
+    abi::{AbiDecode, Address, RawLog},
     contract::EthEvent,
     providers::{Middleware, Provider, PubsubClient, Ws},
     types::{BlockNumber, Filter, ValueOrArray},
@@ -9,7 +9,12 @@ use ethers::{
 use futures::{Sink, SinkExt, StreamExt};
 
 use client::{
-    zksync_contract::codegen::{BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter},
+    zksync_contract::{
+        codegen::{
+            BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter, CommitBlocksCall,
+        },
+        parse_withdrawal_events_l1,
+    },
     BlockEvent,
 };
 
@@ -62,7 +67,8 @@ impl BlockEvents {
     // This function is a workaround for that and implements manual re-connecting.
     pub async fn run_with_reconnects<B, S>(
         self,
-        address: Address,
+        diamond_proxy_addr: Address,
+        l2_erc20_bridge_addr: Address,
         from_block: B,
         sender: S,
     ) -> Result<()>
@@ -81,7 +87,15 @@ impl BlockEvents {
 
             let middleware = Arc::new(provider_l1);
 
-            match Self::run(address, from_block, sender.clone(), middleware).await {
+            match Self::run(
+                diamond_proxy_addr,
+                l2_erc20_bridge_addr,
+                from_block,
+                sender.clone(),
+                middleware,
+            )
+            .await
+            {
                 Err(e) => {
                     vlog::warn!("Block events worker failed with {e}");
                 }
@@ -107,7 +121,8 @@ impl BlockEvents {
     /// lifetimes making it practically impossible to decouple
     /// `Event` and `EventStream` types from each other.
     async fn run<B, S, M>(
-        address: Address,
+        diamond_proxy_addr: Address,
+        l2_erc20_bridge_addr: Address,
         from_block: B,
         mut sender: S,
         middleware: M,
@@ -131,7 +146,7 @@ impl BlockEvents {
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
-            .address(address)
+            .address(diamond_proxy_addr)
             .topic0(vec![
                 BlockCommitFilter::signature(),
                 BlocksVerificationFilter::signature(),
@@ -140,7 +155,7 @@ impl BlockEvents {
 
         let filter = Filter::new()
             .from_block(latest_block)
-            .address(Into::<ValueOrArray<Address>>::into(address))
+            .address(Into::<ValueOrArray<Address>>::into(diamond_proxy_addr))
             .topic0(vec![
                 BlockCommitFilter::signature(),
                 BlocksVerificationFilter::signature(),
@@ -174,6 +189,32 @@ impl BlockEvents {
             let raw_log: RawLog = log.clone().into();
 
             if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
+                let Ok(tx) = middleware
+                    .get_transaction(
+                        log.transaction_hash
+                            .expect("log always has a related transaction; qed"),
+                    )
+                    .await else { break };
+
+                let tx = tx.expect("mined transaction exists; qed");
+
+                let mut events = vec![];
+
+                if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
+                    let mut res = parse_withdrawal_events_l1(
+                        &commit_blocks,
+                        tx.block_number
+                            .expect("a mined transaction has a block number; qed")
+                            .as_u64(),
+                        l2_erc20_bridge_addr,
+                    );
+                    events.append(&mut res);
+                }
+                sender
+                    .send(BlockEvent::L2ToL1Events { events })
+                    .await
+                    .unwrap();
+
                 metrics::increment_counter!("watcher.chain_events.block_commit_events");
                 sender
                     .send(BlockEvent::BlockCommit {

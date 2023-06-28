@@ -61,9 +61,12 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    match storage::last_l1_block_seen(conn).await? {
-        Some(last_l1_block_seen) => Ok(last_l1_block_seen),
-        None => {
+    match (
+        storage::last_l2_to_l1_events_block_seen(conn).await?,
+        storage::last_l1_block_seen(conn).await?,
+    ) {
+        (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
+        _ => {
             let block_details = client_l2
                 .provider()
                 .get_block_details(l2_block_number)
@@ -236,6 +239,7 @@ async fn main() -> Result<()> {
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,
+        config.l2_erc20_bridge_addr,
         from_l1_block,
         blocks_tx,
     ));

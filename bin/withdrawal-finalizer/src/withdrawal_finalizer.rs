@@ -10,8 +10,9 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{
-    l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, BlockEvent, WithdrawalEvent,
-    ZksyncMiddleware,
+    l1bridge::codegen::IL1Bridge,
+    zksync_contract::{codegen::IZkSync, L2ToL1Event},
+    BlockEvent, WithdrawalEvent, ZksyncMiddleware,
 };
 
 use crate::Result;
@@ -100,6 +101,14 @@ where
         Ok(())
     }
 
+    async fn process_l2_to_l1_events(&mut self, events: Vec<L2ToL1Event>) -> Result<()> {
+        let mut pgconn = self.pgpool.acquire().await?;
+
+        storage::l2_to_l1_events(&mut pgconn, &events).await?;
+
+        Ok(())
+    }
+
     async fn process_block_event(&mut self, event: BlockEvent) -> Result<()> {
         let mut pgconn = self.pgpool.acquire().await?;
         match event {
@@ -183,6 +192,7 @@ where
                 }
             }
             BlockEvent::BlocksRevert { .. } => todo!(),
+            BlockEvent::L2ToL1Events { events } => self.process_l2_to_l1_events(events).await?,
         }
 
         Ok(())
