@@ -33,6 +33,42 @@
     },
     "query": "\n        SELECT l2_blocks.commit_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.l2_block_number\n        WHERE withdrawals.tx_hash = $1\n        "
   },
+  "1a8c44a4e6b5a7d96a3ac5f2183bf389d31e098eb5851e939a34597421f82b24": {
+    "describe": {
+      "columns": [
+        {
+          "name": "max",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT MAX(l2_block_number)\n        FROM tokens\n        "
+  },
+  "3167093f1230ee517cfb4940dad1cc0550beb13f7e9482234719cecb65a0789d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Bytea",
+          "Bytea",
+          "Varchar",
+          "Varchar",
+          "Int4",
+          "Int8",
+          "Bytea"
+        ]
+      }
+    },
+    "query": "\n        INSERT INTO tokens\n        (\n            l1_token_address,\n            l2_token_address,\n            name,\n            symbol,\n            decimals,\n            l2_block_number,\n            initialization_transaction\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7)\n        ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING\n        "
+  },
   "6a733fb8a5a93dac84d027e2475a46802d7de85d729c0a10bbb0c24a467cef30": {
     "describe": {
       "columns": [
@@ -247,5 +283,23 @@
       }
     },
     "query": "\n        INSERT INTO l2_blocks (l2_block_number, execute_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET execute_l1_block_number = $2\n        "
+  },
+  "f45d718c4b93138cc567f0a9aac4c5b39f219b9d7a0761807c645f70cd5a0fbc": {
+    "describe": {
+      "columns": [
+        {
+          "name": "l2_token_address",
+          "ordinal": 0,
+          "type_info": "Bytea"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n        SELECT l2_token_address\n        FROM tokens\n        "
   }
 }

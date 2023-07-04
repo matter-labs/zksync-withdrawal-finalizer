@@ -5,7 +5,7 @@
 
 //! A withdraw-finalizer
 
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use clap::Parser;
 use envconfig::Envconfig;
@@ -172,11 +172,14 @@ async fn main() -> Result<()> {
 
     let client_l2 = Arc::new(provider_l2);
 
-    let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
+    let _l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
+    let we_mux = WithdrawalEvents::new(
+        config.api_web3_json_rpc_ws_url.as_str(),
+        config.l2_erc20_bridge_addr,
+    );
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
@@ -192,6 +195,7 @@ async fn main() -> Result<()> {
         &config,
     )
     .await?;
+    //let from_l2_block = 1;
 
     vlog::info!("Starting from L2 block number {from_l2_block}");
 
@@ -210,17 +214,8 @@ async fn main() -> Result<()> {
 
     vlog::info!("Starting from L1 block number {from_l1_block}");
 
-    let l1_tokens = client_l2.get_confirmed_tokens(0, u8::MAX).await?;
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
 
-    let mut tokens = vec![];
-
-    for l1_token in &l1_tokens {
-        let l2_token = l2_bridge.l_2_token_address(l1_token.l1_address).await?;
-
-        let l1_token_address = l1_token.l1_address;
-        vlog::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
-        tokens.push(l2_token);
-    }
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
@@ -232,8 +227,13 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let withdrawal_events_handle =
-        tokio::spawn(we_mux.run_with_reconnects(tokens, from_l2_block, we_tx));
+    let tokens = HashSet::from_iter(tokens.into_iter());
+    let withdrawal_events_handle = tokio::spawn(we_mux.run_with_reconnects(
+        tokens,
+        from_l2_block,
+        last_token_seen_at_block,
+        we_tx,
+    ));
 
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 

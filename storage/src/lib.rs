@@ -7,9 +7,10 @@
 
 use std::time::Instant;
 
-use ethers::types::{H160, H256};
-use sqlx::{Connection, PgConnection};
+use ethers::types::{Address, H160, H256};
+use sqlx::{Connection, PgConnection, PgPool};
 
+use chain_events::L2TokenInitEvent;
 use client::{zksync_contract::L2ToL1Event, WithdrawalEvent};
 
 mod error;
@@ -503,5 +504,64 @@ pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) ->
         "watcher.storage.transactions.add_l2_to_l1_event",
         started_at.elapsed()
     );
+    Ok(())
+}
+
+/// Get addresses of known tokens on L2 + last seen block.
+pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
+    let last_l2_block_seen = sqlx::query!(
+        "
+        SELECT MAX(l2_block_number)
+        FROM tokens
+        ",
+    )
+    .fetch_one(pool)
+    .await?
+    .max
+    .unwrap_or(0);
+
+    let tokens = sqlx::query!(
+        "
+        SELECT l2_token_address
+        FROM tokens
+        "
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| H160::from_slice(&r.l2_token_address))
+    .collect();
+
+    Ok((tokens, last_l2_block_seen as u64))
+}
+
+/// a
+pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
+    sqlx::query!(
+        "
+        INSERT INTO tokens
+        (
+            l1_token_address,
+            l2_token_address,
+            name,
+            symbol,
+            decimals,
+            l2_block_number,
+            initialization_transaction
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
+        ",
+        token.l1_token_address.0.to_vec(),
+        token.l2_token_address.0.to_vec(),
+        token.name,
+        token.symbol,
+        token.decimals as i64,
+        token.l2_block_number as i64,
+        token.initialization_transaction.0.to_vec(),
+    )
+    .execute(pool)
+    .await?;
+
     Ok(())
 }

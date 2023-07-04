@@ -26,6 +26,7 @@ use crate::{Error, Result, RECONNECT_BACKOFF};
 // the `Block` events from the middleware as currently `ethers` events
 // api relies on lifetimes and borrowing is hard to use otherwise
 // in the async context.
+/// Listener of block events on L1.
 pub struct BlockEvents {
     url: String,
 }

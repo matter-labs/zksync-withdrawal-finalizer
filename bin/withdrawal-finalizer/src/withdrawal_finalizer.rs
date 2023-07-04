@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chain_events::L2Event;
 use ethers::{
     providers::{JsonRpcClient, Middleware},
     types::{Address, H256},
@@ -54,7 +55,7 @@ where
     ) -> Result<()>
     where
         BE: Stream<Item = BlockEvent>,
-        WE: Stream<Item = WithdrawalEvent>,
+        WE: Stream<Item = L2Event>,
     {
         pin!(block_events);
         pin!(withdrawal_events);
@@ -84,12 +85,18 @@ where
                     self.process_block_event(event).await?;
                 }
                 Some(event) = withdrawal_events.next() => {
-                    vlog::info!("withdrawal event {event:?}");
-                    if event.block_number > curr_l2_block_number {
-                        self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
-                        curr_l2_block_number = event.block_number;
+                    match event {
+                        L2Event::Withdrawal(event) => {
+                            vlog::info!("withdrawal event {event:?}");
+                            if event.block_number > curr_l2_block_number {
+                                self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
+                                curr_l2_block_number = event.block_number;
+                            }
+                            in_block_events.push(event);
+
+                        }
+                        L2Event::L2TokenInitEvent(event) => storage::add_token(&self.pgpool, &event).await?,
                     }
-                    in_block_events.push(event);
                 }
                 else => {
                     vlog::info!("terminating finalizer");

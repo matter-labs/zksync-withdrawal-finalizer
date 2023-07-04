@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.2.4", features = ["derive", "string"] }
 color-eyre = "0.6.2"
-ethers = { version = "2.0.6", default-features = false, features = ["ws", "rustls"] }
+ethers = { version = "2.0.7", default-features = false, features = ["ws", "rustls"] }
 serde = "1.0.160"
 tokio = { version = "1.28.0", features = ["full"] }
 toml = "0.7.3"

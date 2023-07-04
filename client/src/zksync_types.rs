@@ -5,7 +5,10 @@
 //! interacting with the RPC endpoints.
 
 use chrono::{DateTime, Utc};
-use ethers::types::{Address, Bloom, Bytes, H160, H256, U256, U64};
+use ethers::{
+    abi::RawLog,
+    types::{Address, Bloom, Bytes, H160, H256, U256, U64},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -143,6 +146,12 @@ impl Log {
             }
         }
         false
+    }
+}
+
+impl From<Log> for RawLog {
+    fn from(val: Log) -> Self {
+        (val.topics, val.data.to_vec()).into()
     }
 }
 

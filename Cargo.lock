@@ -3577,6 +3577,7 @@ name = "storage"
 version = "0.1.8"
 dependencies = [
  "bigdecimal",
+ "chain-events",
  "client",
  "ethers",
  "metrics",
