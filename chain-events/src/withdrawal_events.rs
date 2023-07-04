@@ -112,7 +112,7 @@ impl WithdrawalEvents {
         <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
         let mut bridge_init_log = None;
-        if ContractDeployedFilter::decode_log(&raw_log).is_ok() {
+        if ContractDeployedFilter::decode_log(raw_log).is_ok() {
             let tx = middleware
                 .zks_get_transaction_receipt(log.transaction_hash.unwrap())
                 .await
