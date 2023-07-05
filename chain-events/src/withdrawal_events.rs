@@ -110,6 +110,32 @@ impl WithdrawalEvents {
     // event.
     //
     // If such event is found, send it to `sender` and return `true`.
+    async fn try_bridge_burn_event<S>(log: &Log, raw_log: &RawLog, sender: &mut S) -> bool
+    where
+        S: Sink<L2Event> + Unpin,
+        <S as Sink<L2Event>>::Error: std::fmt::Debug,
+    {
+        if let Ok(burn_event) = BridgeBurnFilter::decode_log(raw_log) {
+            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+                metrics::increment_counter!("watcher.chain_events.bridge_burn_events");
+                let we = WithdrawalEvent {
+                    tx_hash,
+                    block_number: block_number.as_u64(),
+                    token: log.address,
+                    amount: burn_event.amount,
+                };
+                sender.send(we.into()).await.unwrap();
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    // Given a `Log` try to figure out if this is a `WithdrawalFilter`
+    // event.
+    //
+    // If such event is found, send it to `sender` and return `true`.
     async fn try_withdrawal_event<S>(log: &Log, raw_log: &RawLog, sender: &mut S) -> bool
     where
         S: Sink<L2Event> + Unpin,
@@ -366,6 +392,10 @@ impl WithdrawalEvents {
             }
 
             if Self::try_withdrawal_event(&log, &raw_log, &mut sender).await {
+                continue;
+            }
+
+            if Self::try_bridge_burn_event(&log, &raw_log, &mut sender).await {
                 continue;
             }
 
