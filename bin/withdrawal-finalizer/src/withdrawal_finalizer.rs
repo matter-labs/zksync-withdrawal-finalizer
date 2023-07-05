@@ -81,22 +81,21 @@ where
         loop {
             tokio::select! {
                 Some(event) = block_events.next() => {
-                    vlog::info!("block event {event}");
+                    vlog::debug!("block event {event}");
                     self.process_block_event(event).await?;
                 }
                 Some(event) = withdrawal_events.next() => {
                     match event {
                         L2Event::Withdrawal(event) => {
-                            vlog::info!("withdrawal event {event:?}");
+                            vlog::debug!("withdrawal event {event:?}");
                             if event.block_number > curr_l2_block_number {
                                 self.process_withdrawals_in_block(std::mem::take(&mut in_block_events)).await?;
                                 curr_l2_block_number = event.block_number;
                             }
                             in_block_events.push(event);
-
                         }
                         L2Event::L2TokenInitEvent(event) => {
-                            vlog::error!("l2 token init event {event:?}");
+                            vlog::debug!("l2 token init event {event:?}");
                             storage::add_token(&self.pgpool, &event).await?;
                         }
                     }

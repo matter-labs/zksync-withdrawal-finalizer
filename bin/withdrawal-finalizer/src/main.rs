@@ -15,10 +15,7 @@ use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
 use chain_events::{BlockEvents, WithdrawalEvents};
 use cli::Args;
-use client::{
-    l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
-    ZksyncMiddleware,
-};
+use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::task::JoinHandle;
@@ -171,8 +168,6 @@ async fn main() -> Result<()> {
     .unwrap();
 
     let client_l2 = Arc::new(provider_l2);
-
-    let _l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
 
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
