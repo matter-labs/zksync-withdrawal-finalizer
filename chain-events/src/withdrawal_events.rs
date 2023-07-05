@@ -115,7 +115,7 @@ impl WithdrawalEvents {
         S: Sink<L2Event> + Unpin,
         <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
-        if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
+        if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(raw_log) {
             if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
                 metrics::increment_counter!("watcher.chain_events.withdrawal_events");
                 let we = WithdrawalEvent {
@@ -372,7 +372,7 @@ impl WithdrawalEvents {
             match Self::try_bridge_initialize_event(
                 &log,
                 &raw_log,
-                &addresses,
+                addresses,
                 &mut sender,
                 &middleware,
             )
