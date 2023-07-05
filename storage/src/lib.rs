@@ -518,7 +518,7 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     .fetch_one(pool)
     .await?
     .max
-    .unwrap_or(0);
+    .unwrap_or(1);
 
     let tokens = sqlx::query!(
         "

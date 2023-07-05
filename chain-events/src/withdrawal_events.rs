@@ -76,21 +76,22 @@ impl WithdrawalEvents {
 
         let filter = Filter::new()
             .from_block(from_block)
-            .address(DEPLOYER_ADDRESS)
             .to_block(to_block)
+            .address(DEPLOYER_ADDRESS)
             .topic0(vec![ContractDeployedFilter::signature()])
             .topic1(l2_erc20_bridge_addr);
 
-        let mut logs = middleware.get_logs_paginated(&filter, 1000000);
+        let logs = middleware
+            .get_logs(&filter)
+            .await
+            .map_err(|e| Error::Middleware(e.to_string()))?;
 
         let mut res = HashSet::new();
-        while let Some(log) = logs.next().await {
-            let log = log?;
-
+        for log in logs {
             let raw_log: RawLog = log.clone().into();
 
             if let Some(address) =
-                Self::bridge_initialize_event(&log, &raw_log, sender, &middleware).await?
+                Self::bridge_initialize_event(&log, &raw_log, &res, sender, &middleware).await?
             {
                 res.insert(address);
             }
@@ -102,6 +103,7 @@ impl WithdrawalEvents {
     async fn bridge_initialize_event<S, M>(
         log: &Log,
         raw_log: &RawLog,
+        known_tokens: &HashSet<Address>,
         sender: &mut S,
         middleware: M,
     ) -> Result<Option<Address>>
@@ -114,9 +116,12 @@ impl WithdrawalEvents {
         let mut bridge_init_log = None;
         if ContractDeployedFilter::decode_log(raw_log).is_ok() {
             let tx = middleware
-                .zks_get_transaction_receipt(log.transaction_hash.unwrap())
+                .zks_get_transaction_receipt(
+                    log.transaction_hash
+                        .expect("a log from a transaction always has a tx hash; qed"),
+                )
                 .await
-                .unwrap();
+                .map_err(|e| Error::Middleware(e.to_string()))?;
             for log in tx.logs {
                 if log.topics[0] == BridgeInitializeFilter::signature()
                     || log.topics[0] == BridgeInitializationFilter::signature()
@@ -140,6 +145,9 @@ impl WithdrawalEvents {
         }
 
         if let Some(bridge_initialize) = bridge_init_event {
+            if known_tokens.contains(&log.address) {
+                return Ok(None);
+            }
             let l2_event = L2TokenInitEvent {
                 l1_token_address: bridge_initialize.l_1_token,
                 l2_token_address: log.address,
@@ -179,9 +187,11 @@ impl WithdrawalEvents {
         <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
         let mut from_block: BlockNumber = from_block.into();
+        let mut last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
 
         addresses.insert(ETH_TOKEN_ADDRESS);
         addresses.insert(ETH_ADDRESS);
+        addresses.insert(DEPLOYER_ADDRESS);
 
         loop {
             let Some(provider_l1) = self.connect().await else {
@@ -204,6 +214,7 @@ impl WithdrawalEvents {
                 Ok(RunResult::StoppedAtBlock { block }) => from_block = block,
                 Ok(RunResult::NewTokenInitialized { token, block }) => {
                     from_block = block;
+                    last_seen_l2_token_block = block;
                     addresses.insert(token);
                 }
                 Err(e) => {
@@ -250,6 +261,12 @@ impl WithdrawalEvents {
         let last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
         let from_block: BlockNumber = from_block.into();
 
+        let topic0 = vec![
+            ContractDeployedFilter::signature(),
+            BridgeBurnFilter::signature(),
+            WithdrawalFilter::signature(),
+        ];
+
         vlog::info!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
         vlog::info!("from_block {from_block:?}");
         if last_seen_l2_token_block.as_number() <= from_block.as_number() {
@@ -277,22 +294,12 @@ impl WithdrawalEvents {
             .from_block(from_block)
             .to_block(latest_block)
             .address(addresses.iter().cloned().collect::<Vec<_>>())
-            .topic0(vec![
-                BridgeInitializeFilter::signature(),
-                BridgeInitializationFilter::signature(),
-                BridgeBurnFilter::signature(),
-                WithdrawalFilter::signature(),
-            ]);
+            .topic0(topic0.clone());
 
         let filter = Filter::new()
             .from_block(latest_block)
             .address(addresses.iter().cloned().collect::<Vec<_>>())
-            .topic0(vec![
-                BridgeBurnFilter::signature(),
-                WithdrawalFilter::signature(),
-                BridgeInitializeFilter::signature(),
-                BridgeInitializationFilter::signature(),
-            ]);
+            .topic0(topic0);
 
         let past_logs = middleware.get_logs_paginated(&past_filter, 10000);
         let current_logs = middleware
@@ -348,20 +355,30 @@ impl WithdrawalEvents {
                 }
                 continue;
             }
-            if let Some(address) =
-                Self::bridge_initialize_event(&log, &raw_log, &mut sender, &middleware).await?
+            match Self::bridge_initialize_event(
+                &log,
+                &raw_log,
+                &addresses,
+                &mut sender,
+                &middleware,
+            )
+            .await
             {
-                if !addresses.contains(&address) {
-                    vlog::info!("Restarting on the token added event {address}",);
+                Ok(Some(address)) => {
+                    if !addresses.contains(&address) {
+                        vlog::info!("Restarting on the token added event {address}",);
 
-                    return Ok(RunResult::NewTokenInitialized {
-                        token: log.address,
-                        block: log
-                            .block_number
-                            .expect("a mined block always has a block number; qed")
-                            .into(),
-                    });
+                        return Ok(RunResult::NewTokenInitialized {
+                            token: address,
+                            block: log
+                                .block_number
+                                .expect("a mined block always has a block number; qed")
+                                .into(),
+                        });
+                    }
                 }
+                Err(_) => break,
+                _ => (),
             }
         }
         vlog::info!("withdrawal streams being closed");

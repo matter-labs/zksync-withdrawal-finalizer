@@ -195,7 +195,6 @@ async fn main() -> Result<()> {
         &config,
     )
     .await?;
-    //let from_l2_block = 1;
 
     vlog::info!("Starting from L2 block number {from_l2_block}");
 

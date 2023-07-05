@@ -95,7 +95,10 @@ where
                             in_block_events.push(event);
 
                         }
-                        L2Event::L2TokenInitEvent(event) => storage::add_token(&self.pgpool, &event).await?,
+                        L2Event::L2TokenInitEvent(event) => {
+                            vlog::error!("l2 token init event {event:?}");
+                            storage::add_token(&self.pgpool, &event).await?;
+                        }
                     }
                 }
                 else => {
