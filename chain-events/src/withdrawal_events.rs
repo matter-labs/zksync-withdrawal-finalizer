@@ -204,7 +204,7 @@ impl WithdrawalEvents {
             match Self::run(
                 addresses.clone(),
                 from_block,
-                last_seen_l2_token_block.into(),
+                last_seen_l2_token_block,
                 self.l2_erc20_bridge_addr,
                 sender.clone(),
                 middleware,
