@@ -535,7 +535,7 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     Ok((tokens, last_l2_block_seen as u64))
 }
 
-/// a
+/// Insert a token initalization event into the DB.
 pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     sqlx::query!(
         "
