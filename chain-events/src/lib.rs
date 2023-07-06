@@ -7,7 +7,7 @@
 
 mod block_events;
 mod error;
-mod withdrawal_events;
+mod l2_events;
 
 use std::time::Duration;
 
@@ -17,7 +17,7 @@ pub use error::{Error, Result};
 pub(crate) const RECONNECT_BACKOFF: Duration = Duration::from_secs(1);
 pub use block_events::BlockEvents;
 use ethers::types::{Address, H256};
-pub use withdrawal_events::WithdrawalEvents;
+pub use l2_events::L2Events;
 
 /// All L2 Events the service is interested in.
 #[derive(Debug)]

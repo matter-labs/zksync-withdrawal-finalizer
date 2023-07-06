@@ -5,7 +5,7 @@
 
 //! A withdraw-finalizer
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use clap::Parser;
 use envconfig::Envconfig;
@@ -13,7 +13,7 @@ use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
-use chain_events::{BlockEvents, WithdrawalEvents};
+use chain_events::{BlockEvents, L2Events};
 use cli::Args;
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
@@ -171,10 +171,6 @@ async fn main() -> Result<()> {
 
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEvents::new(
-        config.api_web3_json_rpc_ws_url.as_str(),
-        config.l2_erc20_bridge_addr,
-    );
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
@@ -210,6 +206,12 @@ async fn main() -> Result<()> {
 
     let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
 
+    let l2_events = L2Events::new(
+        config.api_web3_json_rpc_ws_url.as_str(),
+        config.l2_erc20_bridge_addr,
+        tokens.into_iter().collect(),
+    );
+
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
@@ -221,13 +223,8 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let tokens = HashSet::from_iter(tokens.into_iter());
-    let withdrawal_events_handle = tokio::spawn(we_mux.run_with_reconnects(
-        tokens,
-        from_l2_block,
-        last_token_seen_at_block,
-        we_tx,
-    ));
+    let withdrawal_events_handle =
+        tokio::spawn(l2_events.run_with_reconnects(from_l2_block, last_token_seen_at_block, we_tx));
 
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 

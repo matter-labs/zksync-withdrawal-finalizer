@@ -20,21 +20,27 @@ use futures::{Sink, SinkExt, StreamExt};
 use crate::{Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
 
 /// A convenience multiplexer for withdrawal-related events.
-pub struct WithdrawalEvents {
+pub struct L2Events {
     url: String,
     l2_erc20_bridge_addr: Address,
+    tokens: HashSet<Address>,
 }
 
-impl WithdrawalEvents {
+impl L2Events {
     /// Create a new `WithdrawalEvents` structure.
     ///
     /// # Arguments
     ///
     /// * `middleware`: THe middleware to perform requests with.
-    pub fn new(url: &str, l2_erc20_bridge_addr: Address) -> Self {
+    pub fn new(url: &str, l2_erc20_bridge_addr: Address, mut tokens: HashSet<Address>) -> Self {
+        tokens.insert(ETH_TOKEN_ADDRESS);
+        tokens.insert(ETH_ADDRESS);
+        tokens.insert(DEPLOYER_ADDRESS);
+
         Self {
             url: url.to_string(),
             l2_erc20_bridge_addr,
+            tokens,
         }
     }
 
@@ -57,12 +63,12 @@ impl WithdrawalEvents {
     }
 
     async fn query_past_token_init_events<M, B, S>(
+        &mut self,
         from_block: B,
         to_block: B,
-        l2_erc20_bridge_addr: Address,
         sender: &mut S,
         middleware: M,
-    ) -> Result<HashSet<Address>>
+    ) -> Result<()>
     where
         B: Into<BlockNumber> + Copy,
         M: ZksyncMiddleware,
@@ -82,7 +88,7 @@ impl WithdrawalEvents {
             .to_block(to_block)
             .address(DEPLOYER_ADDRESS)
             .topic0(vec![ContractDeployedFilter::signature()])
-            .topic1(l2_erc20_bridge_addr);
+            .topic1(self.l2_erc20_bridge_addr);
 
         // `get_logs` are used because there are not that many events
         // expected and `get_logs_paginated` contains a bug that incorrectly
@@ -92,19 +98,20 @@ impl WithdrawalEvents {
             .await
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
-        let mut res = HashSet::new();
         for log in logs {
             let raw_log: RawLog = log.clone().into();
 
-            if let Some((l2_event, address)) =
-                Self::try_bridge_initialize_event(&log, &raw_log, &res, &middleware).await?
+            if let Some((l2_event, address)) = self
+                .try_bridge_initialize_event(&log, &raw_log, &middleware)
+                .await?
             {
-                sender.send(l2_event.into()).await.unwrap();
-                res.insert(address);
+                if self.tokens.insert(address) {
+                    sender.send(l2_event.into()).await.unwrap();
+                }
             }
         }
 
-        Ok(res)
+        Ok(())
     }
 
     // Given a `Log` try to figure out if this is a `WithdrawalFilter`
@@ -156,9 +163,9 @@ impl WithdrawalEvents {
     //
     // The address of the token if a bridge init event is found.
     async fn try_bridge_initialize_event<M>(
+        &self,
         log: &Log,
         raw_log: &RawLog,
-        known_tokens: &HashSet<Address>,
         middleware: M,
     ) -> Result<Option<(L2TokenInitEvent, Address)>>
     where
@@ -204,7 +211,7 @@ impl WithdrawalEvents {
 
         let Some(bridge_init_event) = bridge_init_event else { return Ok(None) };
 
-        if known_tokens.contains(&bridge_init_log.address) {
+        if self.tokens.contains(&bridge_init_log.address) {
             return Ok(None);
         }
 
@@ -232,8 +239,7 @@ impl WithdrawalEvents {
     // in `ethers-rs`: https://github.com/gakonst/ethers-rs/issues/2418
     // This function is a workaround for that and implements manual re-connecting.
     pub async fn run_with_reconnects<B, S>(
-        self,
-        mut addresses: HashSet<Address>,
+        mut self,
         from_block: B,
         last_seen_l2_token_block: B,
         sender: S,
@@ -245,11 +251,6 @@ impl WithdrawalEvents {
     {
         let mut from_block: BlockNumber = from_block.into();
         let mut last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
-
-        addresses.insert(ETH_TOKEN_ADDRESS);
-        addresses.insert(ETH_ADDRESS);
-        addresses.insert(DEPLOYER_ADDRESS);
-
         loop {
             let Some(provider_l1) = self.connect().await else {
                 tokio::time::sleep(RECONNECT_BACKOFF).await;
@@ -258,15 +259,14 @@ impl WithdrawalEvents {
 
             let middleware = Arc::new(provider_l1);
 
-            match Self::run(
-                &mut addresses,
-                from_block,
-                last_seen_l2_token_block,
-                self.l2_erc20_bridge_addr,
-                sender.clone(),
-                middleware,
-            )
-            .await
+            match self
+                .run(
+                    from_block,
+                    last_seen_l2_token_block,
+                    sender.clone(),
+                    middleware,
+                )
+                .await
             {
                 Ok(RunResult::StoppedAtBlock { block }) => {
                     from_block = block;
@@ -284,7 +284,7 @@ enum RunResult {
     StoppedAtBlock { block: BlockNumber },
 }
 
-impl WithdrawalEvents {
+impl L2Events {
     /// A convenience function that listens for all withdrawal events on L2
     ///
     /// For more reasoning about the necessity of this function
@@ -296,10 +296,9 @@ impl WithdrawalEvents {
     /// * `from_block`: Query the chain from this particular block
     /// * `sender`: The `Sink` to send received events into.
     async fn run<B, S, M>(
-        addresses: &mut HashSet<Address>,
+        &mut self,
         from_block: B,
         last_seen_l2_token_block: B,
-        l2_erc20_bridge_addr: Address,
         mut sender: S,
         middleware: M,
     ) -> Result<RunResult>
@@ -324,15 +323,13 @@ impl WithdrawalEvents {
         vlog::debug!("from_block {from_block:?}");
 
         if last_seen_l2_token_block.as_number() <= from_block.as_number() {
-            let init_tokens = Self::query_past_token_init_events(
+            self.query_past_token_init_events(
                 last_seen_l2_token_block,
                 from_block,
-                l2_erc20_bridge_addr,
                 &mut sender,
                 &middleware,
             )
             .await?;
-            addresses.extend(&init_tokens);
         }
         let latest_block = middleware
             .get_block(BlockNumber::Latest)
@@ -345,12 +342,12 @@ impl WithdrawalEvents {
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
-            .address(addresses.iter().cloned().collect::<Vec<_>>())
+            .address(self.tokens.iter().cloned().collect::<Vec<_>>())
             .topic0(topic0.clone());
 
         let filter = Filter::new()
             .from_block(latest_block)
-            .address(addresses.iter().cloned().collect::<Vec<_>>())
+            .address(self.tokens.iter().cloned().collect::<Vec<_>>())
             .topic0(topic0);
 
         let past_logs = middleware.get_logs_paginated(&past_filter, 10000);
@@ -386,9 +383,12 @@ impl WithdrawalEvents {
                 continue;
             }
 
-            match Self::try_bridge_initialize_event(&log, &raw_log, addresses, &middleware).await {
+            match self
+                .try_bridge_initialize_event(&log, &raw_log, &middleware)
+                .await
+            {
                 Ok(Some((l2_event, address))) => {
-                    if addresses.insert(address) {
+                    if self.tokens.insert(address) {
                         sender.send(l2_event.into()).await.unwrap();
                         vlog::info!("Restarting on the token added event {address}");
                         break;
