@@ -96,9 +96,10 @@ impl WithdrawalEvents {
         for log in logs {
             let raw_log: RawLog = log.clone().into();
 
-            if let Some(address) =
-                Self::try_bridge_initialize_event(&log, &raw_log, &res, sender, &middleware).await?
+            if let Some((l2_event, address)) =
+                Self::try_bridge_initialize_event(&log, &raw_log, &res, &middleware).await?
             {
+                sender.send(l2_event.into()).await.unwrap();
                 res.insert(address);
             }
         }
@@ -110,11 +111,7 @@ impl WithdrawalEvents {
     // event.
     //
     // If such event is found, send it to `sender` and return `true`.
-    async fn try_bridge_burn_event<S>(log: &Log, raw_log: &RawLog, sender: &mut S) -> bool
-    where
-        S: Sink<L2Event> + Unpin,
-        <S as Sink<L2Event>>::Error: std::fmt::Debug,
-    {
+    async fn try_bridge_burn_event(log: &Log, raw_log: &RawLog) -> Option<WithdrawalEvent> {
         if let Ok(burn_event) = BridgeBurnFilter::decode_log(raw_log) {
             if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
                 metrics::increment_counter!("watcher.chain_events.bridge_burn_events");
@@ -124,23 +121,17 @@ impl WithdrawalEvents {
                     token: log.address,
                     amount: burn_event.amount,
                 };
-                sender.send(we.into()).await.unwrap();
+                return Some(we);
             }
-            true
-        } else {
-            false
         }
+        None
     }
 
     // Given a `Log` try to figure out if this is a `WithdrawalFilter`
     // event.
     //
     // If such event is found, send it to `sender` and return `true`.
-    async fn try_withdrawal_event<S>(log: &Log, raw_log: &RawLog, sender: &mut S) -> bool
-    where
-        S: Sink<L2Event> + Unpin,
-        <S as Sink<L2Event>>::Error: std::fmt::Debug,
-    {
+    async fn try_withdrawal_event(log: &Log, raw_log: &RawLog) -> Option<WithdrawalEvent> {
         if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(raw_log) {
             if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
                 metrics::increment_counter!("watcher.chain_events.withdrawal_events");
@@ -150,12 +141,10 @@ impl WithdrawalEvents {
                     token: log.address,
                     amount: withdrawal_event.amount,
                 };
-                sender.send(we.into()).await.unwrap();
+                return Some(we);
             }
-            true
-        } else {
-            false
         }
+        None
     }
 
     // Given a `Log` returned from by `ContractDeployedFilter` query try to figure out if
@@ -166,18 +155,15 @@ impl WithdrawalEvents {
     // # Returns
     //
     // The address of the token if a bridge init event is found.
-    async fn try_bridge_initialize_event<S, M>(
+    async fn try_bridge_initialize_event<M>(
         log: &Log,
         raw_log: &RawLog,
         known_tokens: &HashSet<Address>,
-        sender: &mut S,
         middleware: M,
-    ) -> Result<Option<Address>>
+    ) -> Result<Option<(L2TokenInitEvent, Address)>>
     where
         M: ZksyncMiddleware,
         <M as Middleware>::Provider: PubsubClient,
-        S: Sink<L2Event> + Unpin,
-        <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
         let mut bridge_init_log = None;
         let bridge_init_topics = vec![
@@ -237,8 +223,7 @@ impl WithdrawalEvents {
                 .expect("logs from mined transaction always have a known hash; qed"),
         };
 
-        sender.send(l2_event.into()).await.unwrap();
-        Ok(Some(bridge_init_log.address))
+        Ok(Some((l2_event, bridge_init_log.address)))
     }
 
     /// Run the main loop with re-connecting on websocket disconnects
@@ -314,7 +299,7 @@ impl WithdrawalEvents {
         addresses: &mut HashSet<Address>,
         from_block: B,
         last_seen_l2_token_block: B,
-        l2_erc20_bridge_addr: Address,
+        l2_jrc20_bridge_addr: Address,
         mut sender: S,
         middleware: M,
     ) -> Result<RunResult>
@@ -391,25 +376,20 @@ impl WithdrawalEvents {
                 last_seen_block = block_number.into();
             }
 
-            if Self::try_withdrawal_event(&log, &raw_log, &mut sender).await {
+            if let Some(we) = Self::try_withdrawal_event(&log, &raw_log).await {
+                sender.send(we.into()).await.unwrap();
                 continue;
             }
 
-            if Self::try_bridge_burn_event(&log, &raw_log, &mut sender).await {
+            if let Some(we) = Self::try_bridge_burn_event(&log, &raw_log).await {
+                sender.send(we.into()).await.unwrap();
                 continue;
             }
 
-            match Self::try_bridge_initialize_event(
-                &log,
-                &raw_log,
-                addresses,
-                &mut sender,
-                &middleware,
-            )
-            .await
-            {
-                Ok(Some(address)) => {
+            match Self::try_bridge_initialize_event(&log, &raw_log, addresses, &middleware).await {
+                Ok(Some((l2_event, address))) => {
                     if addresses.insert(address) {
+                        sender.send(l2_event.into()).await.unwrap();
                         vlog::info!("Restarting on the token added event {address}");
                         break;
                     }
