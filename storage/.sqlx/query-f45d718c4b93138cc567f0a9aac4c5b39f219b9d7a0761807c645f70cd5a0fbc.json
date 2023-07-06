@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l2_token_address\n        FROM tokens\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "l2_token_address",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f45d718c4b93138cc567f0a9aac4c5b39f219b9d7a0761807c645f70cd5a0fbc"
+}

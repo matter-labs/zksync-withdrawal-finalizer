@@ -57,7 +57,7 @@ pub async fn committed_new_batch(
         &range,
         l1_block_number as i64,
     )
-    .execute(&mut tx)
+    .execute(&mut **(&mut tx))
     .await?;
 
     tx.commit().await?;
@@ -168,7 +168,7 @@ pub async fn verified_new_batch(
         &range,
         l1_block_number as i64,
     )
-    .execute(&mut tx)
+    .execute(&mut **(&mut tx))
     .await?;
 
     tx.commit().await?;
@@ -204,7 +204,7 @@ pub async fn executed_new_batch(
         &range,
         l1_block_number as i64,
     )
-    .execute(&mut tx)
+    .execute(&mut **(&mut tx))
     .await?;
 
     tx.commit().await?;

@@ -179,8 +179,8 @@ async fn main() -> Result<()> {
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
 
-    let mut options = PgConnectOptions::from_str(config.database_url.as_str())?;
-    options.disable_statement_logging();
+    let options =
+        PgConnectOptions::from_str(config.database_url.as_str())?.disable_statement_logging();
 
     let pgpool = PgPool::connect_with(options).await?;
 
