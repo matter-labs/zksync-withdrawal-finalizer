@@ -6,6 +6,7 @@ use client::{
     l2standard_token::codegen::{
         BridgeBurnFilter, BridgeInitializationFilter, BridgeInitializeFilter,
     },
+    zksync_types::Log as ZksyncLog,
     WithdrawalEvent, ZksyncMiddleware, DEPLOYER_ADDRESS, ETH_ADDRESS, ETH_TOKEN_ADDRESS,
 };
 use ethers::{
@@ -154,25 +155,15 @@ impl L2Events {
         None
     }
 
-    // Given a `Log` returned from by `ContractDeployedFilter` query try to figure out if
-    // this was the erc20 token deployment event.
-    //
-    // If such an event is found, send it to `sender.
-    //
-    // # Returns
-    //
-    // The address of the token if a bridge init event is found.
-    async fn try_bridge_initialize_event<M>(
-        &self,
+    async fn look_for_bridge_initialize_event<M>(
         log: &Log,
         raw_log: &RawLog,
         middleware: M,
-    ) -> Result<Option<(L2TokenInitEvent, Address)>>
+    ) -> Result<Option<ZksyncLog>>
     where
         M: ZksyncMiddleware,
         <M as Middleware>::Provider: PubsubClient,
     {
-        let mut bridge_init_log = None;
         let bridge_init_topics = vec![
             BridgeInitializeFilter::signature(),
             BridgeInitializationFilter::signature(),
@@ -191,12 +182,38 @@ impl L2Events {
 
             for log in tx.logs {
                 if bridge_init_topics.contains(&log.topics[0]) {
-                    bridge_init_log = Some(log);
-                    break;
+                    return Ok(Some(log));
                 }
             }
         }
-        let Some(bridge_init_log) = bridge_init_log else { return Ok(None) };
+        Ok(None)
+    }
+
+    // Given a `Log` returned from by `ContractDeployedFilter` query try to figure out if
+    // this was the erc20 token deployment event.
+    //
+    // If such an event is found, send it to `sender.
+    //
+    // # Returns
+    //
+    // The address of the token if a bridge init event is found.
+    async fn try_bridge_initialize_event<M>(
+        &self,
+        log: &Log,
+        raw_log: &RawLog,
+        middleware: M,
+    ) -> Result<Option<(L2TokenInitEvent, Address)>>
+    where
+        M: ZksyncMiddleware,
+        <M as Middleware>::Provider: PubsubClient,
+    {
+        let Some(bridge_init_log) = Self::look_for_bridge_initialize_event(
+            log,
+            raw_log,
+            middleware,
+        ).await? else {
+            return Ok(None)
+        };
 
         let raw_log: RawLog = bridge_init_log.clone().into();
 
