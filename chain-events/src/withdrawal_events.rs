@@ -299,7 +299,7 @@ impl WithdrawalEvents {
         addresses: &mut HashSet<Address>,
         from_block: B,
         last_seen_l2_token_block: B,
-        l2_jrc20_bridge_addr: Address,
+        l2_erc20_bridge_addr: Address,
         mut sender: S,
         middleware: M,
     ) -> Result<RunResult>
