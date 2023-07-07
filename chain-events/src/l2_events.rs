@@ -115,7 +115,7 @@ impl L2Events {
         Ok(())
     }
 
-    // Given a `Log` try to figure out if this is a `WithdrawalFilter`
+    // Given a `Log` try to figure out if this is a `BridgeBurnFilter`
     // event.
     //
     // If such event is found, send it to `sender` and return `true`.
