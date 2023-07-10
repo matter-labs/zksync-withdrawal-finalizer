@@ -358,12 +358,11 @@ impl L2EventsListener {
         S: Sink<L2Event> + Unpin,
         <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
-        metrics::increment_counter!("watcher.chain_events.withdrawal_events");
-
         if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
             match l2_event {
                 L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
                 | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
+                    metrics::increment_counter!("watcher.chain_events.withdrawal_events");
                     let we = WithdrawalEvent {
                         tx_hash,
                         block_number: block_number.as_u64(),
@@ -388,6 +387,10 @@ impl L2EventsListener {
                     match self.bridge_initialize_event(bridge_init_log) {
                         Ok(Some((l2_event, address))) => {
                             if self.tokens.insert(address) {
+                                metrics::increment_counter!(
+                                    "watcher.chain_events.new_token_added_events"
+                                );
+
                                 sender.send(l2_event.into()).await.unwrap();
                                 vlog::info!("Restarting on the token added event {address}");
                                 return Ok(true);
