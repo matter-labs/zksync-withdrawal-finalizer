@@ -1,23 +1,31 @@
 use std::sync::Arc;
 
+use ethers::{
+    abi::{Address, RawLog},
+    contract::EthEvent,
+    prelude::EthLogDecode,
+    providers::{Middleware, Provider, PubsubClient, Ws},
+    types::{BlockNumber, Filter, Log},
+};
+use futures::{Sink, SinkExt, StreamExt};
+
 use client::{
     ethtoken::codegen::WithdrawalFilter, l2standard_token::codegen::BridgeBurnFilter,
     WithdrawalEvent, ETH_TOKEN_ADDRESS,
 };
-use ethers::{
-    abi::{Address, RawLog},
-    contract::EthEvent,
-    providers::{Middleware, Provider, PubsubClient, Ws},
-    types::{BlockNumber, Filter},
-};
-
-use futures::{Sink, SinkExt, StreamExt};
+use ethers_log_decode::EthLogDecode;
 
 use crate::{Error, Result, RECONNECT_BACKOFF};
 
 /// A convenience multiplexer for withdrawal-related events.
 pub struct WithdrawalEvents {
     url: String,
+}
+
+#[derive(EthLogDecode)]
+enum L2Events {
+    BridgeBurn(BridgeBurnFilter),
+    Withdrawal(WithdrawalFilter),
 }
 
 impl WithdrawalEvents {
@@ -162,39 +170,35 @@ impl WithdrawalEvents {
                 last_seen_block = block_number.into();
             }
 
-            if let Ok(burn_event) = BridgeBurnFilter::decode_log(&raw_log) {
-                if let (Some(tx_hash), Some(block_number)) =
-                    (log.transaction_hash, log.block_number)
-                {
-                    metrics::increment_counter!("watcher.chain_events.bridge_burn_events");
-                    let we = WithdrawalEvent {
-                        tx_hash,
-                        block_number: block_number.as_u64(),
-                        token: log.address,
-                        amount: burn_event.amount,
-                    };
-                    sender.send(we).await.unwrap();
-                }
-                continue;
-            }
-
-            if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(&raw_log) {
-                if let (Some(tx_hash), Some(block_number)) =
-                    (log.transaction_hash, log.block_number)
-                {
-                    metrics::increment_counter!("watcher.chain_events.withdrawal_events");
-                    let we = WithdrawalEvent {
-                        tx_hash,
-                        block_number: block_number.as_u64(),
-                        token: log.address,
-                        amount: withdrawal_event.amount,
-                    };
-                    sender.send(we).await.unwrap();
-                }
+            if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
+                process_l2_event(&log, &l2_event, &mut sender).await;
             }
         }
         vlog::info!("withdrawal streams being closed");
 
         Ok(last_seen_block)
+    }
+}
+
+async fn process_l2_event<S>(log: &Log, l2_event: &L2Events, sender: &mut S)
+where
+    S: Sink<WithdrawalEvent> + Unpin,
+    <S as Sink<WithdrawalEvent>>::Error: std::fmt::Debug,
+{
+    metrics::increment_counter!("watcher.chain_events.withdrawal_events");
+
+    if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+        match l2_event {
+            L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
+            | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
+                let we = WithdrawalEvent {
+                    tx_hash,
+                    block_number: block_number.as_u64(),
+                    token: log.address,
+                    amount: *amount,
+                };
+                sender.send(we).await.unwrap();
+            }
+        }
     }
 }

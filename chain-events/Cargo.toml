@@ -14,3 +14,4 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["time"] }
 
 vlog = { path = "../vlog" }
+ethers-log-decode = { path = "../ethers-log-decode" }
