@@ -115,8 +115,11 @@ impl L2EventsListener {
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
         for log in logs {
-            if let Some((l2_event, address)) =
-                self.try_bridge_initialize_event(&log, &middleware).await?
+            let Ok(Some(bridge_init_log)) = look_for_bridge_initialize_event(&log, &middleware).await else {
+                    continue;
+            };
+
+            if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log).await?
             {
                 if self.tokens.insert(address) {
                     sender.send(l2_event.into()).await.unwrap();
@@ -135,22 +138,10 @@ impl L2EventsListener {
     // # Returns
     //
     // The address of the token if a bridge init event is found.
-    async fn try_bridge_initialize_event<M>(
+    async fn bridge_initialize_event(
         &self,
-        log: &Log,
-        middleware: M,
-    ) -> Result<Option<(L2TokenInitEvent, Address)>>
-    where
-        M: ZksyncMiddleware,
-        <M as Middleware>::Provider: PubsubClient,
-    {
-        let Some(bridge_init_log) = look_for_bridge_initialize_event(
-            log,
-            middleware,
-        ).await? else {
-            return Ok(None)
-        };
-
+        bridge_init_log: ZksyncLog,
+    ) -> Result<Option<(L2TokenInitEvent, Address)>> {
         let raw_log: RawLog = bridge_init_log.clone().into();
 
         let Ok(bridge_initialize) = BridgeInitEvents::decode_log(&raw_log) else { return Ok(None) };
@@ -366,7 +357,11 @@ impl L2EventsListener {
                     sender.send(we.into()).await.unwrap();
                 }
                 L2Events::ContractDeployed(_) => {
-                    match self.try_bridge_initialize_event(log, middleware).await {
+                    let Ok(Some(bridge_init_log)) = look_for_bridge_initialize_event(&log, &middleware).await else {
+                        return false;
+                    };
+
+                    match self.bridge_initialize_event(bridge_init_log).await {
                         Ok(Some((l2_event, address))) => {
                             if self.tokens.insert(address) {
                                 sender.send(l2_event.into()).await.unwrap();
