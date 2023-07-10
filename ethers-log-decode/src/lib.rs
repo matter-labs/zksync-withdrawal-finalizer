@@ -2,6 +2,40 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Error, Fields};
 
+/// Derives the [`EthLogDecode`] trait
+///
+/// Derivation is only possible for enums with a single-value unnamed variants.
+///
+/// # Examples:
+///
+/// ```
+/// use ethers::prelude::EthLogDecode;
+/// use ethers_log_decode::EthLogDecode;
+///
+/// abigen!(
+///    IERC20,
+///    r#"[
+///        event Transfer(address indexed from, address indexed to, uint256 value)
+///        event Approval(address indexed owner, address indexed spender, uint256 value)
+///    ]"#,
+/// );
+///
+/// abigen!(
+///     IExecutor,
+///     r#"[
+///         event BlockCommit(uint256 indexed blockNumber, bytes32 indexed blockHash, bytes32 indexed commitment)
+///     ]"#,
+/// );
+///     
+/// #[derive(EthLogDecode)]
+/// enum Events {
+///     Approval(IERC20Events::ApprovalFilter),
+///     Transfer(IERC20Events::TransferFilter),
+///     BlockCommit(IExecutor::BlockCommitFilter),
+/// }
+/// ```
+///
+/// [`EthLogDecode`]: https://docs.rs/ethers/latest/ethers/contract/trait.EthLogDecode.html
 #[proc_macro_derive(EthLogDecode)]
 pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -14,7 +48,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
         Data::Struct(_) => {
             return Error::new(
                 input.span(),
-                "MyEthLogDecode cannot be derived for structures".to_string(),
+                "EthLogDecode cannot be derived for structures".to_string(),
             )
             .to_compile_error()
             .into()
@@ -28,7 +62,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
                         if u.unnamed.len() != 1 {
                             return Error::new(
                             input.span(),
-                            "MyEthLogDecode can only be derived for enum with unnamed fields with a single field".to_string(),
+                            "EthLogDecode can only be derived for enum with unnamed fields with a single field".to_string(),
                         )
                         .to_compile_error()
                         .into();
@@ -39,7 +73,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
                     _ => {
                         return Error::new(
                             input.span(),
-                            "MyEthLogDecode can only be derived for enum with unnamed fields"
+                            "EthLogDecode can only be derived for enum with unnamed fields"
                                 .to_string(),
                         )
                         .to_compile_error()
@@ -66,7 +100,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
             }
         }
         Data::Union(_) => {
-            return Error::new(input.span(), "MyEthLogDecode cannot be derived for unions")
+            return Error::new(input.span(), "EthLogDecode cannot be derived for unions")
                 .to_compile_error()
                 .into()
         }
