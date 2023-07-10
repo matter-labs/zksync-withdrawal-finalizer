@@ -129,8 +129,7 @@ impl L2EventsListener {
                     continue;
             };
 
-            if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log).await?
-            {
+            if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log)? {
                 if self.tokens.insert(address) {
                     sender.send(l2_event.into()).await.unwrap();
                 }
@@ -148,7 +147,7 @@ impl L2EventsListener {
     // # Returns
     //
     // The address of the token if a bridge init event is found.
-    async fn bridge_initialize_event(
+    fn bridge_initialize_event(
         &self,
         bridge_init_log: ZksyncLog,
     ) -> Result<Option<(L2TokenInitEvent, Address)>> {
@@ -386,7 +385,7 @@ impl L2EventsListener {
                         return Ok(false);
                     };
 
-                    match self.bridge_initialize_event(bridge_init_log).await {
+                    match self.bridge_initialize_event(bridge_init_log) {
                         Ok(Some((l2_event, address))) => {
                             if self.tokens.insert(address) {
                                 sender.send(l2_event.into()).await.unwrap();
