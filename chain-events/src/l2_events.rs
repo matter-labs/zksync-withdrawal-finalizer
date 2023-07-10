@@ -386,19 +386,18 @@ impl L2EventsListener {
                         return Ok(None);
                     };
 
-                    match self.bridge_initialize_event(bridge_init_log)? {
-                        Some((l2_event, address)) => {
-                            if self.tokens.insert(address) {
-                                metrics::increment_counter!(
-                                    "watcher.chain_events.new_token_added_events"
-                                );
+                    if let Some((l2_event, address)) =
+                        self.bridge_initialize_event(bridge_init_log)?
+                    {
+                        if self.tokens.insert(address) {
+                            metrics::increment_counter!(
+                                "watcher.chain_events.new_token_added_events"
+                            );
 
-                                sender.send(l2_event.into()).await.unwrap();
-                                vlog::info!("Restarting on the token added event {address}");
-                                return Ok(Some(NewTokenAdded));
-                            }
+                            sender.send(l2_event.into()).await.unwrap();
+                            vlog::info!("Restarting on the token added event {address}");
+                            return Ok(Some(NewTokenAdded));
                         }
-                        _ => (),
                     }
                 }
             }
