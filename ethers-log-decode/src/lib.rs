@@ -5,13 +5,16 @@ use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Error, Fields}
 #[proc_macro_derive(EthLogDecode)]
 pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    // clippy fails to understand that this is partially moving here
+    // without a `clone()`.
+    #[allow(clippy::redundant_clone)]
     let name = input.ident.clone();
 
     let fields = match input.data {
         Data::Struct(_) => {
             return Error::new(
                 input.span(),
-                format!("MyEthLogDecode cannot be derived for structures"),
+                "MyEthLogDecode cannot be derived for structures".to_string(),
             )
             .to_compile_error()
             .into()
@@ -25,9 +28,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
                         if u.unnamed.len() != 1 {
                             return Error::new(
                             input.span(),
-                            format!(
-                                "MyEthLogDecode can only be derived for enum with unnamed fields with a single field"
-                            ),
+                            "MyEthLogDecode can only be derived for enum with unnamed fields with a single field".to_string(),
                         )
                         .to_compile_error()
                         .into();
@@ -38,9 +39,8 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
                     _ => {
                         return Error::new(
                             input.span(),
-                            format!(
-                                "MyEthLogDecode can only be derived for enum with unnamed fields"
-                            ),
+                            "MyEthLogDecode can only be derived for enum with unnamed fields"
+                                .to_string(),
                         )
                         .to_compile_error()
                         .into()
