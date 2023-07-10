@@ -22,6 +22,8 @@ use ethers::{
 use crate::{Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
 use ethers_log_decode::EthLogDecode;
 
+struct NewTokenAdded;
+
 /// A convenience multiplexer for withdrawal-related events.
 pub struct L2EventsListener {
     url: String,
@@ -221,9 +223,9 @@ impl L2EventsListener {
                 )
                 .await
             {
-                Ok(RunResult::StoppedAtBlock { block }) => {
-                    from_block = block;
-                    last_seen_l2_token_block = block;
+                Ok(last_seen_block) => {
+                    from_block = last_seen_block;
+                    last_seen_l2_token_block = last_seen_block;
                 }
                 Err(e) => {
                     vlog::warn!("Withdrawal events worker failed with {e}");
@@ -231,10 +233,6 @@ impl L2EventsListener {
             }
         }
     }
-}
-
-enum RunResult {
-    StoppedAtBlock { block: BlockNumber },
 }
 
 impl L2EventsListener {
@@ -254,7 +252,7 @@ impl L2EventsListener {
         last_seen_l2_token_block: B,
         mut sender: S,
         middleware: M,
-    ) -> Result<RunResult>
+    ) -> Result<BlockNumber>
     where
         B: Into<BlockNumber> + Copy,
         M: ZksyncMiddleware,
@@ -329,20 +327,24 @@ impl L2EventsListener {
             }
 
             if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
-                if let Err(e) = self
+                match self
                     .process_l2_event(&log, &l2_event, &mut sender, &middleware)
                     .await
                 {
-                    vlog::error!("Stopping event loop with an error {e}");
-                    break;
+                    Ok(Some(_new_token_added)) => {
+                        break;
+                    }
+                    Err(e) => {
+                        vlog::error!("Stopping event loop with an error {e}");
+                        break;
+                    }
+                    _ => (),
                 };
             }
         }
         vlog::info!("withdrawal streams being closed");
 
-        Ok(RunResult::StoppedAtBlock {
-            block: last_seen_block,
-        })
+        Ok(last_seen_block)
     }
 
     async fn process_l2_event<M, S>(
@@ -351,7 +353,7 @@ impl L2EventsListener {
         l2_event: &L2Events,
         sender: &mut S,
         middleware: M,
-    ) -> Result<bool>
+    ) -> Result<Option<NewTokenAdded>>
     where
         M: ZksyncMiddleware,
         <M as Middleware>::Provider: PubsubClient,
@@ -381,11 +383,11 @@ impl L2EventsListener {
                         .map_err(|e| Error::Middleware(e.to_string()))?;
 
                     let Some(bridge_init_log) = look_for_bridge_initialize_event(tx) else {
-                        return Ok(false);
+                        return Ok(None);
                     };
 
-                    match self.bridge_initialize_event(bridge_init_log) {
-                        Ok(Some((l2_event, address))) => {
+                    match self.bridge_initialize_event(bridge_init_log)? {
+                        Some((l2_event, address)) => {
                             if self.tokens.insert(address) {
                                 metrics::increment_counter!(
                                     "watcher.chain_events.new_token_added_events"
@@ -393,16 +395,16 @@ impl L2EventsListener {
 
                                 sender.send(l2_event.into()).await.unwrap();
                                 vlog::info!("Restarting on the token added event {address}");
-                                return Ok(true);
+                                return Ok(Some(NewTokenAdded));
                             }
                         }
-                        Err(_) => return Ok(true),
                         _ => (),
                     }
                 }
             }
         }
-        Ok(false)
+
+        Ok(None)
     }
 }
 
