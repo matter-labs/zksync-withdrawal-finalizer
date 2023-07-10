@@ -53,7 +53,7 @@ pub fn my_eth_log_decode_derive(input: TokenStream) -> TokenStream {
 
             quote! {
                 impl ethers::prelude::EthLogDecode for #name {
-                    fn decode_log(log: &RawLog) -> core::result::Result<Self, ethers::abi::Error> {
+                    fn decode_log(log: &ethers::abi::RawLog) -> core::result::Result<Self, ethers::abi::Error> {
                         #(
                             if let Ok(a) = <#types as EthLogDecode>::decode_log(log) {
                                 return Ok(#name::#ident(a));
