@@ -13,12 +13,9 @@ use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
-use chain_events::{BlockEvents, WithdrawalEvents};
+use chain_events::{BlockEvents, L2EventsListener};
 use cli::Args;
-use client::{
-    l1bridge::codegen::IL1Bridge, l2bridge::codegen::IL2Bridge, zksync_contract::codegen::IZkSync,
-    ZksyncMiddleware,
-};
+use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::task::JoinHandle;
@@ -172,17 +169,14 @@ async fn main() -> Result<()> {
 
     let client_l2 = Arc::new(provider_l2);
 
-    let l2_bridge = IL2Bridge::new(config.l2_erc20_bridge_addr, client_l2.clone());
-
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
-    let we_mux = WithdrawalEvents::new(config.api_web3_json_rpc_ws_url.as_str());
 
     let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
 
-    let mut options = PgConnectOptions::from_str(config.database_url.as_str())?;
-    options.disable_statement_logging();
+    let options =
+        PgConnectOptions::from_str(config.database_url.as_str())?.disable_statement_logging();
 
     let pgpool = PgPool::connect_with(options).await?;
 
@@ -210,17 +204,14 @@ async fn main() -> Result<()> {
 
     vlog::info!("Starting from L1 block number {from_l1_block}");
 
-    let l1_tokens = client_l2.get_confirmed_tokens(0, u8::MAX).await?;
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
 
-    let mut tokens = vec![];
+    let l2_events = L2EventsListener::new(
+        config.api_web3_json_rpc_ws_url.as_str(),
+        config.l2_erc20_bridge_addr,
+        tokens.into_iter().collect(),
+    );
 
-    for l1_token in &l1_tokens {
-        let l2_token = l2_bridge.l_2_token_address(l1_token.l1_address).await?;
-
-        let l1_token_address = l1_token.l1_address;
-        vlog::info!("l1 token address {l1_token_address} on l2 is {l2_token}");
-        tokens.push(l2_token);
-    }
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
@@ -233,7 +224,7 @@ async fn main() -> Result<()> {
     );
 
     let withdrawal_events_handle =
-        tokio::spawn(we_mux.run_with_reconnects(tokens, from_l2_block, we_tx));
+        tokio::spawn(l2_events.run_with_reconnects(from_l2_block, last_token_seen_at_block, we_tx));
 
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 

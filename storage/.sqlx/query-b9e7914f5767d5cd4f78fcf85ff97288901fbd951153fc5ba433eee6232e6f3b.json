@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO l2_blocks (l2_block_number, verify_l1_block_number)\n        SELECT u.l2_block_number,$2\n        FROM UNNEST ($1::bigint[])\n            AS u(l2_block_number)\n        ON CONFLICT (l2_block_number) DO\n        UPDATE SET verify_l1_block_number = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8Array",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b9e7914f5767d5cd4f78fcf85ff97288901fbd951153fc5ba433eee6232e6f3b"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE withdrawals\n            SET is_finalized = true\n        FROM\n            (\n                SELECT\n                    UNNEST($1::bytea[]) as tx_hash,\n                    UNNEST($2::integer[]) as event_index_in_tx\n            ) as u\n        WHERE\n            withdrawals.tx_hash = u.tx_hash\n        AND\n            withdrawals.event_index_in_tx = u.event_index_in_tx\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "ByteaArray",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a93472664f5259af283d933f4a8fbc80ced5722cd64cc0cd96c61bf0e9c09335"
+}

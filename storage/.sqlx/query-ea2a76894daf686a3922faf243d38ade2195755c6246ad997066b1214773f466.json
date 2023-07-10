@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT l2_blocks.verify_l1_block_number from\n        withdrawals JOIN l2_blocks ON\n        l2_blocks.l2_block_number = withdrawals.l2_block_number\n        WHERE withdrawals.tx_hash = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "verify_l1_block_number",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "ea2a76894daf686a3922faf243d38ade2195755c6246ad997066b1214773f466"
+}
