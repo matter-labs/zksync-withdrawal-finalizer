@@ -390,8 +390,8 @@ impl L2EventsListener {
                             if self.tokens.insert(address) {
                                 sender.send(l2_event.into()).await.unwrap();
                                 vlog::info!("Restarting on the token added event {address}");
+                                return Ok(true);
                             }
-                            return Ok(true);
                         }
                         Err(_) => return Ok(true),
                         _ => (),
