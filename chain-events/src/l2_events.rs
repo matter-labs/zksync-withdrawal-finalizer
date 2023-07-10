@@ -8,7 +8,7 @@ use client::{
     l2standard_token::codegen::{
         BridgeBurnFilter, BridgeInitializationFilter, BridgeInitializeFilter,
     },
-    zksync_types::Log as ZksyncLog,
+    zksync_types::{Log as ZksyncLog, TransactionReceipt as ZksyncTransactionReceipt},
     WithdrawalEvent, ZksyncMiddleware, DEPLOYER_ADDRESS, ETH_ADDRESS, ETH_TOKEN_ADDRESS,
 };
 use ethers::{
@@ -41,6 +41,8 @@ enum BridgeInitEvents {
     BridgeInitializeFilter(BridgeInitializeFilter),
     BridgeInitializationFilter(BridgeInitializationFilter),
 }
+
+const PAGINATION_STEP: u64 = 10_000;
 
 impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
@@ -115,7 +117,15 @@ impl L2EventsListener {
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
         for log in logs {
-            let Ok(Some(bridge_init_log)) = look_for_bridge_initialize_event(&log, &middleware).await else {
+            let tx = middleware
+                .zks_get_transaction_receipt(
+                    log.transaction_hash
+                        .expect("a log from a transaction always has a tx hash; qed"),
+                )
+                .await
+                .map_err(|e| Error::Middleware(e.to_string()))?;
+
+            let Some(bridge_init_log) = look_for_bridge_initialize_event(tx) else {
                     continue;
             };
 
@@ -263,6 +273,8 @@ impl L2EventsListener {
             WithdrawalFilter::signature(),
         ];
 
+        let tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
+
         vlog::debug!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
         vlog::debug!("from_block {from_block:?}");
 
@@ -286,15 +298,15 @@ impl L2EventsListener {
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
-            .address(self.tokens.iter().cloned().collect::<Vec<_>>())
+            .address(tokens.clone())
             .topic0(topic0.clone());
 
         let filter = Filter::new()
             .from_block(latest_block)
-            .address(self.tokens.iter().cloned().collect::<Vec<_>>())
+            .address(tokens)
             .topic0(topic0);
 
-        let past_logs = middleware.get_logs_paginated(&past_filter, 10000);
+        let past_logs = middleware.get_logs_paginated(&past_filter, PAGINATION_STEP);
         let current_logs = middleware
             .subscribe_logs(&filter)
             .await
@@ -318,8 +330,13 @@ impl L2EventsListener {
             }
 
             if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
-                self.process_l2_event(&log, &l2_event, &mut sender, &middleware)
-                    .await;
+                if let Err(e) = self
+                    .process_l2_event(&log, &l2_event, &mut sender, &middleware)
+                    .await
+                {
+                    vlog::error!("Stopping event loop with an error {e}");
+                    break;
+                };
             }
         }
         vlog::info!("withdrawal streams being closed");
@@ -335,7 +352,7 @@ impl L2EventsListener {
         l2_event: &L2Events,
         sender: &mut S,
         middleware: M,
-    ) -> bool
+    ) -> Result<bool>
     where
         M: ZksyncMiddleware,
         <M as Middleware>::Provider: PubsubClient,
@@ -357,8 +374,16 @@ impl L2EventsListener {
                     sender.send(we.into()).await.unwrap();
                 }
                 L2Events::ContractDeployed(_) => {
-                    let Ok(Some(bridge_init_log)) = look_for_bridge_initialize_event(&log, &middleware).await else {
-                        return false;
+                    let tx = middleware
+                        .zks_get_transaction_receipt(
+                            log.transaction_hash
+                                .expect("a log from a transaction always has a tx hash; qed"),
+                        )
+                        .await
+                        .map_err(|e| Error::Middleware(e.to_string()))?;
+
+                    let Some(bridge_init_log) = look_for_bridge_initialize_event(tx) else {
+                        return Ok(false);
                     };
 
                     match self.bridge_initialize_event(bridge_init_log).await {
@@ -367,40 +392,25 @@ impl L2EventsListener {
                                 sender.send(l2_event.into()).await.unwrap();
                                 vlog::info!("Restarting on the token added event {address}");
                             }
-                            return true;
+                            return Ok(true);
                         }
-                        Err(_) => return true,
+                        Err(_) => return Ok(true),
                         _ => (),
                     }
                 }
             }
         }
-        false
+        Ok(false)
     }
 }
 
-async fn look_for_bridge_initialize_event<M>(log: &Log, middleware: M) -> Result<Option<ZksyncLog>>
-where
-    M: ZksyncMiddleware,
-    <M as Middleware>::Provider: PubsubClient,
-{
+fn look_for_bridge_initialize_event(tx: ZksyncTransactionReceipt) -> Option<ZksyncLog> {
     let bridge_init_topics = vec![
         BridgeInitializeFilter::signature(),
         BridgeInitializationFilter::signature(),
     ];
 
-    let tx = middleware
-        .zks_get_transaction_receipt(
-            log.transaction_hash
-                .expect("a log from a transaction always has a tx hash; qed"),
-        )
-        .await
-        .map_err(|e| Error::Middleware(e.to_string()))?;
-
-    for log in tx.logs {
-        if bridge_init_topics.contains(&log.topics[0]) {
-            return Ok(Some(log));
-        }
-    }
-    Ok(None)
+    tx.logs
+        .into_iter()
+        .find(|log| bridge_init_topics.contains(&log.topics[0]))
 }
