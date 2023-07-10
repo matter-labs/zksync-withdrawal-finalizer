@@ -13,7 +13,7 @@ use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
-use chain_events::{BlockEvents, L2Events};
+use chain_events::{BlockEvents, L2EventsListener};
 use cli::Args;
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
@@ -206,7 +206,7 @@ async fn main() -> Result<()> {
 
     let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
 
-    let l2_events = L2Events::new(
+    let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
         config.l2_erc20_bridge_addr,
         tokens.into_iter().collect(),

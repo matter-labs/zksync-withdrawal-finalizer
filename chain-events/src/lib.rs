@@ -17,7 +17,7 @@ pub use error::{Error, Result};
 pub(crate) const RECONNECT_BACKOFF: Duration = Duration::from_secs(1);
 pub use block_events::BlockEvents;
 use ethers::types::{Address, H256};
-pub use l2_events::L2Events;
+pub use l2_events::L2EventsListener;
 
 /// All L2 Events the service is interested in.
 #[derive(Debug)]

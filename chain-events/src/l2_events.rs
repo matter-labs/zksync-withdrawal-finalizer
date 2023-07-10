@@ -1,5 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
+use futures::{Sink, SinkExt, StreamExt};
+
 use client::{
     contracts_deployer::codegen::ContractDeployedFilter,
     ethtoken::codegen::WithdrawalFilter,
@@ -12,22 +14,35 @@ use client::{
 use ethers::{
     abi::{Address, RawLog},
     contract::EthEvent,
+    prelude::EthLogDecode,
     providers::{Middleware, Provider, PubsubClient, Ws},
     types::{BlockNumber, Filter, Log},
 };
 
-use futures::{Sink, SinkExt, StreamExt};
-
 use crate::{Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
+use ethers_log_decode::EthLogDecode;
 
 /// A convenience multiplexer for withdrawal-related events.
-pub struct L2Events {
+pub struct L2EventsListener {
     url: String,
     l2_erc20_bridge_addr: Address,
     tokens: HashSet<Address>,
 }
 
-impl L2Events {
+#[derive(EthLogDecode)]
+enum L2Events {
+    BridgeBurn(BridgeBurnFilter),
+    Withdrawal(WithdrawalFilter),
+    ContractDeployed(ContractDeployedFilter),
+}
+
+#[derive(EthLogDecode)]
+enum BridgeInitEvents {
+    BridgeInitializeFilter(BridgeInitializeFilter),
+    BridgeInitializationFilter(BridgeInitializationFilter),
+}
+
+impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
     ///
     /// # Arguments
@@ -100,11 +115,8 @@ impl L2Events {
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
         for log in logs {
-            let raw_log: RawLog = log.clone().into();
-
-            if let Some((l2_event, address)) = self
-                .try_bridge_initialize_event(&log, &raw_log, &middleware)
-                .await?
+            if let Some((l2_event, address)) =
+                self.try_bridge_initialize_event(&log, &middleware).await?
             {
                 if self.tokens.insert(address) {
                     sender.send(l2_event.into()).await.unwrap();
@@ -113,80 +125,6 @@ impl L2Events {
         }
 
         Ok(())
-    }
-
-    // Given a `Log` try to figure out if this is a `BridgeBurnFilter`
-    // event.
-    //
-    // If such event is found, send it to `sender` and return `true`.
-    async fn try_bridge_burn_event(log: &Log, raw_log: &RawLog) -> Option<WithdrawalEvent> {
-        if let Ok(burn_event) = BridgeBurnFilter::decode_log(raw_log) {
-            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                metrics::increment_counter!("watcher.chain_events.bridge_burn_events");
-                let we = WithdrawalEvent {
-                    tx_hash,
-                    block_number: block_number.as_u64(),
-                    token: log.address,
-                    amount: burn_event.amount,
-                };
-                return Some(we);
-            }
-        }
-        None
-    }
-
-    // Given a `Log` try to figure out if this is a `WithdrawalFilter`
-    // event.
-    //
-    // If such event is found, send it to `sender` and return `true`.
-    async fn try_withdrawal_event(log: &Log, raw_log: &RawLog) -> Option<WithdrawalEvent> {
-        if let Ok(withdrawal_event) = WithdrawalFilter::decode_log(raw_log) {
-            if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
-                metrics::increment_counter!("watcher.chain_events.withdrawal_events");
-                let we = WithdrawalEvent {
-                    tx_hash,
-                    block_number: block_number.as_u64(),
-                    token: log.address,
-                    amount: withdrawal_event.amount,
-                };
-                return Some(we);
-            }
-        }
-        None
-    }
-
-    async fn look_for_bridge_initialize_event<M>(
-        log: &Log,
-        raw_log: &RawLog,
-        middleware: M,
-    ) -> Result<Option<ZksyncLog>>
-    where
-        M: ZksyncMiddleware,
-        <M as Middleware>::Provider: PubsubClient,
-    {
-        let bridge_init_topics = vec![
-            BridgeInitializeFilter::signature(),
-            BridgeInitializationFilter::signature(),
-        ];
-
-        // If this is the deployment event get the corresponding transaction
-        // and try to find one of bridge initialization events in it.
-        if ContractDeployedFilter::decode_log(raw_log).is_ok() {
-            let tx = middleware
-                .zks_get_transaction_receipt(
-                    log.transaction_hash
-                        .expect("a log from a transaction always has a tx hash; qed"),
-                )
-                .await
-                .map_err(|e| Error::Middleware(e.to_string()))?;
-
-            for log in tx.logs {
-                if bridge_init_topics.contains(&log.topics[0]) {
-                    return Ok(Some(log));
-                }
-            }
-        }
-        Ok(None)
     }
 
     // Given a `Log` returned from by `ContractDeployedFilter` query try to figure out if
@@ -200,16 +138,14 @@ impl L2Events {
     async fn try_bridge_initialize_event<M>(
         &self,
         log: &Log,
-        raw_log: &RawLog,
         middleware: M,
     ) -> Result<Option<(L2TokenInitEvent, Address)>>
     where
         M: ZksyncMiddleware,
         <M as Middleware>::Provider: PubsubClient,
     {
-        let Some(bridge_init_log) = Self::look_for_bridge_initialize_event(
+        let Some(bridge_init_log) = look_for_bridge_initialize_event(
             log,
-            raw_log,
             middleware,
         ).await? else {
             return Ok(None)
@@ -217,27 +153,27 @@ impl L2Events {
 
         let raw_log: RawLog = bridge_init_log.clone().into();
 
-        let mut bridge_init_event: Option<BridgeInitializeFilter> = None;
-
-        if let Ok(bridge_initialize) = BridgeInitializationFilter::decode_log(&raw_log) {
-            bridge_init_event = Some(bridge_initialize.into());
-        }
-        if let Ok(bridge_initialize) = BridgeInitializeFilter::decode_log(&raw_log) {
-            bridge_init_event = Some(bridge_initialize);
-        }
-
-        let Some(bridge_init_event) = bridge_init_event else { return Ok(None) };
+        let Ok(bridge_initialize) = BridgeInitEvents::decode_log(&raw_log) else { return Ok(None) };
 
         if self.tokens.contains(&bridge_init_log.address) {
             return Ok(None);
         }
 
+        let (l1_token_address, name, symbol, decimals) = match bridge_initialize {
+            BridgeInitEvents::BridgeInitializeFilter(bi) => {
+                (bi.l_1_token, bi.name, bi.symbol, bi.decimals)
+            }
+            BridgeInitEvents::BridgeInitializationFilter(bi) => {
+                (bi.l_1_token, bi.name, bi.symbol, bi.decimals)
+            }
+        };
+
         let l2_event = L2TokenInitEvent {
-            l1_token_address: bridge_init_event.l_1_token,
+            l1_token_address,
             l2_token_address: bridge_init_log.address,
-            name: bridge_init_event.name,
-            symbol: bridge_init_event.symbol,
-            decimals: bridge_init_event.decimals,
+            name,
+            symbol,
+            decimals,
             l2_block_number: bridge_init_log
                 .block_number
                 .expect("a mined block always has a block number; qed")
@@ -301,7 +237,7 @@ enum RunResult {
     StoppedAtBlock { block: BlockNumber },
 }
 
-impl L2Events {
+impl L2EventsListener {
     /// A convenience function that listens for all withdrawal events on L2
     ///
     /// For more reasoning about the necessity of this function
@@ -390,30 +326,9 @@ impl L2Events {
                 last_seen_block = block_number.into();
             }
 
-            if let Some(we) = Self::try_withdrawal_event(&log, &raw_log).await {
-                sender.send(we.into()).await.unwrap();
-                continue;
-            }
-
-            if let Some(we) = Self::try_bridge_burn_event(&log, &raw_log).await {
-                sender.send(we.into()).await.unwrap();
-                continue;
-            }
-
-            match self
-                .try_bridge_initialize_event(&log, &raw_log, &middleware)
-                .await
-            {
-                Ok(Some((l2_event, address))) => {
-                    if self.tokens.insert(address) {
-                        sender.send(l2_event.into()).await.unwrap();
-                        vlog::info!("Restarting on the token added event {address}");
-                        break;
-                    }
-                }
-
-                Err(_) => break,
-                _ => (),
+            if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
+                self.process_l2_event(&log, &l2_event, &mut sender, &middleware)
+                    .await;
             }
         }
         vlog::info!("withdrawal streams being closed");
@@ -422,4 +337,75 @@ impl L2Events {
             block: last_seen_block,
         })
     }
+
+    async fn process_l2_event<M, S>(
+        &mut self,
+        log: &Log,
+        l2_event: &L2Events,
+        sender: &mut S,
+        middleware: M,
+    ) -> bool
+    where
+        M: ZksyncMiddleware,
+        <M as Middleware>::Provider: PubsubClient,
+        S: Sink<L2Event> + Unpin,
+        <S as Sink<L2Event>>::Error: std::fmt::Debug,
+    {
+        metrics::increment_counter!("watcher.chain_events.withdrawal_events");
+
+        if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
+            match l2_event {
+                L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
+                | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
+                    let we = WithdrawalEvent {
+                        tx_hash,
+                        block_number: block_number.as_u64(),
+                        token: log.address,
+                        amount: *amount,
+                    };
+                    sender.send(we.into()).await.unwrap();
+                }
+                L2Events::ContractDeployed(_) => {
+                    match self.try_bridge_initialize_event(log, middleware).await {
+                        Ok(Some((l2_event, address))) => {
+                            if self.tokens.insert(address) {
+                                sender.send(l2_event.into()).await.unwrap();
+                                vlog::info!("Restarting on the token added event {address}");
+                            }
+                            return true;
+                        }
+                        Err(_) => return true,
+                        _ => (),
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
+async fn look_for_bridge_initialize_event<M>(log: &Log, middleware: M) -> Result<Option<ZksyncLog>>
+where
+    M: ZksyncMiddleware,
+    <M as Middleware>::Provider: PubsubClient,
+{
+    let bridge_init_topics = vec![
+        BridgeInitializeFilter::signature(),
+        BridgeInitializationFilter::signature(),
+    ];
+
+    let tx = middleware
+        .zks_get_transaction_receipt(
+            log.transaction_hash
+                .expect("a log from a transaction always has a tx hash; qed"),
+        )
+        .await
+        .map_err(|e| Error::Middleware(e.to_string()))?;
+
+    for log in tx.logs {
+        if bridge_init_topics.contains(&log.topics[0]) {
+            return Ok(Some(log));
+        }
+    }
+    Ok(None)
 }
