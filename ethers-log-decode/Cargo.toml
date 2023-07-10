@@ -1,0 +1,13 @@
+[package]
+name = "ethers-log-decode"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+ethers = "2.0.7"
+proc-macro2 = "1.0.63"
+quote = "1.0.29"
+syn = "2.0.23"

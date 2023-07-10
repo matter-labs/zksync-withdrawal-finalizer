@@ -41,3 +41,7 @@ jobs:
       - name: Check formatting
         run: |
           cargo fmt --check
+          
+      - name: Doc Tests
+        run: |
+          cargo test --doc

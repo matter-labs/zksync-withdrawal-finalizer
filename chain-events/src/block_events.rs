@@ -3,8 +3,9 @@ use std::sync::Arc;
 use ethers::{
     abi::{AbiDecode, Address, RawLog},
     contract::EthEvent,
+    prelude::EthLogDecode,
     providers::{Middleware, Provider, PubsubClient, Ws},
-    types::{BlockNumber, Filter, ValueOrArray},
+    types::{BlockNumber, Filter, Log, ValueOrArray},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
@@ -17,8 +18,16 @@ use client::{
     },
     BlockEvent,
 };
+use ethers_log_decode::EthLogDecode;
 
 use crate::{Error, Result, RECONNECT_BACKOFF};
+
+#[derive(EthLogDecode)]
+enum L1Events {
+    BlockCommit(BlockCommitFilter),
+    BlocksVerification(BlocksVerificationFilter),
+    BlocksExecution(BlockExecutionFilter),
+}
 
 // A convenience multiplexer for `Block`-related events.
 //
@@ -179,81 +188,104 @@ impl BlockEvents {
                 }
                 Ok(log) => log,
             };
-
-            let block_number = match log.block_number {
-                Some(b) => b.as_u64(),
-                None => {
-                    continue;
-                }
+            let Some(block_number) = log.block_number.map(|bn|  bn.as_u64()) else {
+               continue
             };
+
             last_seen_block = block_number.into();
             let raw_log: RawLog = log.clone().into();
 
-            if let Ok(event) = BlockCommitFilter::decode_log(&raw_log) {
-                let Ok(tx) = middleware
-                    .get_transaction(
-                        log.transaction_hash
-                            .expect("log always has a related transaction; qed"),
-                    )
-                    .await else { break };
-
-                let tx = tx.expect("mined transaction exists; qed");
-
-                let mut events = vec![];
-
-                if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
-                    let mut res = parse_withdrawal_events_l1(
-                        &commit_blocks,
-                        tx.block_number
-                            .expect("a mined transaction has a block number; qed")
-                            .as_u64(),
-                        l2_erc20_bridge_addr,
-                    );
-                    events.append(&mut res);
-                }
-                sender
-                    .send(BlockEvent::L2ToL1Events { events })
-                    .await
-                    .unwrap();
-
-                metrics::increment_counter!("watcher.chain_events.block_commit_events");
-                sender
-                    .send(BlockEvent::BlockCommit {
-                        block_number,
-                        event,
-                    })
-                    .await
-                    .unwrap();
-                continue;
-            }
-
-            if let Ok(event) = BlocksVerificationFilter::decode_log(&raw_log) {
-                metrics::increment_counter!("watcher.chain_events.block_verification_events");
-                sender
-                    .send(BlockEvent::BlocksVerification {
-                        block_number,
-                        event,
-                    })
-                    .await
-                    .unwrap();
-                continue;
-            }
-
-            if let Ok(event) = BlockExecutionFilter::decode_log(&raw_log) {
-                metrics::increment_counter!("watcher.chain_events.block_execution_events");
-                sender
-                    .send(BlockEvent::BlockExecution {
-                        block_number,
-                        event,
-                    })
-                    .await
-                    .unwrap();
-                continue;
+            if let Ok(l1_event) = L1Events::decode_log(&raw_log) {
+                process_l1_event(
+                    l2_erc20_bridge_addr,
+                    &log,
+                    &l1_event,
+                    &middleware,
+                    &mut sender,
+                )
+                .await;
             }
         }
 
         vlog::info!("all event streams have terminated, exiting...");
 
         Ok(last_seen_block)
+    }
+}
+
+async fn process_l1_event<M, S>(
+    l2_erc20_bridge_addr: Address,
+    log: &Log,
+    l1_event: &L1Events,
+    middleware: M,
+    sender: &mut S,
+) where
+    M: Middleware,
+    <M as Middleware>::Provider: PubsubClient,
+    S: Sink<BlockEvent> + Unpin,
+    <S as Sink<BlockEvent>>::Error: std::fmt::Debug,
+{
+    let Some(block_number) = log.block_number.map(|bn|  bn.as_u64()) else {
+        return
+    };
+
+    match l1_event {
+        L1Events::BlockCommit(bc) => {
+            let Ok(tx) = middleware
+                .get_transaction(
+                    log.transaction_hash
+                        .expect("log always has a related transaction; qed"),
+                )
+                .await
+                else { return };
+
+            let tx = tx.expect("mined transaction exists; qed");
+
+            let mut events = vec![];
+
+            if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
+                let mut res = parse_withdrawal_events_l1(
+                    &commit_blocks,
+                    tx.block_number
+                        .expect("a mined transaction has a block number; qed")
+                        .as_u64(),
+                    l2_erc20_bridge_addr,
+                );
+                events.append(&mut res);
+            }
+            sender
+                .send(BlockEvent::L2ToL1Events { events })
+                .await
+                .unwrap();
+
+            metrics::increment_counter!("watcher.chain_events.block_commit_events");
+            sender
+                .send(BlockEvent::BlockCommit {
+                    block_number,
+                    event: bc.clone(),
+                })
+                .await
+                .unwrap()
+        }
+        L1Events::BlocksVerification(event) => {
+            metrics::increment_counter!("watcher.chain_events.block_verification_events");
+            sender
+                .send(BlockEvent::BlocksVerification {
+                    block_number,
+                    event: event.clone(),
+                })
+                .await
+                .unwrap();
+        }
+        L1Events::BlocksExecution(event) => {
+            metrics::increment_counter!("watcher.chain_events.block_execution_events");
+            sender
+                .send(BlockEvent::BlockExecution {
+                    block_number,
+                    event: event.clone(),
+                })
+                .await
+                .unwrap()
+        }
     }
 }
