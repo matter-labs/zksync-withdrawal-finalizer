@@ -16,7 +16,10 @@ pub use error::{Error, Result};
 
 pub(crate) const RECONNECT_BACKOFF: Duration = Duration::from_secs(1);
 pub use block_events::BlockEvents;
-use ethers::types::{Address, H256};
+use ethers::{
+    providers::{LogQueryError, ProviderError},
+    types::{Address, H256},
+};
 pub use l2_events::L2EventsListener;
 
 /// All L2 Events the service is interested in.
@@ -65,4 +68,16 @@ pub struct L2TokenInitEvent {
 
     /// Transaction on l2 in which the event happened
     pub initialization_transaction: H256,
+}
+
+pub(crate) fn rpc_query_too_large(e: &LogQueryError<ProviderError>) -> bool {
+    if let LogQueryError::LoadLogsError(ProviderError::JsonRpcClientError(e)) = e {
+        if let Some(e) = e.as_error_response() {
+            return e
+                .message
+                .starts_with("Query returned more than 10000 results. Try with this block range");
+        }
+    }
+
+    false
 }
