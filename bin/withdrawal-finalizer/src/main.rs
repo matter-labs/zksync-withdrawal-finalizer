@@ -49,7 +49,6 @@ fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
 async fn start_from_l1_block<M1, M2>(
     client_l1: Arc<M1>,
     client_l2: Arc<M2>,
-    l2_block_number: u32,
     conn: &mut PgConnection,
 ) -> Result<u64>
 where
@@ -63,20 +62,37 @@ where
         storage::last_l1_block_seen(conn).await?,
     ) {
         (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
-        _ => {
+        (b1, b2) => {
+            if b1.is_none() {
+                vlog::info!(concat!(
+                    "information about l2 to l1 events is missing, ",
+                    "starting from L1 block corresponding to L2 block 1"
+                ));
+            }
+
+            if b2.is_none() {
+                vlog::info!(concat!(
+                    "information about last block seen is missing, ",
+                    "starting from L1 block corresponding to L2 block 1"
+                ));
+            }
+
             let block_details = client_l2
                 .provider()
-                .get_block_details(l2_block_number)
+                .get_block_details(1)
                 .await?
                 .expect("Always start from the block that there is info about; qed");
 
-            let commit_tx_hash = block_details.commit_tx_hash.unwrap();
+            let commit_tx_hash = block_details
+                .commit_tx_hash
+                .expect("A first block on L2 is always committed; qed");
 
             let commit_tx = client_l1
                 .get_transaction(commit_tx_hash)
                 .await
                 .map_err(|e| anyhow!("{e}"))?
                 .expect("The corresponding L1 tx exists; qed");
+
             let commit_tx_block_number = commit_tx
                 .block_number
                 .expect("Already mined TX always has a block number; qed")
@@ -197,7 +213,6 @@ async fn main() -> Result<()> {
     let from_l1_block = start_from_l1_block(
         client_l1.clone(),
         client_l2.clone(),
-        from_l2_block as u32,
         &mut pgpool.acquire().await?.detach(),
     )
     .await?;
