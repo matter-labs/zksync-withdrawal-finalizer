@@ -431,7 +431,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chain-events"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "client",
  "ethers",
@@ -513,7 +513,7 @@ checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 
 [[package]]
 name = "client"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -1192,7 +1192,7 @@ dependencies = [
 
 [[package]]
 name = "ethers-log-decode"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "ethers",
  "proc-macro2",
@@ -3778,7 +3778,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "storage"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "bigdecimal",
  "chain-events",
@@ -4749,7 +4749,7 @@ dependencies = [
 
 [[package]]
 name = "withdrawal-finalizer"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "chain-events",
  "clap",
