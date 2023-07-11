@@ -215,6 +215,10 @@ impl L2EventsListener {
             };
 
             let middleware = Arc::new(provider_l1);
+            metrics::gauge!(
+                "watcher.chain_events.l2_events.query_pagination",
+                pagination as f64
+            );
 
             match self
                 .run(
