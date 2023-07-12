@@ -234,15 +234,14 @@ async fn process_l1_event<M, S>(
             let Ok(tx) = middleware
                 .get_transaction(
                     log.transaction_hash
-                        .expect(&format!("log always has a related transaction {:?}; qed", log)),
+                        .unwrap_or_else(|| panic!("log always has a related transaction {:?}; qed", log)),
                 )
                 .await
                 else { return };
 
-            let tx = tx.expect(&format!(
-                "mined transaction exists {:?}; qed",
-                log.transaction_hash
-            ));
+            let tx = tx.unwrap_or_else(|| {
+                panic!("mined transaction exists {:?}; qed", log.transaction_hash)
+            });
 
             let mut events = vec![];
 
@@ -250,10 +249,9 @@ async fn process_l1_event<M, S>(
                 let mut res = parse_withdrawal_events_l1(
                     &commit_blocks,
                     tx.block_number
-                        .expect(&format!(
-                            "a mined transaction {:?} has a block number; qed",
-                            tx.hash
-                        ))
+                        .unwrap_or_else(|| {
+                            panic!("a mined transaction {:?} has a block number; qed", tx.hash)
+                        })
                         .as_u64(),
                     l2_erc20_bridge_addr,
                 );

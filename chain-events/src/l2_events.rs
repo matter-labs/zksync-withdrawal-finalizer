@@ -121,10 +121,12 @@ impl L2EventsListener {
 
         for log in logs {
             let tx = middleware
-                .zks_get_transaction_receipt(log.transaction_hash.expect(&format!(
-                    "a log from a transaction always has a tx hash {:?}; qed",
-                    log
-                )))
+                .zks_get_transaction_receipt(log.transaction_hash.unwrap_or_else(|| {
+                    panic!(
+                        "a log from a transaction always has a tx hash {:?}; qed",
+                        log
+                    )
+                }))
                 .await
                 .map_err(|e| Error::Middleware(e.to_string()))?;
 
@@ -179,15 +181,19 @@ impl L2EventsListener {
             decimals,
             l2_block_number: bridge_init_log
                 .block_number
-                .expect(&format!(
-                    "a mined block always has a block number {:?}; qed",
-                    bridge_init_log
-                ))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "a mined block always has a block number {:?}; qed",
+                        bridge_init_log
+                    )
+                })
                 .as_u64(),
-            initialization_transaction: bridge_init_log.transaction_hash.expect(&format!(
-                "logs from mined transaction always have a known hash {:?}; qed",
-                bridge_init_log
-            )),
+            initialization_transaction: bridge_init_log.transaction_hash.unwrap_or_else(|| {
+                panic!(
+                    "logs from mined transaction always have a known hash {:?}; qed",
+                    bridge_init_log
+                )
+            }),
         };
 
         Ok(Some((l2_event, bridge_init_log.address)))
@@ -408,10 +414,12 @@ impl L2EventsListener {
                 }
                 L2Events::ContractDeployed(_) => {
                     let tx = middleware
-                        .zks_get_transaction_receipt(log.transaction_hash.expect(&format!(
-                            "a log from a transaction always has a tx hash {:?}; qed",
-                            log
-                        )))
+                        .zks_get_transaction_receipt(log.transaction_hash.unwrap_or_else(|| {
+                            panic!(
+                                "a log from a transaction always has a tx hash {:?}; qed",
+                                log
+                            )
+                        }))
                         .await
                         .map_err(|e| Error::Middleware(e.to_string()))?;
 
