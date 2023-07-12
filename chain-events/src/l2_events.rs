@@ -123,7 +123,7 @@ impl L2EventsListener {
             let tx = middleware
                 .zks_get_transaction_receipt(
                     log.transaction_hash
-                        .expect("a log from a transaction always has a tx hash; qed"),
+                        .expect("a log from a transaction always has a tx hash {log:?}; qed"),
                 )
                 .await
                 .map_err(|e| Error::Middleware(e.to_string()))?;
@@ -179,11 +179,11 @@ impl L2EventsListener {
             decimals,
             l2_block_number: bridge_init_log
                 .block_number
-                .expect("a mined block always has a block number; qed")
+                .expect("a mined block always has a block number {bridge_init_log:?}; qed")
                 .as_u64(),
-            initialization_transaction: bridge_init_log
-                .transaction_hash
-                .expect("logs from mined transaction always have a known hash; qed"),
+            initialization_transaction: bridge_init_log.transaction_hash.expect(
+                "logs from mined transaction always have a known hash {bridge_init_log:?}; qed",
+            ),
         };
 
         Ok(Some((l2_event, bridge_init_log.address)))
@@ -403,13 +403,13 @@ impl L2EventsListener {
                     sender.send(we.into()).await.unwrap();
                 }
                 L2Events::ContractDeployed(_) => {
-                    let tx = middleware
-                        .zks_get_transaction_receipt(
-                            log.transaction_hash
-                                .expect("a log from a transaction always has a tx hash; qed"),
-                        )
-                        .await
-                        .map_err(|e| Error::Middleware(e.to_string()))?;
+                    let tx =
+                        middleware
+                            .zks_get_transaction_receipt(log.transaction_hash.expect(
+                                "a log from a transaction always has a tx hash {log:?}; qed",
+                            ))
+                            .await
+                            .map_err(|e| Error::Middleware(e.to_string()))?;
 
                     let Some(bridge_init_log) = look_for_bridge_initialize_event(tx) else {
                         return Ok(None);
