@@ -19,7 +19,7 @@ use ethers::{
     types::{BlockNumber, Filter, Log},
 };
 
-use crate::{Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
+use crate::{rpc_query_too_large, Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
 use ethers_log_decode::EthLogDecode;
 
 struct NewTokenAdded;
@@ -45,6 +45,7 @@ enum BridgeInitEvents {
 }
 
 const PAGINATION_STEP: u64 = 10_000;
+const PAGINATION_DECREASE_STEP: u64 = 1_000;
 
 impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
@@ -204,6 +205,7 @@ impl L2EventsListener {
         S: Sink<L2Event> + Unpin + Clone,
         <S as Sink<L2Event>>::Error: std::fmt::Debug,
     {
+        let mut pagination = PAGINATION_STEP;
         let mut from_block: BlockNumber = from_block.into();
         let mut last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
         loop {
@@ -213,19 +215,34 @@ impl L2EventsListener {
             };
 
             let middleware = Arc::new(provider_l1);
+            metrics::gauge!(
+                "watcher.chain_events.l2_events.query_pagination",
+                pagination as f64
+            );
 
             match self
                 .run(
                     from_block,
                     last_seen_l2_token_block,
                     sender.clone(),
+                    pagination,
                     middleware,
                 )
                 .await
             {
-                Ok(last_seen_block) => {
+                Ok((last_seen_block, reason)) => {
                     from_block = last_seen_block;
                     last_seen_l2_token_block = last_seen_block;
+
+                    if reason == RunResult::PaginationTooLarge {
+                        let pagination_old = pagination;
+                        if pagination > PAGINATION_DECREASE_STEP {
+                            pagination -= PAGINATION_DECREASE_STEP;
+                            vlog::debug!(
+                                "Decreasing pagination from {pagination_old} to {pagination}",
+                            );
+                        }
+                    }
                 }
                 Err(e) => {
                     vlog::warn!("Withdrawal events worker failed with {e}");
@@ -233,6 +250,12 @@ impl L2EventsListener {
             }
         }
     }
+}
+
+#[derive(PartialEq)]
+enum RunResult {
+    PaginationTooLarge,
+    OtherError,
 }
 
 impl L2EventsListener {
@@ -251,8 +274,9 @@ impl L2EventsListener {
         from_block: B,
         last_seen_l2_token_block: B,
         mut sender: S,
+        pagination_step: u64,
         middleware: M,
-    ) -> Result<BlockNumber>
+    ) -> Result<(BlockNumber, RunResult)>
     where
         B: Into<BlockNumber> + Copy,
         M: ZksyncMiddleware,
@@ -303,7 +327,7 @@ impl L2EventsListener {
             .address(tokens)
             .topic0(topic0);
 
-        let past_logs = middleware.get_logs_paginated(&past_filter, PAGINATION_STEP);
+        let past_logs = middleware.get_logs_paginated(&past_filter, pagination_step);
         let current_logs = middleware
             .subscribe_logs(&filter)
             .await
@@ -314,7 +338,11 @@ impl L2EventsListener {
         while let Some(log) = logs.next().await {
             let log = match log {
                 Err(e) => {
-                    vlog::warn!("L2 withdrawal events stream ended with {e}");
+                    vlog::warn!("L2 withdrawal events stream ended with {e:?}");
+                    if rpc_query_too_large(&e) {
+                        return Ok((last_seen_block, RunResult::PaginationTooLarge));
+                    }
+
                     break;
                 }
                 Ok(log) => log,
@@ -335,16 +363,17 @@ impl L2EventsListener {
                         break;
                     }
                     Err(e) => {
-                        vlog::error!("Stopping event loop with an error {e}");
+                        vlog::warn!("Stopping event loop with an error {e}");
                         break;
                     }
                     _ => (),
                 };
             }
         }
+
         vlog::info!("withdrawal streams being closed");
 
-        Ok(last_seen_block)
+        Ok((last_seen_block, RunResult::OtherError))
     }
 
     async fn process_l2_event<M, S>(
