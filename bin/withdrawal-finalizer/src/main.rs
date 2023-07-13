@@ -5,7 +5,7 @@
 
 //! A withdraw-finalizer
 
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use envconfig::Envconfig;
@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
     let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
-    let blocks_tx = tokio_util::sync::PollSender::new(blocks_tx);
+    let blocks_tx_wrapped = tokio_util::sync::PollSender::new(blocks_tx.clone());
     let blocks_rx = tokio_stream::wrappers::ReceiverStream::new(blocks_rx);
 
     let options =
@@ -207,7 +207,7 @@ async fn main() -> Result<()> {
 
     let (we_tx, we_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
-    let we_tx = tokio_util::sync::PollSender::new(we_tx);
+    let we_tx_wrapped = tokio_util::sync::PollSender::new(we_tx.clone());
     let we_rx = tokio_stream::wrappers::ReceiverStream::new(we_rx);
 
     let from_l1_block = start_from_l1_block(
@@ -238,8 +238,11 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let withdrawal_events_handle =
-        tokio::spawn(l2_events.run_with_reconnects(from_l2_block, last_token_seen_at_block, we_tx));
+    let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
+        from_l2_block,
+        last_token_seen_at_block,
+        we_tx_wrapped,
+    ));
 
     let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
 
@@ -247,8 +250,17 @@ async fn main() -> Result<()> {
         config.diamond_proxy_addr,
         config.l2_erc20_bridge_addr,
         from_l1_block,
-        blocks_tx,
+        blocks_tx_wrapped,
     ));
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            metrics::gauge!("watcher.l1_channel.capacity", blocks_tx.capacity() as f64);
+            metrics::gauge!("watcher.l2_channel.capacity", we_tx.capacity() as f64)
+        }
+    });
 
     tokio::select! {
         r = block_events_handle => {
