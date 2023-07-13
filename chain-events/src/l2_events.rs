@@ -45,7 +45,6 @@ enum BridgeInitEvents {
 }
 
 const PAGINATION_STEP: u64 = 10_000;
-const PAGINATION_DECREASE_STEP: u64 = 200;
 const PAGINATION_INCREASE_STEP: u64 = 256;
 // usually queries break at 10k return results
 // if restarted on that limit make sure it is passed.
@@ -251,8 +250,8 @@ impl L2EventsListener {
                     match reason {
                         RunResult::PaginationTooLarge => {
                             let pagination_old = pagination;
-                            if pagination > PAGINATION_DECREASE_STEP {
-                                pagination -= PAGINATION_DECREASE_STEP;
+                            if pagination > 2 {
+                                pagination /= 2;
                                 vlog::debug!(
                                     "Decreasing pagination from {pagination_old} to {pagination}",
                                 );
@@ -472,8 +471,7 @@ impl L2EventsListener {
 }
 
 fn should_attempt_pagination_increase(pagination_step: u64, successful_logs: i32) -> bool {
-    pagination_step < PAGINATION_STEP - PAGINATION_DECREASE_STEP
-        && successful_logs > SUCCESSFUL_LOGS_TO_UPSCALE
+    pagination_step < PAGINATION_STEP && successful_logs > SUCCESSFUL_LOGS_TO_UPSCALE
 }
 
 fn look_for_bridge_initialize_event(tx: ZksyncTransactionReceipt) -> Option<ZksyncLog> {
