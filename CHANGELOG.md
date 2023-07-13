@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.15...v0.1.16) (2023-07-13)
+
+
+### Bug Fixes
+
+* try upscaling the pagination  ([#43](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/43)) ([286ff7a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/286ff7a4f91ce55b09941ffbad87584f44bd7aa8))
+
 ## [0.1.15](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.14...v0.1.15) (2023-07-13)
 
 
