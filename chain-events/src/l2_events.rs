@@ -46,7 +46,10 @@ enum BridgeInitEvents {
 
 const PAGINATION_STEP: u64 = 10_000;
 const PAGINATION_DECREASE_STEP: u64 = 200;
-const SUCCESSFUL_LOGS_TO_UPSCALE: i32 = 256;
+const PAGINATION_INCREASE_STEP: u64 = 256;
+// usually queries break at 10k return results
+// if restarted on that limit make sure it is passed.
+const SUCCESSFUL_LOGS_TO_UPSCALE: i32 = 11_000;
 
 impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
@@ -257,8 +260,8 @@ impl L2EventsListener {
                         }
                         RunResult::AttemptPaginationIncrease => {
                             let pagination_old = pagination;
-                            if pagination + PAGINATION_DECREASE_STEP < PAGINATION_STEP {
-                                pagination += PAGINATION_DECREASE_STEP;
+                            if pagination + PAGINATION_INCREASE_STEP < PAGINATION_STEP {
+                                pagination += PAGINATION_INCREASE_STEP;
                                 vlog::debug!(
                                     "Increasing pagination from {pagination_old} to {pagination}",
                                 );
