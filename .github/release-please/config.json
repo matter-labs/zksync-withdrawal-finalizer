@@ -1,0 +1,9 @@
+{
+    "bump-minor-pre-major": false,
+    "bump-patch-for-minor-pre-major": false,
+    "packages": {
+      ".": {
+        "release-type": "rust"
+      }
+    }
+}
