@@ -45,7 +45,7 @@ enum BridgeInitEvents {
 }
 
 const PAGINATION_STEP: u64 = 10_000;
-const PAGINATION_DECREASE_STEP: u64 = 1_000;
+const PAGINATION_DECREASE_STEP: u64 = 200;
 
 impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
@@ -348,7 +348,7 @@ impl L2EventsListener {
         while let Some(log) = logs.next().await {
             let log = match log {
                 Err(e) => {
-                    vlog::warn!("L2 withdrawal events stream ended with {e:?}");
+                    vlog::info!("L2 withdrawal events stream ended with {e:?}");
                     if rpc_query_too_large(&e) {
                         return Ok((last_seen_block, RunResult::PaginationTooLarge));
                     }
