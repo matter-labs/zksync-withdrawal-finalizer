@@ -3,7 +3,7 @@ name: Build and publish era-withdrawal-finalizer image
 on:
   push:
     tags:
-      - "*"
+      - v*
 
 jobs:
   push_to_registry:
