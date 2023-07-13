@@ -46,6 +46,7 @@ enum BridgeInitEvents {
 
 const PAGINATION_STEP: u64 = 10_000;
 const PAGINATION_DECREASE_STEP: u64 = 200;
+const SUCCESSFUL_LOGS_TO_UPSCALE: i32 = 256;
 
 impl L2EventsListener {
     /// Create a new `WithdrawalEvents` structure.
@@ -244,14 +245,26 @@ impl L2EventsListener {
                     from_block = last_seen_block;
                     last_seen_l2_token_block = last_seen_block;
 
-                    if reason == RunResult::PaginationTooLarge {
-                        let pagination_old = pagination;
-                        if pagination > PAGINATION_DECREASE_STEP {
-                            pagination -= PAGINATION_DECREASE_STEP;
-                            vlog::debug!(
-                                "Decreasing pagination from {pagination_old} to {pagination}",
-                            );
+                    match reason {
+                        RunResult::PaginationTooLarge => {
+                            let pagination_old = pagination;
+                            if pagination > PAGINATION_DECREASE_STEP {
+                                pagination -= PAGINATION_DECREASE_STEP;
+                                vlog::debug!(
+                                    "Decreasing pagination from {pagination_old} to {pagination}",
+                                );
+                            }
                         }
+                        RunResult::AttemptPaginationIncrease => {
+                            let pagination_old = pagination;
+                            if pagination + PAGINATION_DECREASE_STEP < PAGINATION_STEP {
+                                pagination += PAGINATION_DECREASE_STEP;
+                                vlog::debug!(
+                                    "Increasing pagination from {pagination_old} to {pagination}",
+                                );
+                            }
+                        }
+                        _ => (),
                     }
                 }
                 Err(e) => {
@@ -265,6 +278,7 @@ impl L2EventsListener {
 #[derive(PartialEq)]
 enum RunResult {
     PaginationTooLarge,
+    AttemptPaginationIncrease,
     OtherError,
 }
 
@@ -344,6 +358,7 @@ impl L2EventsListener {
             .map_err(|e| Error::Middleware(e.to_string()))?;
 
         let mut logs = past_logs.chain(current_logs.map(Ok));
+        let mut successful_logs = 0;
 
         while let Some(log) = logs.next().await {
             let log = match log {
@@ -359,6 +374,11 @@ impl L2EventsListener {
             };
             let raw_log: RawLog = log.clone().into();
             metrics::increment_counter!("watcher.chain_events.l2_logs_received");
+            successful_logs += 1;
+
+            if should_attempt_pagination_increase(pagination_step, successful_logs) {
+                return Ok((last_seen_block, RunResult::AttemptPaginationIncrease));
+            }
 
             if let Some(block_number) = log.block_number {
                 last_seen_block = block_number.into();
@@ -446,6 +466,11 @@ impl L2EventsListener {
 
         Ok(None)
     }
+}
+
+fn should_attempt_pagination_increase(pagination_step: u64, successful_logs: i32) -> bool {
+    pagination_step < PAGINATION_STEP - PAGINATION_DECREASE_STEP
+        && successful_logs > SUCCESSFUL_LOGS_TO_UPSCALE
 }
 
 fn look_for_bridge_initialize_event(tx: ZksyncTransactionReceipt) -> Option<ZksyncLog> {
