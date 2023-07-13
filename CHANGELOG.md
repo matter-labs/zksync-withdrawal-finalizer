@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.17...v0.1.18) (2023-07-13)
+
+
+### Bug Fixes
+
+* halven the pagination instead of linear ([#49](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/49)) ([8e36e5d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/8e36e5dbaeab727977010d01b2c2f621834865f0))
+
 ## [0.1.17](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.16...v0.1.17) (2023-07-13)
 
 
