@@ -2,7 +2,6 @@ name: Build and publish era-withdrawal-finalizer image
 
 on:
   push:
-    branches: ["main"]
     tags:
       - "*"
 
@@ -35,12 +34,14 @@ jobs:
           sha=$(git rev-parse --short HEAD)
           ts=$(date +%s%N | cut -b1-13)
           echo "::set-output name=BUILD_ID::${sha}-${ts}"
+
       - name: Auth to google artifact registry
         run: |
           gcloud auth configure-docker us-docker.pkg.dev -q
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2.7.0
+        if: ${{ startsWith(github.ref, 'refs/tags') }}
         with:
           push: true
           tags: |
