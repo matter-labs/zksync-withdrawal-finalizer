@@ -18,4 +18,4 @@ jobs:
           command: manifest
             config-file: .github/release-please/config.json
             manifest-file: .github/release-please/manifest.json
-            token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+            token: ${{ secrets.GH_TOKEN }}
