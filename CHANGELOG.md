@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.13...v0.1.14) (2023-07-13)
+
+
+### Bug Fixes
+
+* run on a tag unquoted  ([#40](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/40)) ([46d23b3](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/46d23b3b787295a881477a4ad995c95f9d153c3c))
+
 ## [0.1.13](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.12...v0.1.13) (2023-07-13)
 
 
