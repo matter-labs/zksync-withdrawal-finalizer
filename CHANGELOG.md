@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.18...v0.1.19) (2023-07-14)
+
+
+### Bug Fixes
+
+* ignore non deployer contract deployed events  ([#51](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/51)) ([46854da](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/46854da922fbbc93264e4d623e9e0b9927562058))
+
 ## [0.1.18](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.17...v0.1.18) (2023-07-13)
 
 
