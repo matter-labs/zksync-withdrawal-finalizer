@@ -375,7 +375,6 @@ impl L2EventsListener {
                 Ok(log) => log,
             };
             let raw_log: RawLog = log.clone().into();
-            metrics::increment_counter!("watcher.chain_events.l2_logs_received");
             successful_logs += 1;
 
             if should_attempt_pagination_increase(pagination_step, successful_logs) {
@@ -387,6 +386,13 @@ impl L2EventsListener {
             }
 
             if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
+                metrics::increment_counter!("watcher.chain_events.l2_logs_received");
+                if let L2Events::ContractDeployed(_) = l2_event {
+                    if log.topics.get(1) != Some(&DEPLOYER_ADDRESS.into()) {
+                        continue;
+                    };
+                }
+
                 match self
                     .process_l2_event(&log, &l2_event, &mut sender, &middleware)
                     .await
