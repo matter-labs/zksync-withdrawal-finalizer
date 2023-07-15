@@ -314,6 +314,8 @@ impl L2EventsListener {
         let last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
         let from_block: BlockNumber = from_block.into();
 
+        let past_topic0 = vec![BridgeBurnFilter::signature(), WithdrawalFilter::signature()];
+
         let topic0 = vec![
             ContractDeployedFilter::signature(),
             BridgeBurnFilter::signature(),
@@ -325,15 +327,6 @@ impl L2EventsListener {
         vlog::debug!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
         vlog::debug!("from_block {from_block:?}");
 
-        if last_seen_l2_token_block.as_number() <= from_block.as_number() {
-            self.query_past_token_init_events(
-                last_seen_l2_token_block,
-                from_block,
-                &mut sender,
-                &middleware,
-            )
-            .await?;
-        }
         let latest_block = middleware
             .get_block(BlockNumber::Latest)
             .await
@@ -342,11 +335,21 @@ impl L2EventsListener {
             .number
             .expect("last block always has a number; qed");
 
+        if last_seen_l2_token_block.as_number() <= from_block.as_number() {
+            self.query_past_token_init_events(
+                last_seen_l2_token_block,
+                BlockNumber::Number(latest_block),
+                &mut sender,
+                &middleware,
+            )
+            .await?;
+        }
+
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
             .address(tokens.clone())
-            .topic0(topic0.clone());
+            .topic0(past_topic0.clone());
 
         let filter = Filter::new()
             .from_block(latest_block)
@@ -387,12 +390,12 @@ impl L2EventsListener {
             }
 
             if let Ok(l2_event) = L2Events::decode_log(&raw_log) {
-                metrics::increment_counter!("watcher.chain_events.l2_logs_decoded");
                 if let L2Events::ContractDeployed(_) = l2_event {
                     if log.topics.get(1) != Some(&DEPLOYER_ADDRESS.into()) {
                         continue;
                     };
                 }
+                metrics::increment_counter!("watcher.chain_events.l2_logs_decoded");
 
                 match self
                     .process_l2_event(&log, &l2_event, &mut sender, &middleware)
