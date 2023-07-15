@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.20](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.19...v0.1.20) (2023-07-15)
+
+
+### Bug Fixes
+
+* request all past tokens in one go ([#53](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/53)) ([0165979](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/016597974c9ae5668eecb1ce11255da928567cab))
+
 ## [0.1.19](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.18...v0.1.19) (2023-07-14)
 
 
