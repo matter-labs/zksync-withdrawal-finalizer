@@ -13,19 +13,30 @@ The finalizer keeps information about its operation in a separate table. This ta
 references the information about withdrawals in the `withdrawals` table by
 `(tx_hash, event_index_in_tx)` key. To this key this table adds the fields specific
 to finalization process:
+
 ```sql
 CREATE TABLE finalized_withdrawals (
     tx_hash BYTEA NOT NULL,
     event_index_in_tx INT NOT NULL,
+
+    -- parameters needed to call `finalizeWithdrawal` on withdrawer contract
     l2_block_number BIGINT NOT NULL,
+    l1_batch_number BIGINT NOT NULL,
+    l2_message_index INT NOT NULL,
+    l2_tx_number_in_block SMALLINT NOT NULL,
+    message BYTEA NOT NULL,
+    sender BYTEA NOT NULL,
+    proof BYTEA NOT NULL,
 
-    --- The tx of successful tx call to finalizer contract.
+    -- The tx of successful tx call to finalizer contract.
     finalization_tx BYTEA DEFAULT NULL,
-
     -- If the tx to finalize has failed, this number is bumped.
     failed_finalization_attempts BIGINT DEFAULT 0,
 
-    PRIMARY KEY (tx_hash, event_index_in_tx)
+    PRIMARY KEY (tx_hash, event_index_in_tx),
+
+    -- Should be constrained to only already seen withdrawals from the main table.
+    FOREIGN KEY (tx_hash, event_index_in_tx) REFERENCES withdrawals (tx_hash, event_index_in_tx)
 );
 ```
 
@@ -51,7 +62,8 @@ Then in a loop finalizer performs the following steps:
     WHERE l2_block_number < maxExecutedBlock.max AND l2_block_number > maxSeenBlock.max;
     ```
 
-2. All newly received information is inserted into `finalized_withdrawals` with `finalization_tx`
+2. All newly received information is is accompanied by finalization parameters fields by calling
+   `finalize_withdrawal_params` and are inserted into `finalized_withdrawals` with `finalization_tx`
    set to `NULL`. and `failed_finalization_attempts` set to `0`.
 
 3. Start querying all events in `finalized_withdrawals` that have never been attempted to be
@@ -63,7 +75,7 @@ Then in a loop finalizer performs the following steps:
    ```
 
 4. For each of the returned events start building a finalization batch in `WithdrawalsAccumulator`
-   by calling `finalize_withdrawal_params` and adding returned parameters to accumulator as
+   and adding returned parameters to accumulator as
    done in the previous version of the finalizer.
 
 5. As before at each newly added withdrawal to accumulator check if the batch is ready to be finalized
