@@ -1,17 +1,28 @@
 Finalizer
 =========
 
+Note:
+
+> All previously implemented components names have to change their names from `finalizer`-related
+> ones to `watcher`-related counterparts.
 
 Storage
 -------
 
+The finalizer keeps information about its operation in a separate table. This table
+references the information about withdrawals in the `withdrawals` table by
+`(tx_hash, event_index_in_tx)` key. To this key this table adds the fields specific
+to finalization process:
 ```sql
 CREATE TABLE finalized_withdrawals (
     tx_hash BYTEA NOT NULL,
     event_index_in_tx INT NOT NULL,
     l2_block_number BIGINT NOT NULL,
 
+    --- The tx of successful tx call to finalizer contract.
     finalization_tx BYTEA DEFAULT NULL,
+
+    -- If the tx to finalize has failed, this number is bumped.
     failed_finalization_attempts BIGINT DEFAULT 0,
 
     PRIMARY KEY (tx_hash, event_index_in_tx)
@@ -69,3 +80,18 @@ Then in a loop finalizer performs the following steps:
      * if the submitted transaction future has succeeded, update the `finalization_tx` field from
        `NULL` to the hash of the said tx for the batch.
 
+
+Possible pitfalls
+=================
+
+Step `5` may fail at any step and create inconsistencies such as "a transaction has been submitted"
+but neither successful or failed result has ever been recorded into the database.
+
+Not clear what to do with tx that have failed once and `failed_finalization_attempts` has been
+incremented for them from `0` to `1`.
+
+In the process of switching from the old finalizer to the new one there still may
+be an overlap of history and the new finalizer may see withdrawals that have been
+finalizer by the old one. As such likely `is_withdrawal_finalized` call is needed.
+
+Transition to the new finalizer makes `withdrawals.is_finalized` field obsolete.
