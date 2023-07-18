@@ -11,7 +11,7 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{Connection, PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalEvent};
+use client::{zksync_contract::L2ToL1Event, WithdrawalData, WithdrawalEvent};
 
 mod error;
 mod utils;
@@ -562,6 +562,100 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     )
     .execute(pool)
     .await?;
+
+    Ok(())
+}
+
+/// Adds withdrawal information to the `finalization_data` table.
+pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalData]) -> Result<()> {
+    let mut tx_hashes = Vec::with_capacity(wd.len());
+    let mut event_index_in_txs = Vec::with_capacity(wd.len());
+    let mut l2_block_number = Vec::with_capacity(wd.len());
+    let mut l1_batch_number = Vec::with_capacity(wd.len());
+    let mut l2_message_index = Vec::with_capacity(wd.len());
+    let mut l2_tx_number_in_block = Vec::with_capacity(wd.len());
+    let mut message = Vec::with_capacity(wd.len());
+    let mut sender = Vec::with_capacity(wd.len());
+    let mut proof = Vec::with_capacity(wd.len());
+
+    wd.iter().for_each(|d| {
+        tx_hashes.push(d.tx_hash.0.to_vec());
+        event_index_in_txs.push(d.event_index_in_tx as i32);
+        l2_block_number.push(d.l2_block_number as i64);
+        l1_batch_number.push(d.params.l1_batch_number.as_u64() as i64);
+        l2_message_index.push(d.params.l2_message_index as i32);
+        l2_tx_number_in_block.push(d.params.l2_tx_number_in_block as i32);
+        message.push(d.params.message.to_vec());
+        sender.push(d.params.sender.0.to_vec());
+        proof.push(bincode::serialize(&d.params.proof).unwrap());
+    });
+
+    let started_at = Instant::now();
+
+    sqlx::query!(
+        "
+        INSERT INTO finalization_data
+        (
+            tx_hash,
+            event_index_in_tx,
+            l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        )
+        SELECT
+            u.tx_hash,
+            u.event_index_in_tx,
+            u.l2_block_number,
+            u.l1_batch_number,
+            u.l2_message_index,
+            u.l2_tx_number_in_block,
+            u.message,
+            u.sender,
+            u.proof
+        FROM UNNEST (
+            $1::bytea[],
+            $2::integer[],
+            $3::bigint[],
+            $4::bigint[],
+            $5::integer[],
+            $6::integer[],
+            $7::bytea[],
+            $8::bytea[],
+            $9::bytea[]
+        ) AS u(
+            tx_hash,
+            event_index_in_tx,
+            l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        )
+        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
+        ",
+        &tx_hashes,
+        &event_index_in_txs,
+        &l2_block_number,
+        &l1_batch_number,
+        &l2_message_index,
+        &l2_tx_number_in_block,
+        &message,
+        &sender,
+        &proof
+    )
+    .execute(pool)
+    .await?;
+
+    metrics::histogram!(
+        "watcher.storage.transactions.add_withdrawal_data",
+        started_at.elapsed(),
+    );
 
     Ok(())
 }

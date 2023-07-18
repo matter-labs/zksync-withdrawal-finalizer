@@ -65,6 +65,21 @@ pub fn is_eth(address: Address) -> bool {
     address == ETH_TOKEN_ADDRESS || address == ETH_ADDRESS
 }
 
+/// All data needed to finalize a withdrawal coupled together.
+pub struct WithdrawalData {
+    /// Hash of the withdrawal transaction.
+    pub tx_hash: H256,
+
+    /// Event index in the transaction.
+    pub event_index_in_tx: u32,
+
+    /// Block number on l2 withdrawal transaction happened in.
+    pub l2_block_number: u32,
+
+    /// The parameters.
+    pub params: WithdrawalParams,
+}
+
 /// Withdrawal params
 pub struct WithdrawalParams {
     /// The number of batch on L1
