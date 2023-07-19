@@ -219,7 +219,7 @@ async fn main() -> Result<()> {
 
     vlog::info!("Starting from L1 block number {from_l1_block}");
 
-    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
@@ -232,8 +232,8 @@ async fn main() -> Result<()> {
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l2,
-        pgpool,
+        client_l2.clone(),
+        pgpool.clone(),
         zksync_contract,
         l1_bridge,
     );
@@ -262,6 +262,10 @@ async fn main() -> Result<()> {
         }
     });
 
+    let finalizer = finalizer::Finalizer::new(pgpool);
+
+    let actual_finalizer_handle = tokio::spawn(finalizer.run(client_l2));
+
     tokio::select! {
         r = block_events_handle => {
             vlog::error!("Block Events stream ended with {r:?}");
@@ -274,6 +278,9 @@ async fn main() -> Result<()> {
         }
         r = prometheus_exporter_handle => {
             vlog::error!("Prometheus exporter ended with {r:?}");
+        }
+        r = actual_finalizer_handle => {
+            vlog::error!("Finalizer ended with {r:?}");
         }
     }
 

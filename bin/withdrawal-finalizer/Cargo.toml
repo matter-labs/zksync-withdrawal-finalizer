@@ -26,5 +26,6 @@ client = { path = "../../client" }
 storage = { path = "../../storage" }
 chain-events = { path = "../../chain-events" }
 vlog = { path = "../../vlog" }
+finalizer = { path = "../../finalizer" }
 metrics-exporter-prometheus = "0.12.1"
 metrics = "0.21.0"
