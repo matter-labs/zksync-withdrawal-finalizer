@@ -11,7 +11,7 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{Connection, PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalData, WithdrawalEvent};
+use client::{zksync_contract::L2ToL1Event, WithdrawalData, WithdrawalEvent, WithdrawalParams};
 
 mod error;
 mod utils;
@@ -698,4 +698,51 @@ pub async fn get_withdrawals_with_no_data(
     .collect();
 
     Ok(withdrawals)
+}
+
+/// Get the earliest withdrawals never attempted to be finalized before
+pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalData>> {
+    let data = sqlx::query!(
+        "
+        SELECT
+            tx_hash,
+            event_index_in_tx,
+            l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        FROM
+            finalization_data
+        WHERE
+            finalization_tx = NULL
+            AND
+            failed_finalization_attempts = 0
+        ORDER BY l2_block_number
+        LIMIT $1
+        ",
+        limit_by as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|record| WithdrawalData {
+        tx_hash: H256::from_slice(&record.tx_hash),
+        event_index_in_tx: record.event_index_in_tx as u32,
+        l2_block_number: record.l2_block_number as u64,
+        params: WithdrawalParams {
+            l1_batch_number: record.l1_batch_number.into(),
+            l2_message_index: record.l2_message_index as u32,
+            l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+            message: record.message.into(),
+            sender: Address::from_slice(&record.sender),
+            proof: bincode::deserialize(&record.proof)
+                .expect("storage contains data correctly serialized by bincode; qed"),
+        },
+    })
+    .collect();
+
+    Ok(data)
 }
