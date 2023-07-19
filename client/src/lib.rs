@@ -66,6 +66,7 @@ pub fn is_eth(address: Address) -> bool {
 }
 
 /// All data needed to finalize a withdrawal coupled together.
+#[derive(Debug)]
 pub struct WithdrawalData {
     /// Hash of the withdrawal transaction.
     pub tx_hash: H256,
@@ -74,13 +75,14 @@ pub struct WithdrawalData {
     pub event_index_in_tx: u32,
 
     /// Block number on l2 withdrawal transaction happened in.
-    pub l2_block_number: u32,
+    pub l2_block_number: u64,
 
     /// The parameters.
     pub params: WithdrawalParams,
 }
 
 /// Withdrawal params
+#[derive(Debug)]
 pub struct WithdrawalParams {
     /// The number of batch on L1
     pub l1_batch_number: U64,
@@ -273,9 +275,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             None => return Ok(None),
         };
 
-        let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
-            .expect("H256 always has enough bytes to fill H160. qed")
-            .into();
+        let sender = log.topics[1].into();
 
         let proof = self
             .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
