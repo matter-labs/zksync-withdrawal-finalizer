@@ -659,3 +659,43 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalData]) -> Resul
 
     Ok(())
 }
+
+/// Returns all previously unseen executed events after a given block
+pub async fn get_withdrawals_with_no_data(
+    pool: &PgPool,
+    from_block: u64,
+    limit_by: u64,
+) -> Result<Vec<(H256, u16, u64)>> {
+    let withdrawals = sqlx::query!(
+        "
+        WITH max_executed AS (SELECT MAX(l2_block_number)
+                FROM l2_blocks
+                WHERE execute_l1_block_number IS NOT NULL),
+             max_seen AS (SELECT MAX(l2_block_number)
+                FROM finalization_data)
+        SELECT tx_hash,event_index_in_tx,l2_block_number
+        FROM withdrawals,max_executed,max_seen
+        WHERE
+            l2_block_number > COALESCE(max_seen.max, 1)
+            AND l2_block_number > $1
+            AND l2_block_number <= max_executed.max
+        ORDER BY l2_block_number
+        LIMIT $2
+        ",
+        from_block as i64,
+        limit_by as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| {
+        (
+            H256::from_slice(&r.tx_hash),
+            r.event_index_in_tx as u16,
+            r.l2_block_number as u64,
+        )
+    })
+    .collect();
+
+    Ok(withdrawals)
+}
