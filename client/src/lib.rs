@@ -14,6 +14,7 @@ pub use error::{Error, Result};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use ethers::{
+    abi::{ParamType, Token},
     contract::EthEvent,
     providers::{JsonRpcClient, Middleware, Provider},
     types::{Address, Bytes, H160, H256, U64},
@@ -23,7 +24,7 @@ use l1bridge::codegen::IL1Bridge;
 use l1messenger::codegen::L1MessageSentFilter;
 use zksync_contract::codegen::IZkSync;
 use zksync_types::{
-    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
+    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog,
     TransactionReceipt as ZksyncTransactionReceipt,
 };
 
@@ -282,7 +283,14 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .await?
             .expect("Log proof should be present. qed");
 
-        let message = log.data;
+        let message: Bytes = match ethers::abi::decode(&[ParamType::Bytes], &log.data)
+            .expect("log data is valid rlp data; qed")
+            .swap_remove(0)
+        {
+            Token::Bytes(b) => b.into(),
+            b => panic!("log data is expected to be rlp bytes, got {b:?}"),
+        };
+
         let l2_message_index = proof.id;
         let proof: Vec<_> = proof
             .proof
@@ -294,7 +302,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             l1_batch_number: log.l1_batch_number.unwrap(),
             l2_message_index,
             l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
-            message: message.0.into(),
+            message,
             sender,
             proof,
         }))
