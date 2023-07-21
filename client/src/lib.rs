@@ -17,11 +17,12 @@ use ethers::{
     abi::{ParamType, Token},
     contract::EthEvent,
     providers::{JsonRpcClient, Middleware, Provider},
-    types::{Address, Bytes, H160, H256, U64},
+    types::{Address, Bytes, H160, H256, U256, U64},
 };
 
 use l1bridge::codegen::IL1Bridge;
 use l1messenger::codegen::L1MessageSentFilter;
+use withdrawal_finalizer::codegen::RequestFinalizeWithdrawal;
 use zksync_contract::codegen::IZkSync;
 use zksync_types::{
     BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog,
@@ -80,6 +81,24 @@ pub struct WithdrawalData {
 
     /// The parameters.
     pub params: WithdrawalParams,
+}
+
+impl WithdrawalData {
+    /// Convert `WithdrawalData` into a `RequestFinalizeWithdrawal` given a gas limit.
+    pub fn into_request_with_gaslimit(
+        self,
+        withdrawal_gas_limit: U256,
+    ) -> RequestFinalizeWithdrawal {
+        RequestFinalizeWithdrawal {
+            l_2_block_number: self.params.l1_batch_number.as_u64().into(),
+            l_2_message_index: self.params.l2_message_index.into(),
+            l_2_tx_number_in_block: self.params.l2_tx_number_in_block,
+            message: self.params.message,
+            merkle_proof: self.params.proof,
+            is_eth: is_eth(self.params.sender),
+            gas: withdrawal_gas_limit,
+        }
+    }
 }
 
 /// Withdrawal params
