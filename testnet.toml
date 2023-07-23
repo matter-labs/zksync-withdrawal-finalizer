@@ -8,3 +8,4 @@ database_url = "postgres://postgres@localhost/finalizer_local"
 start_from_l2_block = 7000000
 one_withdrawal_gas_limit = "100000"
 batch_finalization_gas_limit = "4000000"
+account_private_key = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"

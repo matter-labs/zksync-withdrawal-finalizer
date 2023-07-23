@@ -267,8 +267,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    let wallet = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
-        .parse::<LocalWallet>()?;
+    let wallet = config.account_private_key.parse::<LocalWallet>()?;
 
     let client_l1_with_signer = Arc::new(SignerMiddleware::new(client_l1, wallet));
 
