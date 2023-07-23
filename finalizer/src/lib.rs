@@ -99,7 +99,7 @@ where
             .iter()
             .map(|r| {
                 r.clone()
-                    .into_request_with_gaslimit(self.one_withdrawal_gas_limit.into())
+                    .into_request_with_gaslimit(self.one_withdrawal_gas_limit)
             })
             .collect();
 
@@ -111,7 +111,7 @@ where
                 ok_requests.push(
                     withdrawals[i]
                         .clone()
-                        .into_request_with_gaslimit(self.one_withdrawal_gas_limit.into()),
+                        .into_request_with_gaslimit(self.one_withdrawal_gas_limit),
                 );
             } else {
                 self.unsuccessful.push((withdrawals[i].clone(), prediction));
@@ -219,7 +219,7 @@ where
         }
         vlog::info!("here3");
 
-        let predicted = std::mem::replace(&mut self.unsuccessful, vec![]);
+        let predicted = std::mem::take(&mut self.unsuccessful);
 
         let finalize_query: Vec<_> = predicted
             .iter()
