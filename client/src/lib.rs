@@ -68,7 +68,7 @@ pub fn is_eth(address: Address) -> bool {
 }
 
 /// All data needed to finalize a withdrawal coupled together.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WithdrawalData {
     /// Hash of the withdrawal transaction.
     pub tx_hash: H256,
@@ -102,7 +102,7 @@ impl WithdrawalData {
 }
 
 /// Withdrawal params
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WithdrawalParams {
     /// The number of batch on L1
     pub l1_batch_number: U64,

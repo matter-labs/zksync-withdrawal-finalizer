@@ -9,7 +9,12 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use envconfig::Envconfig;
-use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
+use ethers::{
+    prelude::SignerMiddleware,
+    providers::{JsonRpcClient, Middleware, Provider, Ws},
+    signers::LocalWallet,
+    types::U256,
+};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
@@ -234,8 +239,8 @@ async fn main() -> Result<()> {
     let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
         client_l2.clone(),
         pgpool.clone(),
-        zksync_contract,
-        l1_bridge,
+        zksync_contract.clone(),
+        l1_bridge.clone(),
     );
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
@@ -262,7 +267,33 @@ async fn main() -> Result<()> {
         }
     });
 
-    let finalizer = finalizer::Finalizer::new(pgpool);
+    let wallet = "dcf2cbdd171a21c480aa7f53d77f31bb102282b3ff099c78e3118b37348c72f7"
+        .parse::<LocalWallet>()?;
+
+    let client_l1_with_signer = Arc::new(SignerMiddleware::new(client_l1, wallet));
+
+    let contract = client::withdrawal_finalizer::codegen::WithdrawalFinalizer::new(
+        config.withdrawal_finalizer_addr,
+        client_l1_with_signer,
+    );
+    let batch_finalization_gas_limit = U256::from_dec_str(&config.batch_finalization_gas_limit)?;
+    let one_withdrawal_gas_limit = U256::from_dec_str(&config.one_withdrawal_gas_limit)?;
+
+    vlog::info!(
+        "finalization gas limits one: {}, batch: {}",
+        config.one_withdrawal_gas_limit,
+        config.batch_finalization_gas_limit,
+    );
+
+    let finalizer = finalizer::Finalizer::new(
+        pgpool,
+        one_withdrawal_gas_limit,
+        batch_finalization_gas_limit,
+        contract,
+        from_l2_block,
+        zksync_contract,
+        l1_bridge,
+    );
 
     let actual_finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
