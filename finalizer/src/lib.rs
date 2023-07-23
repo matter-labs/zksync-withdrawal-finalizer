@@ -109,36 +109,31 @@ where
         &mut self,
         withdrawals: &[WithdrawalData],
     ) -> Result<Vec<FinalizeResult>> {
-        let mut results = vec![];
+        vlog::debug!("predicting results for withdrawals: {withdrawals:?}");
 
         let w: Vec<_> = withdrawals
             .iter()
-            .map(|r| {
-                r.clone()
-                    .into_request_with_gaslimit(self.one_withdrawal_gas_limit)
-            })
+            .cloned()
+            .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        let predictions = self.contract.finalize_withdrawals(w.clone()).call().await?;
-
-        for prediction in predictions {
-            if !prediction.success || prediction.gas > self.one_withdrawal_gas_limit {
-                results.push(prediction);
-            }
-        }
-
-        Ok(results)
+        Ok(self
+            .contract
+            .finalize_withdrawals(w.clone())
+            .call()
+            .await?
+            .into_iter()
+            .filter(|p| !p.success || p.gas > self.one_withdrawal_gas_limit)
+            .collect())
     }
 
     async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalData>) -> Result<()> {
-        vlog::debug!("Finalizeing batch {withdrawals:?}");
+        vlog::debug!("finalizeing batch {withdrawals:?}");
 
         let w: Vec<_> = withdrawals
             .iter()
-            .map(|r| {
-                r.clone()
-                    .into_request_with_gaslimit(self.one_withdrawal_gas_limit)
-            })
+            .cloned()
+            .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
         let tx = self.contract.finalize_withdrawals(w);
