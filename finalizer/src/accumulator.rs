@@ -1,6 +1,10 @@
+use std::collections::HashSet;
+
 use ethers::types::U256;
 
-use client::WithdrawalData;
+use client::{
+    withdrawal_finalizer::codegen::withdrawal_finalizer::Result as FinalizeResult, WithdrawalData,
+};
 
 /// A struct that holds `RequestFinalizeWithdrawal`s and computes
 /// when there are enough in a batch to be submitted.
@@ -16,6 +20,34 @@ impl WithdrawalsAccumulator {
     /// take withdrawals
     pub fn take_withdrawals(&mut self) -> Vec<WithdrawalData> {
         std::mem::take(&mut self.withdrawals)
+    }
+
+    pub fn withdrawals(&self) -> &[WithdrawalData] {
+        &self.withdrawals
+    }
+
+    /// Remove unsuccessful withdrawals by returned results.
+    pub fn remove_unsuccessful(&mut self, unsuccessful: &[FinalizeResult]) -> Vec<WithdrawalData> {
+        let mut result = Vec::with_capacity(unsuccessful.len());
+        let unsuccessful_set: HashSet<_> = unsuccessful
+            .iter()
+            .map(|r| (r.l_2_message_index, r.l_2_block_number))
+            .collect();
+
+        let mut i = 0;
+
+        while i < self.withdrawals.len() {
+            if unsuccessful_set.contains(&(
+                self.withdrawals[i].params.l1_batch_number.as_u64().into(),
+                self.withdrawals[i].params.l2_message_index.into(),
+            )) {
+                result.push(self.withdrawals.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+
+        result
     }
 
     /// Create a new `WithdrawalsAccumulator`.

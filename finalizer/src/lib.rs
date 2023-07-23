@@ -37,10 +37,15 @@ pub struct Finalizer<M1, M2> {
     from_l2_block: u64,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
-    unsuccessful: Vec<(WithdrawalData, FinalizeResult)>,
+    unsuccessful: Vec<WithdrawalData>,
+
+    no_new_withdrawals_backoff: Duration,
+    query_db_pagination_limit: u64,
+    tx_fee_limit: U256,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
+const QUERY_DB_PAGINATION_LIMIT: u64 = 50;
 
 impl<M1, M2> Finalizer<M1, M2>
 where
@@ -57,6 +62,9 @@ where
         zksync_contract: IZkSync<M2>,
         l1_bridge: IL1Bridge<M2>,
     ) -> Self {
+        let tx_fee_limit =
+            ethers::utils::parse_ether("0.8").expect("0.8 ether is a parsable amount; qed");
+
         Self {
             pgpool,
             one_withdrawal_gas_limit,
@@ -66,6 +74,9 @@ where
             zksync_contract,
             l1_bridge,
             unsuccessful: vec![],
+            no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
+            query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
+            tx_fee_limit,
         }
     }
 
@@ -94,7 +105,12 @@ where
         Ok(())
     }
 
-    async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalData>) -> Result<()> {
+    async fn predict_fails(
+        &mut self,
+        withdrawals: &[WithdrawalData],
+    ) -> Result<Vec<FinalizeResult>> {
+        let mut results = vec![];
+
         let w: Vec<_> = withdrawals
             .iter()
             .map(|r| {
@@ -105,39 +121,46 @@ where
 
         let predictions = self.contract.finalize_withdrawals(w.clone()).call().await?;
 
-        let mut ok_requests = vec![];
-        for (i, prediction) in predictions.into_iter().enumerate() {
-            if prediction.success {
-                ok_requests.push(
-                    withdrawals[i]
-                        .clone()
-                        .into_request_with_gaslimit(self.one_withdrawal_gas_limit),
-                );
-            } else {
-                self.unsuccessful.push((withdrawals[i].clone(), prediction));
+        for prediction in predictions {
+            if !prediction.success || prediction.gas > self.one_withdrawal_gas_limit {
+                results.push(prediction);
             }
         }
 
-        if ok_requests.is_empty() {
-            return Ok(());
-        }
+        Ok(results)
+    }
 
-        let tx = self.contract.finalize_withdrawals(ok_requests);
+    async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalData>) -> Result<()> {
+        vlog::debug!("Finalizeing batch {withdrawals:?}");
+
+        let w: Vec<_> = withdrawals
+            .iter()
+            .map(|r| {
+                r.clone()
+                    .into_request_with_gaslimit(self.one_withdrawal_gas_limit)
+            })
+            .collect();
+
+        let tx = self.contract.finalize_withdrawals(w);
         let pending_tx = tx.send().await;
-        let pending_tx = match pending_tx {
-            Ok(e) => e,
-            Err(e) => {
-                vlog::error!("Filaed to send tx {e}");
-                return Ok(());
-            }
-        };
-        let mined = pending_tx.await;
 
         // Turn actual withdrawals into info to update db with.
         let withdrawals = withdrawals
             .into_iter()
             .map(|w| (w.tx_hash, w.event_index_in_tx))
             .collect::<Vec<_>>();
+
+        let pending_tx = match pending_tx {
+            Ok(e) => e,
+            Err(e) => {
+                vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
+                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
+
+                return Ok(());
+            }
+        };
+
+        let mined = pending_tx.await;
 
         match mined {
             Ok(Some(tx)) => {
@@ -164,60 +187,68 @@ where
         Ok(())
     }
 
+    async fn new_accumulator(&self) -> Result<WithdrawalsAccumulator> {
+        let gas_price = self
+            .contract
+            .client()
+            .get_gas_price()
+            .await
+            .map_err(|e| Error::Middleware(format!("{e}")))?;
+
+        Ok(WithdrawalsAccumulator::new(
+            gas_price,
+            self.tx_fee_limit,
+            self.batch_finalization_gas_limit,
+            self.one_withdrawal_gas_limit,
+        ))
+    }
+
     async fn finalizer_loop(mut self) -> Result<()>
     where
         M1: Middleware,
         M2: Middleware,
     {
-        let one_withdrawal_gas_limit = self.one_withdrawal_gas_limit;
-        let tx_fee_limit =
-            ethers::utils::parse_ether("0.8").expect("0.8 ether is a parsable amount; qed");
-
         loop {
-            let gas_price = self
-                .contract
-                .client()
-                .get_gas_price()
-                .await
-                .map_err(|e| Error::Middleware(format!("{e}")))?;
+            let try_finalize_these =
+                storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
+                    .await?;
 
-            let mut accumulator = WithdrawalsAccumulator::new(
-                gas_price,
-                tx_fee_limit,
-                self.batch_finalization_gas_limit,
-                one_withdrawal_gas_limit,
-            );
+            if try_finalize_these.is_empty() {
+                tokio::time::sleep(self.no_new_withdrawals_backoff).await;
+                continue;
+            }
 
-            let try_finalize_these = storage::withdrwals_to_finalize(&self.pgpool, 50).await?;
+            let mut accumulator = self.new_accumulator().await?;
+            let mut iter = try_finalize_these.iter().peekable();
 
-            vlog::info!("try {try_finalize_these:?}");
-
-            for t in &try_finalize_these {
+            while let Some(t) = iter.next() {
                 accumulator.add_withdrawal(t.clone());
 
-                if accumulator.ready_to_finalize() {
-                    let requests = accumulator.take_withdrawals();
-                    self.finalize_batch(requests).await?;
+                if accumulator.ready_to_finalize() || iter.peek().is_none() {
+                    let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
+
+                    vlog::debug!("predicted to fail: {predicted_to_fail:?}");
+
+                    if !predicted_to_fail.is_empty() {
+                        let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
+
+                        self.unsuccessful.append(&mut removed);
+                        continue;
+                    } else {
+                        let requests = accumulator.take_withdrawals();
+                        self.finalize_batch(requests).await?;
+                    }
                 }
             }
 
-            let requests = accumulator.take_withdrawals();
-
-            if !requests.is_empty() {
-                self.finalize_batch(requests).await?;
-            }
-
-            self.process_predicted_unsuccessful().await?;
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            self.process_unsuccessful().await?;
         }
     }
 
-    async fn process_predicted_unsuccessful(&mut self) -> Result<()> {
-        vlog::info!("here2");
+    async fn process_unsuccessful(&mut self) -> Result<()> {
         if self.unsuccessful.is_empty() {
             return Ok(());
         }
-        vlog::info!("here3");
 
         let predicted = std::mem::take(&mut self.unsuccessful);
 
@@ -225,9 +256,9 @@ where
             .iter()
             .map(|d| {
                 (
-                    d.0.params.l1_batch_number.as_u64(),
-                    d.0.params.l2_message_index as u64,
-                    is_eth(d.0.params.sender),
+                    d.params.l1_batch_number.as_u64(),
+                    d.params.l2_message_index as u64,
+                    is_eth(d.params.sender),
                 )
             })
             .collect();
@@ -241,9 +272,9 @@ where
 
         for i in 0..are_finalized.len() {
             if are_finalized[i] {
-                already_finalized.push((predicted[i].0.tx_hash, predicted[i].0.event_index_in_tx));
+                already_finalized.push((predicted[i].tx_hash, predicted[i].event_index_in_tx));
             } else {
-                unsuccessful.push((predicted[i].0.tx_hash, predicted[i].0.event_index_in_tx));
+                unsuccessful.push((predicted[i].tx_hash, predicted[i].event_index_in_tx));
             }
         }
 

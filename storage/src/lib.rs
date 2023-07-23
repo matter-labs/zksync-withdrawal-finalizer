@@ -718,6 +718,8 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
             finalization_data
         WHERE
             finalization_tx IS NULL
+            AND
+            failed_finalization_attempts < 3
         ORDER BY l2_block_number
         LIMIT $1
         ",
