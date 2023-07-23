@@ -718,8 +718,6 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
             finalization_data
         WHERE
             finalization_tx IS NULL
-            AND
-            failed_finalization_attempts = 0
         ORDER BY l2_block_number
         LIMIT $1
         ",
@@ -745,4 +743,79 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     .collect();
 
     Ok(data)
+}
+
+/// Set status of a set of withdrawals in `finalization_data` to finalized
+pub async fn finalization_data_set_finalized_in_tx(
+    pool: &PgPool,
+    withdrawals: &[(H256, u32)],
+    tx_hash: H256,
+) -> Result<()> {
+    let mut tx_hashes = Vec::with_capacity(withdrawals.len());
+    let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
+
+    withdrawals.iter().for_each(|w| {
+        tx_hashes.push(w.0 .0.to_vec());
+        event_index_in_tx.push(w.1 as i32);
+    });
+
+    sqlx::query!(
+        "
+        UPDATE finalization_data
+        SET finalization_tx = $1
+        FROM (
+            SELECT
+            UNNEST ($2::bytea[]) as tx_hash,
+            UNNEST ($3::integer[]) as event_index_in_tx
+        ) AS u
+        WHERE
+            finalization_data.tx_hash = u.tx_hash
+            AND
+            finalization_data.event_index_in_tx = u.event_index_in_tx
+        ",
+        &tx_hash.0.as_ref(),
+        &tx_hashes,
+        &event_index_in_tx,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Increment unsuccessful transaction attempt count for a set
+/// of withdrawals
+pub async fn inc_unsuccessful_finalization_attempts(
+    pool: &PgPool,
+    withdrawals: &[(H256, u32)],
+) -> Result<()> {
+    let mut tx_hashes = Vec::with_capacity(withdrawals.len());
+    let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
+
+    withdrawals.iter().for_each(|w| {
+        tx_hashes.push(w.0 .0.to_vec());
+        event_index_in_tx.push(w.1 as i32);
+    });
+
+    sqlx::query!(
+        "
+        UPDATE finalization_data
+        SET failed_finalization_attempts = failed_finalization_attempts + 1
+        FROM (
+            SELECT
+            UNNEST ($1::bytea[]) as tx_hash,
+            UNNEST ($2::integer[]) as event_index_in_tx
+        ) AS u
+        WHERE
+            finalization_data.tx_hash = u.tx_hash
+            AND
+            finalization_data.event_index_in_tx = u.event_index_in_tx
+        ",
+        &tx_hashes,
+        &event_index_in_tx,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
