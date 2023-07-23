@@ -2,7 +2,10 @@
 use std::{env, fs, path::Path, str::FromStr};
 
 use envconfig::Envconfig;
-use ethers::types::{Address, H160, U256};
+use ethers::{
+    abi::ethereum_types::FromStrRadixErr,
+    types::{Address, H160, U256},
+};
 use serde::Deserialize;
 use url::Url;
 
@@ -29,6 +32,10 @@ pub struct Config {
     #[envconfig(from = "CONTRACTS_DIAMOND_PROXY_ADDR")]
     pub diamond_proxy_addr: Address,
 
+    /// Finalizer contract
+    #[envconfig(from = "CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT")]
+    pub withdrawal_finalizer_addr: Address,
+
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub api_web3_json_rpc_ws_url: Url,
@@ -41,6 +48,12 @@ pub struct Config {
 
     #[envconfig(from = "UPDATER_BACKOFF")]
     pub updater_backoff: Option<u64>,
+
+    #[envconfig(from = "GAS_LIMIT")]
+    pub one_withdrawal_gas_limit: String,
+
+    #[envconfig(from = "BATCH_FINALIZATION_GAS_LIMIT")]
+    pub batch_finalization_gas_limit: String,
 }
 
 impl Config {
