@@ -244,6 +244,7 @@ where
                     } else {
                         let requests = accumulator.take_withdrawals();
                         self.finalize_batch(requests).await?;
+                        accumulator = self.new_accumulator().await?;
                     }
                 }
             }
