@@ -182,6 +182,7 @@ where
         Ok(())
     }
 
+    // Create a new withdrawal accumulator given the current gas price.
     async fn new_accumulator(&self) -> Result<WithdrawalsAccumulator> {
         let gas_price = self
             .finalizer_contract
@@ -241,25 +242,18 @@ where
         }
     }
 
+    // process withdrawals that have been predicted as unsuccessful.
+    //
+    // there may be two reasons for such predictions:
+    // 1. a withdrawal is already finalized
+    // 2. a gas limit on request was too low
     async fn process_unsuccessful(&mut self) -> Result<()> {
         if self.unsuccessful.is_empty() {
             return Ok(());
         }
 
         let predicted = std::mem::take(&mut self.unsuccessful);
-
-        let finalize_query: Vec<_> = predicted
-            .iter()
-            .map(|d| {
-                (
-                    d.l1_batch_number.as_u64(),
-                    d.l2_message_index as u64,
-                    is_eth(d.sender),
-                )
-            })
-            .collect();
-
-        let are_finalized = self.are_withdrawals_finalized(&finalize_query).await?;
+        let are_finalized = self.are_withdrawals_finalized(&predicted).await?;
 
         let mut already_finalized = vec![];
         let mut unsuccessful = vec![];
@@ -272,7 +266,21 @@ where
             }
         }
 
+        // Either finalization tx has failed for these, or they were
+        // predicted to fail.
         storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &unsuccessful).await?;
+
+        // if the withdrawal has already been finalized set its
+        // finalization transaction to zero which is signals exactly this
+        // it is known that withdrawal has been fianlized but not known
+        // in which exact transaction.
+        //
+        // this may happen in two cases:
+        // 1. someone else has finalized it
+        // 2. finalizer has finalized it however its course of
+        // execution has been interrupted somewhere between the
+        // submission of transaction and updating the db with the
+        // result of said transaction success.
         storage::finalization_data_set_finalized_in_tx(
             &self.pgpool,
             &already_finalized,
@@ -285,28 +293,30 @@ where
 
     async fn are_withdrawals_finalized(
         &self,
-        withdrawals: &[(u64, u64, bool)],
+        withdrawals: &[WithdrawalParams],
     ) -> Result<Vec<bool>> {
-        let results: Result<Vec<_>> = futures::future::join_all(withdrawals.iter().map(
-            |(batch, index, is_eth)| async move {
-                if *is_eth {
+        let results: Result<Vec<_>> =
+            futures::future::join_all(withdrawals.iter().map(|wd| async move {
+                let l1_batch_number = U256::from(wd.l1_batch_number.as_u64());
+                let l2_message_index = U256::from(wd.l2_message_index);
+
+                if is_eth(wd.sender) {
                     self.zksync_contract
-                        .is_eth_withdrawal_finalized(U256::from(*batch), U256::from(*index))
+                        .is_eth_withdrawal_finalized(l1_batch_number, l2_message_index)
                         .call()
                         .await
                         .map_err(|e| e.into())
                 } else {
                     self.l1_bridge
-                        .is_withdrawal_finalized(U256::from(*batch), U256::from(*index))
+                        .is_withdrawal_finalized(l1_batch_number, l2_message_index)
                         .call()
                         .await
                         .map_err(|e| e.into())
                 }
-            },
-        ))
-        .await
-        .into_iter()
-        .collect();
+            }))
+            .await
+            .into_iter()
+            .collect();
 
         let results = results?;
 
@@ -314,6 +324,7 @@ where
     }
 }
 
+// Request finalization parameters for a set of withdrawals in parallel.
 async fn request_finalize_params<M2>(
     middleware: M2,
     hash_and_indices: &[(H256, u16)],
@@ -337,6 +348,9 @@ where
     Ok(results)
 }
 
+// Continiously query the new withdrawals that have been seen by watcher
+// request finalizing params for them and store this information into
+// finalizer db table.
 async fn migrator_loop<M2>(pool: PgPool, middleware: M2, from_l2_block: u64) -> Result<()>
 where
     M2: ZksyncMiddleware,
@@ -357,7 +371,7 @@ where
             .map(|p| (p.0, p.1))
             .collect();
 
-        let params: Vec<_> = request_finalize_params(&middleware, &hash_and_index).await?;
+        let params = request_finalize_params(&middleware, &hash_and_index).await?;
 
         storage::add_withdrawals_data(&pool, &params).await?;
     }

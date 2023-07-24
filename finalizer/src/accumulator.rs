@@ -22,6 +22,7 @@ impl WithdrawalsAccumulator {
         std::mem::take(&mut self.withdrawals)
     }
 
+    /// Get a reference to a current set of withdrawals
     pub fn withdrawals(&self) -> &[WithdrawalParams] {
         &self.withdrawals
     }
