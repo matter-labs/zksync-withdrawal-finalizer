@@ -20,7 +20,7 @@ use client::{
 };
 use client::{
     l1bridge::codegen::IL1Bridge, withdrawal_finalizer::codegen::WithdrawalFinalizer,
-    zksync_contract::codegen::IZkSync, WithdrawalData, WithdrawalParams, ZksyncMiddleware,
+    zksync_contract::codegen::IZkSync, WithdrawalParams, ZksyncMiddleware,
 };
 
 use crate::error::{Error, Result};
@@ -37,7 +37,7 @@ pub struct Finalizer<M1, M2> {
     from_l2_block: u64,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
-    unsuccessful: Vec<WithdrawalData>,
+    unsuccessful: Vec<WithdrawalParams>,
 
     no_new_withdrawals_backoff: Duration,
     query_db_pagination_limit: u64,
@@ -107,7 +107,7 @@ where
 
     async fn predict_fails(
         &mut self,
-        withdrawals: &[WithdrawalData],
+        withdrawals: &[WithdrawalParams],
     ) -> Result<Vec<FinalizeResult>> {
         vlog::debug!("predicting results for withdrawals: {withdrawals:?}");
 
@@ -127,7 +127,7 @@ where
             .collect())
     }
 
-    async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalData>) -> Result<()> {
+    async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
         vlog::debug!("finalizeing batch {withdrawals:?}");
 
         let w: Vec<_> = withdrawals
@@ -228,6 +228,7 @@ where
                         let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
 
                         self.unsuccessful.append(&mut removed);
+                        vlog::debug!("unsucc {:?}", self.unsuccessful);
                         continue;
                     } else {
                         let requests = accumulator.take_withdrawals();
@@ -251,16 +252,14 @@ where
             .iter()
             .map(|d| {
                 (
-                    d.params.l1_batch_number.as_u64(),
-                    d.params.l2_message_index as u64,
-                    is_eth(d.params.sender),
+                    d.l1_batch_number.as_u64(),
+                    d.l2_message_index as u64,
+                    is_eth(d.sender),
                 )
             })
             .collect();
 
-        let are_finalized =
-            are_withdrawals_finalized(&self.zksync_contract, &self.l1_bridge, &finalize_query)
-                .await?;
+        let are_finalized = self.are_withdrawals_finalized(&finalize_query).await?;
 
         let mut already_finalized = vec![];
         let mut unsuccessful = vec![];
@@ -282,6 +281,36 @@ where
         .await?;
 
         Ok(())
+    }
+
+    async fn are_withdrawals_finalized(
+        &self,
+        withdrawals: &[(u64, u64, bool)],
+    ) -> Result<Vec<bool>> {
+        let results: Result<Vec<_>> = futures::future::join_all(withdrawals.iter().map(
+            |(batch, index, is_eth)| async move {
+                if *is_eth {
+                    self.zksync_contract
+                        .is_eth_withdrawal_finalized(U256::from(*batch), U256::from(*index))
+                        .call()
+                        .await
+                        .map_err(|e| e.into())
+                } else {
+                    self.l1_bridge
+                        .is_withdrawal_finalized(U256::from(*batch), U256::from(*index))
+                        .call()
+                        .await
+                        .map_err(|e| e.into())
+                }
+            },
+        ))
+        .await
+        .into_iter()
+        .collect();
+
+        let results = results?;
+
+        Ok(results)
     }
 }
 
@@ -328,51 +357,8 @@ where
             .map(|p| (p.0, p.1))
             .collect();
 
-        let params: Vec<_> = request_finalize_params(&middleware, &hash_and_index)
-            .await?
-            .into_iter()
-            .zip(newly_executed_withdrawals)
-            .map(|(params, e)| WithdrawalData {
-                tx_hash: e.0,
-                event_index_in_tx: e.1 as u32,
-                l2_block_number: e.2,
-                params,
-            })
-            .collect();
+        let params: Vec<_> = request_finalize_params(&middleware, &hash_and_index).await?;
 
         storage::add_withdrawals_data(&pool, &params).await?;
     }
-}
-
-async fn are_withdrawals_finalized<M>(
-    zksync_contract: &IZkSync<M>,
-    l1_bridge: &IL1Bridge<M>,
-    withdrawals: &[(u64, u64, bool)],
-) -> Result<Vec<bool>>
-where
-    M: Middleware,
-{
-    let results: Result<Vec<_>> =
-        futures::future::join_all(withdrawals.iter().map(|(batch, index, is_eth)| async move {
-            if *is_eth {
-                zksync_contract
-                    .is_eth_withdrawal_finalized(U256::from(*batch), U256::from(*index))
-                    .call()
-                    .await
-                    .map_err(|e| e.into())
-            } else {
-                l1_bridge
-                    .is_withdrawal_finalized(U256::from(*batch), U256::from(*index))
-                    .call()
-                    .await
-                    .map_err(|e| e.into())
-            }
-        }))
-        .await
-        .into_iter()
-        .collect();
-
-    let results = results?;
-
-    Ok(results)
 }

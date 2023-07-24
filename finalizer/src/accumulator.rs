@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use ethers::types::U256;
 
 use client::{
-    withdrawal_finalizer::codegen::withdrawal_finalizer::Result as FinalizeResult, WithdrawalData,
+    withdrawal_finalizer::codegen::withdrawal_finalizer::Result as FinalizeResult, WithdrawalParams,
 };
 
 /// A struct that holds `RequestFinalizeWithdrawal`s and computes
@@ -13,33 +13,36 @@ pub struct WithdrawalsAccumulator {
     tx_fee_limit: U256,
     batch_finalization_gas_limit: U256,
     one_withdrawal_gas_limit: U256,
-    withdrawals: Vec<WithdrawalData>,
+    withdrawals: Vec<WithdrawalParams>,
 }
 
 impl WithdrawalsAccumulator {
     /// take withdrawals
-    pub fn take_withdrawals(&mut self) -> Vec<WithdrawalData> {
+    pub fn take_withdrawals(&mut self) -> Vec<WithdrawalParams> {
         std::mem::take(&mut self.withdrawals)
     }
 
-    pub fn withdrawals(&self) -> &[WithdrawalData] {
+    pub fn withdrawals(&self) -> &[WithdrawalParams] {
         &self.withdrawals
     }
 
     /// Remove unsuccessful withdrawals by returned results.
-    pub fn remove_unsuccessful(&mut self, unsuccessful: &[FinalizeResult]) -> Vec<WithdrawalData> {
+    pub fn remove_unsuccessful(
+        &mut self,
+        unsuccessful: &[FinalizeResult],
+    ) -> Vec<WithdrawalParams> {
         let mut result = Vec::with_capacity(unsuccessful.len());
         let unsuccessful_set: HashSet<_> = unsuccessful
             .iter()
-            .map(|r| (r.l_2_message_index, r.l_2_block_number))
+            .map(|r| (r.l_2_block_number, r.l_2_message_index))
             .collect();
 
         let mut i = 0;
 
         while i < self.withdrawals.len() {
             if unsuccessful_set.contains(&(
-                self.withdrawals[i].params.l1_batch_number.as_u64().into(),
-                self.withdrawals[i].params.l2_message_index.into(),
+                self.withdrawals[i].l1_batch_number.as_u64().into(),
+                self.withdrawals[i].l2_message_index.into(),
             )) {
                 result.push(self.withdrawals.remove(i));
             } else {
@@ -71,7 +74,7 @@ impl WithdrawalsAccumulator {
     /// # Argument
     ///
     /// * `request` A finalization request.
-    pub fn add_withdrawal(&mut self, data: WithdrawalData) {
+    pub fn add_withdrawal(&mut self, data: WithdrawalParams) {
         self.withdrawals.push(data);
     }
 

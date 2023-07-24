@@ -67,9 +67,27 @@ pub fn is_eth(address: Address) -> bool {
     address == ETH_TOKEN_ADDRESS || address == ETH_ADDRESS
 }
 
-/// All data needed to finalize a withdrawal coupled together.
+impl WithdrawalParams {
+    /// Convert `WithdrawalData` into a `RequestFinalizeWithdrawal` given a gas limit.
+    pub fn into_request_with_gaslimit(
+        self,
+        withdrawal_gas_limit: U256,
+    ) -> RequestFinalizeWithdrawal {
+        RequestFinalizeWithdrawal {
+            l_2_block_number: self.l1_batch_number.as_u64().into(),
+            l_2_message_index: self.l2_message_index.into(),
+            l_2_tx_number_in_block: self.l2_tx_number_in_block,
+            message: self.message,
+            merkle_proof: self.proof,
+            is_eth: is_eth(self.sender),
+            gas: withdrawal_gas_limit,
+        }
+    }
+}
+
+/// Withdrawal params
 #[derive(Debug, Clone)]
-pub struct WithdrawalData {
+pub struct WithdrawalParams {
     /// Hash of the withdrawal transaction.
     pub tx_hash: H256,
 
@@ -79,31 +97,6 @@ pub struct WithdrawalData {
     /// Block number on l2 withdrawal transaction happened in.
     pub l2_block_number: u64,
 
-    /// The parameters.
-    pub params: WithdrawalParams,
-}
-
-impl WithdrawalData {
-    /// Convert `WithdrawalData` into a `RequestFinalizeWithdrawal` given a gas limit.
-    pub fn into_request_with_gaslimit(
-        self,
-        withdrawal_gas_limit: U256,
-    ) -> RequestFinalizeWithdrawal {
-        RequestFinalizeWithdrawal {
-            l_2_block_number: self.params.l1_batch_number.as_u64().into(),
-            l_2_message_index: self.params.l2_message_index.into(),
-            l_2_tx_number_in_block: self.params.l2_tx_number_in_block,
-            message: self.params.message,
-            merkle_proof: self.params.proof,
-            is_eth: is_eth(self.params.sender),
-            gas: withdrawal_gas_limit,
-        }
-    }
-}
-
-/// Withdrawal params
-#[derive(Debug, Clone)]
-pub struct WithdrawalParams {
     /// The number of batch on L1
     pub l1_batch_number: U64,
 
@@ -318,6 +311,12 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .collect();
 
         Ok(Some(WithdrawalParams {
+            tx_hash: withdrawal_hash,
+            event_index_in_tx: index as u32,
+            l2_block_number: log
+                .block_number
+                .expect("log always has a block number; qed")
+                .as_u64(),
             l1_batch_number: log.l1_batch_number.unwrap(),
             l2_message_index,
             l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,

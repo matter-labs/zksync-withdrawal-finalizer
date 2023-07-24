@@ -11,7 +11,7 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{Connection, PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalData, WithdrawalEvent, WithdrawalParams};
+use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalParams};
 
 mod error;
 mod utils;
@@ -567,7 +567,7 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
 }
 
 /// Adds withdrawal information to the `finalization_data` table.
-pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalData]) -> Result<()> {
+pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(wd.len());
     let mut event_index_in_txs = Vec::with_capacity(wd.len());
     let mut l2_block_number = Vec::with_capacity(wd.len());
@@ -582,12 +582,12 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalData]) -> Resul
         tx_hashes.push(d.tx_hash.0.to_vec());
         event_index_in_txs.push(d.event_index_in_tx as i32);
         l2_block_number.push(d.l2_block_number as i64);
-        l1_batch_number.push(d.params.l1_batch_number.as_u64() as i64);
-        l2_message_index.push(d.params.l2_message_index as i32);
-        l2_tx_number_in_block.push(d.params.l2_tx_number_in_block as i32);
-        message.push(d.params.message.to_vec());
-        sender.push(d.params.sender.0.to_vec());
-        proof.push(bincode::serialize(&d.params.proof).unwrap());
+        l1_batch_number.push(d.l1_batch_number.as_u64() as i64);
+        l2_message_index.push(d.l2_message_index as i32);
+        l2_tx_number_in_block.push(d.l2_tx_number_in_block as i32);
+        message.push(d.message.to_vec());
+        sender.push(d.sender.0.to_vec());
+        proof.push(bincode::serialize(&d.proof).unwrap());
     });
 
     let started_at = Instant::now();
@@ -701,7 +701,7 @@ pub async fn get_withdrawals_with_no_data(
 }
 
 /// Get the earliest withdrawals never attempted to be finalized before
-pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalData>> {
+pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalParams>> {
     let data = sqlx::query!(
         "
         SELECT
@@ -728,19 +728,17 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|record| WithdrawalData {
+    .map(|record| WithdrawalParams {
         tx_hash: H256::from_slice(&record.tx_hash),
         event_index_in_tx: record.event_index_in_tx as u32,
         l2_block_number: record.l2_block_number as u64,
-        params: WithdrawalParams {
-            l1_batch_number: record.l1_batch_number.into(),
-            l2_message_index: record.l2_message_index as u32,
-            l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
-            message: record.message.into(),
-            sender: Address::from_slice(&record.sender),
-            proof: bincode::deserialize(&record.proof)
-                .expect("storage contains data correctly serialized by bincode; qed"),
-        },
+        l1_batch_number: record.l1_batch_number.into(),
+        l2_message_index: record.l2_message_index as u32,
+        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+        message: record.message.into(),
+        sender: Address::from_slice(&record.sender),
+        proof: bincode::deserialize(&record.proof)
+            .expect("storage contains data correctly serialized by bincode; qed"),
     })
     .collect();
 
