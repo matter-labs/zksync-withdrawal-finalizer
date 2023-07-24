@@ -32,12 +32,18 @@
         "ordinal": 5,
         "name": "is_finalized",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "id",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": []
     },
     "nullable": [
+      false,
       false,
       false,
       false,

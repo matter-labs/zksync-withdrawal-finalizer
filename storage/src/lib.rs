@@ -566,10 +566,19 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     Ok(())
 }
 
+#[allow(missing_docs)]
+#[derive(Debug)]
+pub struct WithdrawalWithBlock {
+    pub key: WithdrawalKey,
+    pub id: u64,
+    pub l2_block_number: u64,
+}
+
 /// Adds withdrawal information to the `finalization_data` table.
 pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(wd.len());
     let mut event_index_in_txs = Vec::with_capacity(wd.len());
+    let mut ids = Vec::with_capacity(wd.len());
     let mut l2_block_number = Vec::with_capacity(wd.len());
     let mut l1_batch_number = Vec::with_capacity(wd.len());
     let mut l2_message_index = Vec::with_capacity(wd.len());
@@ -581,6 +590,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
     wd.iter().for_each(|d| {
         tx_hashes.push(d.tx_hash.0.to_vec());
         event_index_in_txs.push(d.event_index_in_tx as i32);
+        ids.push(d.id as i64);
         l2_block_number.push(d.l2_block_number as i64);
         l1_batch_number.push(d.l1_batch_number.as_u64() as i64);
         l2_message_index.push(d.l2_message_index as i32);
@@ -598,6 +608,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         (
             tx_hash,
             event_index_in_tx,
+            id,
             l2_block_number,
             l1_batch_number,
             l2_message_index,
@@ -609,6 +620,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         SELECT
             u.tx_hash,
             u.event_index_in_tx,
+            u.id,
             u.l2_block_number,
             u.l1_batch_number,
             u.l2_message_index,
@@ -621,14 +633,16 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             $2::integer[],
             $3::bigint[],
             $4::bigint[],
-            $5::integer[],
+            $5::bigint[],
             $6::integer[],
-            $7::bytea[],
+            $7::integer[],
             $8::bytea[],
-            $9::bytea[]
+            $9::bytea[],
+            $10::bytea[]
         ) AS u(
             tx_hash,
             event_index_in_tx,
+            id,
             l2_block_number,
             l1_batch_number,
             l2_message_index,
@@ -641,6 +655,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         ",
         &tx_hashes,
         &event_index_in_txs,
+        &ids,
         &l2_block_number,
         &l1_batch_number,
         &l2_message_index,
@@ -665,20 +680,20 @@ pub async fn get_withdrawals_with_no_data(
     pool: &PgPool,
     from_block: u64,
     limit_by: u64,
-) -> Result<Vec<(H256, u16, u64)>> {
+) -> Result<Vec<WithdrawalWithBlock>> {
     let withdrawals = sqlx::query!(
         "
-        WITH max_executed AS (SELECT MAX(l2_block_number)
+        WITH max_committed AS (SELECT MAX(l2_block_number)
                 FROM l2_blocks
-                WHERE execute_l1_block_number IS NOT NULL),
-             max_seen AS (SELECT MAX(l2_block_number)
+                WHERE commit_l1_block_number IS NOT NULL),
+             max_seen AS (SELECT MAX(id)
                 FROM finalization_data)
-        SELECT tx_hash,event_index_in_tx,l2_block_number
-        FROM withdrawals,max_executed,max_seen
+        SELECT tx_hash,event_index_in_tx,id,l2_block_number
+        FROM withdrawals,max_committed,max_seen
         WHERE
-            l2_block_number > COALESCE(max_seen.max, 1)
+            id > COALESCE(max_seen.max, 1)
             AND l2_block_number > $1
-            AND l2_block_number <= max_executed.max
+            AND l2_block_number <= max_committed.max
         ORDER BY l2_block_number
         LIMIT $2
         ",
@@ -688,12 +703,13 @@ pub async fn get_withdrawals_with_no_data(
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|r| {
-        (
-            H256::from_slice(&r.tx_hash),
-            r.event_index_in_tx as u16,
-            r.l2_block_number as u64,
-        )
+    .map(|r| WithdrawalWithBlock {
+        key: WithdrawalKey {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            event_index_in_tx: r.event_index_in_tx as u32,
+        },
+        id: r.id as u64,
+        l2_block_number: r.l2_block_number as u64,
     })
     .collect();
 
@@ -707,6 +723,7 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
         SELECT
             tx_hash,
             event_index_in_tx,
+            id,
             l2_block_number,
             l1_batch_number,
             l2_message_index,
@@ -731,6 +748,7 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     .map(|record| WithdrawalParams {
         tx_hash: H256::from_slice(&record.tx_hash),
         event_index_in_tx: record.event_index_in_tx as u32,
+        id: record.id as u64,
         l2_block_number: record.l2_block_number as u64,
         l1_batch_number: record.l1_batch_number.into(),
         l2_message_index: record.l2_message_index as u32,

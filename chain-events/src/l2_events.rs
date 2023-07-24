@@ -322,8 +322,6 @@ impl L2EventsListener {
             WithdrawalFilter::signature(),
         ];
 
-        let tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
-
         vlog::debug!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
         vlog::debug!("from_block {from_block:?}");
 
@@ -344,6 +342,8 @@ impl L2EventsListener {
             )
             .await?;
         }
+
+        let tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
 
         let past_filter = Filter::new()
             .from_block(from_block)

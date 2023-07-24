@@ -86,7 +86,7 @@ impl WithdrawalParams {
 }
 
 /// A key that uniquely identifies each withdrawal
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct WithdrawalKey {
     /// A transaction in which the withdrawal has happened
     pub tx_hash: H256,
@@ -103,6 +103,11 @@ pub struct WithdrawalParams {
 
     /// Event index in the transaction.
     pub event_index_in_tx: u32,
+
+    /// ID serial number.
+    ///
+    /// A monotonically increasing counter for every withdrawal.
+    pub id: u64,
 
     /// Block number on l2 withdrawal transaction happened in.
     pub l2_block_number: u64,
@@ -333,6 +338,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         Ok(Some(WithdrawalParams {
             tx_hash: withdrawal_hash,
             event_index_in_tx: index as u32,
+            id: 0,
             l2_block_number: log
                 .block_number
                 .expect("log always has a block number; qed")

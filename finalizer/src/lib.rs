@@ -386,10 +386,17 @@ where
 
         let hash_and_index: Vec<_> = newly_executed_withdrawals
             .iter()
-            .map(|p| (p.0, p.1))
+            .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
             .collect();
 
-        let params = request_finalize_params(&middleware, &hash_and_index).await?;
+        let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
+
+        for (param, id) in params
+            .iter_mut()
+            .zip(newly_executed_withdrawals.iter().map(|v| v.id))
+        {
+            param.id = id;
+        }
 
         storage::add_withdrawals_data(&pool, &params).await?;
     }
