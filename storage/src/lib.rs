@@ -16,7 +16,7 @@ use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, Withd
 mod error;
 mod utils;
 
-use utils::{bigdecimal_to_u256, u256_to_big_decimal};
+use utils::u256_to_big_decimal;
 
 pub use error::{Error, Result};
 
@@ -29,9 +29,6 @@ pub struct StoredWithdrawal {
 
     /// Index of this event within the transaction
     pub index_in_tx: usize,
-
-    /// If the event is finalized
-    pub is_finalized: bool,
 }
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
@@ -229,7 +226,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
-    let mut is_finalized = Vec::with_capacity(events.len());
 
     events.iter().for_each(|sw| {
         tx_hashes.push(sw.event.tx_hash.0.to_vec());
@@ -237,7 +233,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         tokens.push(sw.event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(sw.event.amount));
         indices_in_tx.push(sw.index_in_tx as i32);
-        is_finalized.push(sw.is_finalized);
     });
 
     let started_at = Instant::now();
@@ -250,24 +245,21 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
             l2_block_number,
             token,
             amount,
-            event_index_in_tx,
-            is_finalized
+            event_index_in_tx
         )
         SELECT
             u.tx_hash,
             u.l2_block_number,
             u.token,
             u.amount,
-            u.index_in_tx,
-            u.is_finalized
+            u.index_in_tx
         FROM UNNEST(
             $1::bytea[],
             $2::bigint[],
             $3::bytea[],
             $4::numeric[],
-            $5::integer[],
-            $6::boolean[]
-        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx, is_finalized)
+            $5::integer[]
+        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
         ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         &tx_hashes,
@@ -275,7 +267,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         &tokens,
         &amounts,
         &indices_in_tx,
-        &is_finalized,
     )
     .execute(conn)
     .await?;
@@ -350,84 +341,6 @@ pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<
     );
 
     Ok(res)
-}
-
-/// Get all withdrawals that are not finalized yet
-pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<StoredWithdrawal>> {
-    let started_at = Instant::now();
-
-    let res = sqlx::query!(
-        "
-        SELECT * FROM withdrawals
-        WHERE NOT is_finalized
-        ORDER BY l2_block_number ASC
-        LIMIT 30
-        "
-    )
-    .fetch_all(conn)
-    .await?
-    .into_iter()
-    .map(|r| StoredWithdrawal {
-        event: WithdrawalEvent {
-            tx_hash: H256::from_slice(&r.tx_hash),
-            block_number: r.l2_block_number as u64,
-            token: H160::from_slice(&r.token),
-            amount: bigdecimal_to_u256(r.amount),
-        },
-        index_in_tx: r.event_index_in_tx as usize,
-        is_finalized: r.is_finalized,
-    })
-    .collect();
-
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "unfinalized_withdrawals");
-
-    Ok(res)
-}
-
-/// Update the status of a set of withdrawals to finalized.
-pub async fn update_withdrawals_to_finalized(
-    conn: &mut PgConnection,
-    tx_hashes_and_indices_in_tx: &[WithdrawalKey],
-) -> Result<()> {
-    let tx_hashes: Vec<_> = tx_hashes_and_indices_in_tx
-        .iter()
-        .map(|h| h.tx_hash.0.to_vec())
-        .collect();
-
-    let event_indices_in_tx: Vec<_> = tx_hashes_and_indices_in_tx
-        .iter()
-        .map(|h| h.event_index_in_tx as i32)
-        .collect();
-
-    let started_at = Instant::now();
-
-    sqlx::query!(
-        "
-        UPDATE withdrawals
-            SET is_finalized = true
-        FROM
-            (
-                SELECT
-                    UNNEST($1::bytea[]) as tx_hash,
-                    UNNEST($2::integer[]) as event_index_in_tx
-            ) as u
-        WHERE
-            withdrawals.tx_hash = u.tx_hash
-        AND
-            withdrawals.event_index_in_tx = u.event_index_in_tx
-        ",
-        &tx_hashes,
-        &event_indices_in_tx,
-    )
-    .execute(conn)
-    .await?;
-
-    metrics::histogram!(
-        "watcher.storage.transactions.update_withdrawals_to_finalized",
-        started_at.elapsed()
-    );
-
-    Ok(())
 }
 
 /// Adds a `L2ToL1Event` set to the DB.

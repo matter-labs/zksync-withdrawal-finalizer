@@ -207,12 +207,9 @@ where
         let mut stored_withdrawals = vec![];
 
         for (event, index) in withdrawals_vec.into_iter() {
-            let is_finalized = false;
-
             stored_withdrawals.push(StoredWithdrawal {
                 event,
                 index_in_tx: index,
-                is_finalized,
             });
         }
 

@@ -1,3 +1,4 @@
+ALTER TABLE withdrawals DROP COLUMN is_finalized;
 ALTER TABLE withdrawals ADD id BIGSERIAL NOT NULL UNIQUE;
 
 CREATE TABLE finalization_data (
