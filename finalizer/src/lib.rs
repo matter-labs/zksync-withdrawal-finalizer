@@ -105,17 +105,16 @@ where
         Ok(())
     }
 
-    async fn predict_fails(
+    async fn predict_fails<'a, W: Iterator<Item = &'a WithdrawalParams>>(
         &mut self,
-        withdrawals: &[WithdrawalParams],
+        withdrawals: W,
     ) -> Result<Vec<FinalizeResult>> {
-        vlog::debug!("predicting results for withdrawals: {withdrawals:?}");
-
         let w: Vec<_> = withdrawals
-            .iter()
             .cloned()
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
+
+        vlog::debug!("predicting results for withdrawals: {w:?}");
 
         Ok(self
             .finalizer_contract

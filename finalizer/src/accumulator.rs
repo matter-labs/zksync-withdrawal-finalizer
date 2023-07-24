@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 
 use ethers::types::U256;
 
@@ -13,18 +13,22 @@ pub struct WithdrawalsAccumulator {
     tx_fee_limit: U256,
     batch_finalization_gas_limit: U256,
     one_withdrawal_gas_limit: U256,
-    withdrawals: Vec<WithdrawalParams>,
+    // key: (l_2_block_number, l_2_message_index)
+    withdrawals: BTreeMap<(u64, u64), WithdrawalParams>,
 }
 
 impl WithdrawalsAccumulator {
     /// take withdrawals
     pub fn take_withdrawals(&mut self) -> Vec<WithdrawalParams> {
         std::mem::take(&mut self.withdrawals)
+            .into_iter()
+            .map(|v| v.1)
+            .collect()
     }
 
     /// Get a reference to a current set of withdrawals
-    pub fn withdrawals(&self) -> &[WithdrawalParams] {
-        &self.withdrawals
+    pub fn withdrawals(&self) -> impl Iterator<Item = &WithdrawalParams> {
+        self.withdrawals.values()
     }
 
     /// Remove unsuccessful withdrawals by returned results.
@@ -33,21 +37,13 @@ impl WithdrawalsAccumulator {
         unsuccessful: &[FinalizeResult],
     ) -> Vec<WithdrawalParams> {
         let mut result = Vec::with_capacity(unsuccessful.len());
-        let unsuccessful_set: HashSet<_> = unsuccessful
-            .iter()
-            .map(|r| (r.l_2_block_number, r.l_2_message_index))
-            .collect();
 
-        let mut i = 0;
-
-        while i < self.withdrawals.len() {
-            if unsuccessful_set.contains(&(
-                self.withdrawals[i].l1_batch_number.as_u64().into(),
-                self.withdrawals[i].l2_message_index.into(),
-            )) {
-                result.push(self.withdrawals.remove(i));
-            } else {
-                i += 1;
+        for u in unsuccessful {
+            if let Some(wp) = self
+                .withdrawals
+                .remove(&(u.l_2_block_number.as_u64(), u.l_2_message_index.as_u64()))
+            {
+                result.push(wp);
             }
         }
 
@@ -66,7 +62,7 @@ impl WithdrawalsAccumulator {
             tx_fee_limit,
             batch_finalization_gas_limit,
             one_withdrawal_gas_limit,
-            withdrawals: Vec::new(),
+            withdrawals: BTreeMap::new(),
         }
     }
 
@@ -76,7 +72,10 @@ impl WithdrawalsAccumulator {
     ///
     /// * `request` A finalization request.
     pub fn add_withdrawal(&mut self, data: WithdrawalParams) {
-        self.withdrawals.push(data);
+        self.withdrawals.insert(
+            (data.l1_batch_number.as_u64(), data.l2_message_index.into()),
+            data,
+        );
     }
 
     /// Get estimated gas consumption of the current set.
