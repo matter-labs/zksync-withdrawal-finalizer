@@ -521,7 +521,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         (
             tx_hash,
             event_index_in_tx,
-            id,
+            withdrawal_id,
             l2_block_number,
             l1_batch_number,
             l2_message_index,
@@ -599,7 +599,7 @@ pub async fn get_withdrawals_with_no_data(
         WITH max_committed AS (SELECT MAX(l2_block_number)
                 FROM l2_blocks
                 WHERE commit_l1_block_number IS NOT NULL),
-             max_seen AS (SELECT MAX(id)
+             max_seen AS (SELECT MAX(withdrawal_id)
                 FROM finalization_data)
         SELECT tx_hash,event_index_in_tx,id,l2_block_number
         FROM withdrawals,max_committed,max_seen
@@ -636,7 +636,7 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
         SELECT
             tx_hash,
             event_index_in_tx,
-            id,
+            withdrawal_id,
             l2_block_number,
             l1_batch_number,
             l2_message_index,
@@ -661,7 +661,7 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     .map(|record| WithdrawalParams {
         tx_hash: H256::from_slice(&record.tx_hash),
         event_index_in_tx: record.event_index_in_tx as u32,
-        id: record.id as u64,
+        id: record.withdrawal_id as u64,
         l2_block_number: record.l2_block_number as u64,
         l1_batch_number: record.l1_batch_number.into(),
         l2_message_index: record.l2_message_index as u32,
