@@ -28,6 +28,9 @@ use crate::error::{Error, Result};
 mod accumulator;
 mod error;
 
+/// A limit to cap a transaction fee (in ether) for safety reasons.
+const TX_FEE_LIMIT: f64 = 0.8;
+
 /// Finalizer.
 pub struct Finalizer<M1, M2> {
     pgpool: PgPool,
@@ -69,7 +72,7 @@ where
         l1_bridge: IL1Bridge<M>,
     ) -> Self {
         let tx_fee_limit =
-            ethers::utils::parse_ether("0.8").expect("0.8 ether is a parsable amount; qed");
+            ethers::utils::parse_ether(TX_FEE_LIMIT).expect("0.8 ether is a parsable amount; qed");
 
         Self {
             pgpool,
