@@ -119,7 +119,7 @@ where
 
         Ok(self
             .finalizer_contract
-            .finalize_withdrawals(w.clone())
+            .finalize_withdrawals(w)
             .call()
             .await?
             .into_iter()
