@@ -85,6 +85,16 @@ impl WithdrawalParams {
     }
 }
 
+/// A key that uniquely identifies each withdrawal
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct WithdrawalKey {
+    /// A transaction in which the withdrawal has happened
+    pub tx_hash: H256,
+
+    /// Event index of withdrawal within the transaction
+    pub event_index_in_tx: u32,
+}
+
 /// Withdrawal params
 #[derive(Debug, Clone)]
 pub struct WithdrawalParams {
@@ -114,6 +124,16 @@ pub struct WithdrawalParams {
 
     /// Proof
     pub proof: Vec<[u8; 32]>,
+}
+
+impl WithdrawalParams {
+    /// Get the key of this withdrawal.
+    pub fn key(&self) -> WithdrawalKey {
+        WithdrawalKey {
+            tx_hash: self.tx_hash,
+            event_index_in_tx: self.event_index_in_tx,
+        }
+    }
 }
 
 /// A middleware for interacting with Zksync node.

@@ -5,7 +5,7 @@
 
 //! Finalization logic implementation.
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
@@ -17,6 +17,7 @@ use sqlx::PgPool;
 
 use client::{
     is_eth, withdrawal_finalizer::codegen::withdrawal_finalizer::Result as FinalizeResult,
+    WithdrawalKey,
 };
 use client::{
     l1bridge::codegen::IL1Bridge, withdrawal_finalizer::codegen::WithdrawalFinalizer,
@@ -150,10 +151,7 @@ where
         let pending_tx = tx.send().await;
 
         // Turn actual withdrawals into info to update db with.
-        let withdrawals = withdrawals
-            .into_iter()
-            .map(|w| (w.tx_hash, w.event_index_in_tx))
-            .collect::<Vec<_>>();
+        let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
         let pending_tx = match pending_tx {
             Ok(e) => e,
@@ -264,16 +262,18 @@ where
         }
 
         let predicted = std::mem::take(&mut self.unsuccessful);
-        let are_finalized = self.are_withdrawals_finalized(&predicted).await?;
+        let are_finalized = self.get_finalized_withdrawals(&predicted).await?;
 
         let mut already_finalized = vec![];
         let mut unsuccessful = vec![];
 
-        for i in 0..are_finalized.len() {
-            if are_finalized[i] {
-                already_finalized.push((predicted[i].tx_hash, predicted[i].event_index_in_tx));
+        for p in predicted {
+            let key = p.key();
+
+            if are_finalized.contains(&key) {
+                already_finalized.push(key);
             } else {
-                unsuccessful.push((predicted[i].tx_hash, predicted[i].event_index_in_tx));
+                unsuccessful.push(key);
             }
         }
 
@@ -302,10 +302,10 @@ where
         Ok(())
     }
 
-    async fn are_withdrawals_finalized(
+    async fn get_finalized_withdrawals(
         &self,
         withdrawals: &[WithdrawalParams],
-    ) -> Result<Vec<bool>> {
+    ) -> Result<HashSet<WithdrawalKey>> {
         let results: Result<Vec<_>> =
             futures::future::join_all(withdrawals.iter().map(|wd| async move {
                 let l1_batch_number = U256::from(wd.l1_batch_number.as_u64());
@@ -331,7 +331,14 @@ where
 
         let results = results?;
 
-        Ok(results)
+        let mut set = HashSet::new();
+        for i in 0..results.len() {
+            if results[i] {
+                set.insert(withdrawals[i].key());
+            }
+        }
+
+        Ok(set)
     }
 }
 

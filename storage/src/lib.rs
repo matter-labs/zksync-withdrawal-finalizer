@@ -11,7 +11,7 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{Connection, PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalParams};
+use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, WithdrawalParams};
 
 mod error;
 mod utils;
@@ -387,16 +387,16 @@ pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<Stor
 /// Update the status of a set of withdrawals to finalized.
 pub async fn update_withdrawals_to_finalized(
     conn: &mut PgConnection,
-    tx_hashes_and_indices_in_tx: &[(H256, usize)],
+    tx_hashes_and_indices_in_tx: &[WithdrawalKey],
 ) -> Result<()> {
     let tx_hashes: Vec<_> = tx_hashes_and_indices_in_tx
         .iter()
-        .map(|h| h.0 .0.to_vec())
+        .map(|h| h.tx_hash.0.to_vec())
         .collect();
 
     let event_indices_in_tx: Vec<_> = tx_hashes_and_indices_in_tx
         .iter()
-        .map(|h| h.1 as i32)
+        .map(|h| h.event_index_in_tx as i32)
         .collect();
 
     let started_at = Instant::now();
@@ -748,15 +748,15 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
 /// Set status of a set of withdrawals in `finalization_data` to finalized
 pub async fn finalization_data_set_finalized_in_tx(
     pool: &PgPool,
-    withdrawals: &[(H256, u32)],
+    withdrawals: &[WithdrawalKey],
     tx_hash: H256,
 ) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(withdrawals.len());
     let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
 
     withdrawals.iter().for_each(|w| {
-        tx_hashes.push(w.0 .0.to_vec());
-        event_index_in_tx.push(w.1 as i32);
+        tx_hashes.push(w.tx_hash.0.to_vec());
+        event_index_in_tx.push(w.event_index_in_tx as i32);
     });
 
     sqlx::query!(
@@ -787,14 +787,14 @@ pub async fn finalization_data_set_finalized_in_tx(
 /// of withdrawals
 pub async fn inc_unsuccessful_finalization_attempts(
     pool: &PgPool,
-    withdrawals: &[(H256, u32)],
+    withdrawals: &[WithdrawalKey],
 ) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(withdrawals.len());
     let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
 
     withdrawals.iter().for_each(|w| {
-        tx_hashes.push(w.0 .0.to_vec());
-        event_index_in_tx.push(w.1 as i32);
+        tx_hashes.push(w.tx_hash.0.to_vec());
+        event_index_in_tx.push(w.event_index_in_tx as i32);
     });
 
     sqlx::query!(
