@@ -33,7 +33,7 @@ pub struct Finalizer<M1, M2> {
     pgpool: PgPool,
     one_withdrawal_gas_limit: U256,
     batch_finalization_gas_limit: U256,
-    contract: WithdrawalFinalizer<M1>,
+    finalizer_contract: WithdrawalFinalizer<M1>,
     from_l2_block: u64,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
@@ -69,7 +69,7 @@ where
             pgpool,
             one_withdrawal_gas_limit,
             batch_finalization_gas_limit,
-            contract,
+            finalizer_contract: contract,
             from_l2_block,
             zksync_contract,
             l1_bridge,
@@ -118,7 +118,7 @@ where
             .collect();
 
         Ok(self
-            .contract
+            .finalizer_contract
             .finalize_withdrawals(w.clone())
             .call()
             .await?
@@ -136,7 +136,7 @@ where
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        let tx = self.contract.finalize_withdrawals(w);
+        let tx = self.finalizer_contract.finalize_withdrawals(w);
         let pending_tx = tx.send().await;
 
         // Turn actual withdrawals into info to update db with.
@@ -184,7 +184,7 @@ where
 
     async fn new_accumulator(&self) -> Result<WithdrawalsAccumulator> {
         let gas_price = self
-            .contract
+            .finalizer_contract
             .client()
             .get_gas_price()
             .await
