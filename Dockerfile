@@ -6,7 +6,7 @@ COPY . .
 
 run cargo build --release
 
-FROM ubuntu AS runtime
+FROM debian:buster-slim AS runtime
 COPY --from=builder /app/target/release/withdrawal-finalizer /usr/local/bin/
 
 ENTRYPOINT ["/usr/local/bin/withdrawal-finalizer"]
