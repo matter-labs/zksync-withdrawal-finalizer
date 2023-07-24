@@ -1,49 +1,31 @@
 use std::sync::Arc;
 
 use chain_events::L2Event;
-use ethers::{
-    providers::{JsonRpcClient, Middleware},
-    types::{Address, H256},
-};
+use ethers::providers::{JsonRpcClient, Middleware};
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 use tokio::pin;
 
-use client::{
-    l1bridge::codegen::IL1Bridge,
-    zksync_contract::{codegen::IZkSync, L2ToL1Event},
-    BlockEvent, WithdrawalEvent, ZksyncMiddleware,
-};
+use client::{zksync_contract::L2ToL1Event, BlockEvent, WithdrawalEvent, ZksyncMiddleware};
 
 use crate::Result;
 
-pub struct WithdrawalFinalizer<M1, M2> {
+pub struct WithdrawalFinalizer<M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
-    l1_bridge: IL1Bridge<M1>,
-    zksync_contract: IZkSync<M1>,
 }
 
-impl<M1, M2> WithdrawalFinalizer<M1, M2>
+impl<M2> WithdrawalFinalizer<M2>
 where
-    M1: Middleware,
-    <M1 as Middleware>::Provider: JsonRpcClient,
     M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        l2_provider: Arc<M2>,
-        pgpool: PgPool,
-        zksync_contract: IZkSync<M1>,
-        l1_bridge: IL1Bridge<M1>,
-    ) -> Self {
+    pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
         Self {
             l2_provider,
             pgpool,
-            zksync_contract,
-            l1_bridge,
         }
     }
 
@@ -225,9 +207,7 @@ where
         let mut stored_withdrawals = vec![];
 
         for (event, index) in withdrawals_vec.into_iter() {
-            let is_finalized = self
-                .is_withdrawal_finalized(event.tx_hash, index, event.token)
-                .await?;
+            let is_finalized = false;
 
             stored_withdrawals.push(StoredWithdrawal {
                 event,
@@ -239,22 +219,5 @@ where
         let mut pgconn = self.pgpool.acquire().await?;
         storage::add_withdrawals(&mut pgconn, &stored_withdrawals).await?;
         Ok(())
-    }
-
-    async fn is_withdrawal_finalized(
-        &self,
-        withdrawal_hash: H256,
-        index: usize,
-        sender: Address,
-    ) -> Result<bool> {
-        Ok(client::is_withdrawal_finalized(
-            withdrawal_hash,
-            index,
-            sender,
-            &self.zksync_contract,
-            &self.l1_bridge,
-            &self.l2_provider,
-        )
-        .await?)
     }
 }

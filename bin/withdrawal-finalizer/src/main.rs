@@ -236,12 +236,7 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l2.clone(),
-        pgpool.clone(),
-        zksync_contract.clone(),
-        l1_bridge.clone(),
-    );
+    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2.clone(), pgpool.clone());
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,
