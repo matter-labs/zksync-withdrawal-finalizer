@@ -96,7 +96,7 @@ where
     where
         M2: ZksyncMiddleware + 'static,
     {
-        let migrator_handle = tokio::spawn(migrator_loop(
+        let migrator_handle = tokio::spawn(params_fetcher_loop(
             self.pgpool.clone(),
             middleware,
             self.from_l2_block,
@@ -362,7 +362,7 @@ where
 // Continiously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
-async fn migrator_loop<M2>(pool: PgPool, middleware: M2, from_l2_block: u64) -> Result<()>
+async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2, from_l2_block: u64) -> Result<()>
 where
     M2: ZksyncMiddleware,
 {
