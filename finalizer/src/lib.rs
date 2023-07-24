@@ -72,8 +72,8 @@ where
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
     ) -> Self {
-        let tx_fee_limit =
-            ethers::utils::parse_ether(TX_FEE_LIMIT).expect("0.8 ether is a parsable amount; qed");
+        let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
+            .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
         Self {
             pgpool,
