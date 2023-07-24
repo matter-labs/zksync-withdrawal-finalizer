@@ -47,20 +47,26 @@ pub struct Finalizer<M1, M2> {
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
 const QUERY_DB_PAGINATION_LIMIT: u64 = 50;
 
-impl<M1, M2> Finalizer<M1, M2>
+impl<S, M> Finalizer<S, M>
 where
-    M1: Middleware + 'static,
-    M2: Middleware + 'static,
+    S: Middleware + 'static,
+    M: Middleware + 'static,
 {
-    /// Create a new `Finalizer`.
+    /// Create a new [`Finalizer`].
+    ///
+    /// * `S` is expected to be a [`Middleware`] instance equipped with [`SignerMiddleware`]
+    /// * `M` is expected to be an ordinary read-only middleware to read information from L1.
+    ///
+    /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
+    /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
     pub fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
-        contract: WithdrawalFinalizer<M1>,
+        finalizer_contract: WithdrawalFinalizer<S>,
         from_l2_block: u64,
-        zksync_contract: IZkSync<M2>,
-        l1_bridge: IL1Bridge<M2>,
+        zksync_contract: IZkSync<M>,
+        l1_bridge: IL1Bridge<M>,
     ) -> Self {
         let tx_fee_limit =
             ethers::utils::parse_ether("0.8").expect("0.8 ether is a parsable amount; qed");
@@ -69,7 +75,7 @@ where
             pgpool,
             one_withdrawal_gas_limit,
             batch_finalization_gas_limit,
-            finalizer_contract: contract,
+            finalizer_contract,
             from_l2_block,
             zksync_contract,
             l1_bridge,
@@ -80,10 +86,12 @@ where
         }
     }
 
-    /// `Finalizer` main loop.
-    pub async fn run<M3>(self, middleware: M3) -> Result<()>
+    /// [`Finalizer`] main loop.
+    ///
+    /// `M2` is expected to be an [`ZksyncMiddleware`] to connect to L2.
+    pub async fn run<M2>(self, middleware: M2) -> Result<()>
     where
-        M3: ZksyncMiddleware + 'static,
+        M2: ZksyncMiddleware + 'static,
     {
         let migrator_handle = tokio::spawn(migrator_loop(
             self.pgpool.clone(),
@@ -200,8 +208,8 @@ where
 
     async fn finalizer_loop(mut self) -> Result<()>
     where
-        M1: Middleware,
-        M2: Middleware,
+        S: Middleware,
+        M: Middleware,
     {
         loop {
             let try_finalize_these =
