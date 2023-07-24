@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.21](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.20...v0.1.21) (2023-07-24)
+
+
+### Features
+
+* do not ship build artifacts with docker image ([#57](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/57)) ([9271d6d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/9271d6d8ed7d9c7ade230546f5f8e31e459f4fe7))
+
+
+### Bug Fixes
+
+* try fix releaseplease borked pr ([#60](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/60)) ([8dbc9c8](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/8dbc9c880305fa0971ce4e9f1df1e7b054118aad))
+
 ## [0.1.20](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.19...v0.1.20) (2023-07-15)
 
 
