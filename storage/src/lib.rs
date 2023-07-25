@@ -260,7 +260,7 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
             $4::numeric[],
             $5::integer[]
         ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
-        ON CONFLICT (tx_hash, event_index_in_tx, id) DO NOTHING
+        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         &tx_hashes,
         &block_numbers,
@@ -489,8 +489,6 @@ pub struct WithdrawalWithBlock {
 
 /// Adds withdrawal information to the `finalization_data` table.
 pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Result<()> {
-    let mut tx_hashes = Vec::with_capacity(wd.len());
-    let mut event_index_in_txs = Vec::with_capacity(wd.len());
     let mut ids = Vec::with_capacity(wd.len());
     let mut l2_block_number = Vec::with_capacity(wd.len());
     let mut l1_batch_number = Vec::with_capacity(wd.len());
@@ -501,8 +499,6 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
     let mut proof = Vec::with_capacity(wd.len());
 
     wd.iter().for_each(|d| {
-        tx_hashes.push(d.tx_hash.0.to_vec());
-        event_index_in_txs.push(d.event_index_in_tx as i32);
         ids.push(d.id as i64);
         l2_block_number.push(d.l2_block_number as i64);
         l1_batch_number.push(d.l1_batch_number.as_u64() as i64);
@@ -519,8 +515,6 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         "
         INSERT INTO finalization_data
         (
-            tx_hash,
-            event_index_in_tx,
             withdrawal_id,
             l2_block_number,
             l1_batch_number,
@@ -531,8 +525,6 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             proof
         )
         SELECT
-            u.tx_hash,
-            u.event_index_in_tx,
             u.id,
             u.l2_block_number,
             u.l1_batch_number,
@@ -542,19 +534,15 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             u.sender,
             u.proof
         FROM UNNEST (
-            $1::bytea[],
-            $2::integer[],
+            $1::bigint[],
+            $2::bigint[],
             $3::bigint[],
-            $4::bigint[],
-            $5::bigint[],
-            $6::integer[],
-            $7::integer[],
-            $8::bytea[],
-            $9::bytea[],
-            $10::bytea[]
+            $4::integer[],
+            $5::integer[],
+            $6::bytea[],
+            $7::bytea[],
+            $8::bytea[]
         ) AS u(
-            tx_hash,
-            event_index_in_tx,
             id,
             l2_block_number,
             l1_batch_number,
@@ -564,10 +552,8 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             sender,
             proof
         )
-        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
+        ON CONFLICT (withdrawal_id) DO NOTHING
         ",
-        &tx_hashes,
-        &event_index_in_txs,
         &ids,
         &l2_block_number,
         &l1_batch_number,
@@ -603,7 +589,7 @@ pub async fn get_withdrawals_with_no_data(
         SELECT tx_hash,event_index_in_tx,id,l2_block_number
         FROM withdrawals,max_committed,max_seen
         WHERE
-            id > COALESCE(max_seen.max, 1)
+            id >= COALESCE(max_seen.max, 1)
             AND l2_block_number <= max_committed.max
         ORDER BY l2_block_number
         LIMIT $1
@@ -631,10 +617,10 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     let data = sqlx::query!(
         "
         SELECT
-            tx_hash,
-            event_index_in_tx,
+            w.tx_hash,
+            w.event_index_in_tx,
             withdrawal_id,
-            l2_block_number,
+            finalization_data.l2_block_number,
             l1_batch_number,
             l2_message_index,
             l2_tx_number_in_block,
@@ -643,11 +629,12 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
             proof
         FROM
             finalization_data
+            JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
         WHERE
             finalization_tx IS NULL
             AND
             failed_finalization_attempts < 3
-        ORDER BY l2_block_number
+        ORDER BY finalization_data.l2_block_number
         LIMIT $1
         ",
         limit_by as i64,
@@ -697,9 +684,10 @@ pub async fn finalization_data_set_finalized_in_tx(
             UNNEST ($3::integer[]) as event_index_in_tx
         ) AS u
         WHERE
-            finalization_data.tx_hash = u.tx_hash
-            AND
-            finalization_data.event_index_in_tx = u.event_index_in_tx
+            finalization_data.withdrawal_id =
+                (SELECT id from withdrawals
+                    WHERE tx_hash = u.tx_hash
+                    AND event_index_in_tx = u.event_index_in_tx)
         ",
         &tx_hash.0.as_ref(),
         &tx_hashes,
@@ -735,9 +723,9 @@ pub async fn inc_unsuccessful_finalization_attempts(
             UNNEST ($2::integer[]) as event_index_in_tx
         ) AS u
         WHERE
-            finalization_data.tx_hash = u.tx_hash
-            AND
-            finalization_data.event_index_in_tx = u.event_index_in_tx
+            finalization_data.withdrawal_id =
+                (SELECT id FROM withdrawals WHERE tx_hash = u.tx_hash
+                 AND event_index_in_tx = u.event_index_in_tx)
         ",
         &tx_hashes,
         &event_index_in_tx,
