@@ -260,7 +260,7 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
             $4::numeric[],
             $5::integer[]
         ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
-        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
+        ON CONFLICT (tx_hash, event_index_in_tx, id) DO NOTHING
         ",
         &tx_hashes,
         &block_numbers,

@@ -1,5 +1,7 @@
 ALTER TABLE withdrawals DROP COLUMN is_finalized;
 ALTER TABLE withdrawals ADD id BIGSERIAL NOT NULL UNIQUE;
+ALTER TABLE withdrawals DROP CONSTRAINT withdrawals_pkey;
+ALTER TABLE withdrawals ADD PRIMARY KEY (tx_hash, event_index_in_tx, id);
 
 CREATE TABLE finalization_data (
     tx_hash BYTEA NOT NULL,
@@ -20,8 +22,6 @@ CREATE TABLE finalization_data (
 
     PRIMARY KEY (tx_hash, event_index_in_tx),
 
-    FOREIGN KEY (tx_hash, event_index_in_tx) REFERENCES withdrawals (tx_hash, event_index_in_tx),
-
-    FOREIGN KEY (withdrawal_id) REFERENCES withdrawals (id)
+    FOREIGN KEY (tx_hash, event_index_in_tx, withdrawal_id) REFERENCES withdrawals (tx_hash, event_index_in_tx, id)
 );
 
