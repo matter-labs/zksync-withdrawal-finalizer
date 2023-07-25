@@ -246,9 +246,10 @@ where
 
     // process withdrawals that have been predicted as unsuccessful.
     //
-    // there may be two reasons for such predictions:
-    // 1. a withdrawal is already finalized
-    // 2. a gas limit on request was too low
+    // there may be many reasons for such predictions for instance the following:
+    // * a withdrawal is already finalized
+    // * a gas limit on request was too low
+    // * erc20 has denied a tx for some internal reasons.
     async fn process_unsuccessful(&mut self) -> Result<()> {
         if self.unsuccessful.is_empty() {
             return Ok(());
