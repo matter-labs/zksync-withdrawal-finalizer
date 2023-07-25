@@ -284,7 +284,6 @@ async fn main() -> Result<()> {
         one_withdrawal_gas_limit,
         batch_finalization_gas_limit,
         contract,
-        from_l2_block,
         zksync_contract,
         l1_bridge,
     );

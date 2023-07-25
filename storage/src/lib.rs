@@ -591,7 +591,6 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
 /// Returns all previously unseen executed events after a given block
 pub async fn get_withdrawals_with_no_data(
     pool: &PgPool,
-    from_block: u64,
     limit_by: u64,
 ) -> Result<Vec<WithdrawalWithBlock>> {
     let withdrawals = sqlx::query!(
@@ -605,12 +604,10 @@ pub async fn get_withdrawals_with_no_data(
         FROM withdrawals,max_committed,max_seen
         WHERE
             id > COALESCE(max_seen.max, 1)
-            AND l2_block_number > $1
             AND l2_block_number <= max_committed.max
         ORDER BY l2_block_number
-        LIMIT $2
+        LIMIT $1
         ",
-        from_block as i64,
         limit_by as i64,
     )
     .fetch_all(pool)

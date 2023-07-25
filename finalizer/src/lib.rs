@@ -38,7 +38,6 @@ pub struct Finalizer<M1, M2> {
     one_withdrawal_gas_limit: U256,
     batch_finalization_gas_limit: U256,
     finalizer_contract: WithdrawalFinalizer<M1>,
-    from_l2_block: u64,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
     unsuccessful: Vec<WithdrawalParams>,
@@ -68,7 +67,6 @@ where
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
         finalizer_contract: WithdrawalFinalizer<S>,
-        from_l2_block: u64,
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
     ) -> Self {
@@ -80,7 +78,6 @@ where
             one_withdrawal_gas_limit,
             batch_finalization_gas_limit,
             finalizer_contract,
-            from_l2_block,
             zksync_contract,
             l1_bridge,
             unsuccessful: vec![],
@@ -97,11 +94,7 @@ where
     where
         M2: ZksyncMiddleware + 'static,
     {
-        let migrator_handle = tokio::spawn(params_fetcher_loop(
-            self.pgpool.clone(),
-            middleware,
-            self.from_l2_block,
-        ));
+        let migrator_handle = tokio::spawn(params_fetcher_loop(self.pgpool.clone(), middleware));
 
         let finalizer_handle = tokio::spawn(self.finalizer_loop());
 
@@ -369,13 +362,12 @@ where
 // Continiously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
-async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2, from_l2_block: u64) -> Result<()>
+async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2) -> Result<()>
 where
     M2: ZksyncMiddleware,
 {
     loop {
-        let newly_executed_withdrawals =
-            storage::get_withdrawals_with_no_data(&pool, from_l2_block, 50).await?;
+        let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(&pool, 50).await?;
 
         if newly_executed_withdrawals.is_empty() {
             tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;
