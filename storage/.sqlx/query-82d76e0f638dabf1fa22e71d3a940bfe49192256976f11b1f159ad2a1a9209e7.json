@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE finalization_data\n        SET failed_finalization_attempts = failed_finalization_attempts + 1\n        FROM (\n            SELECT\n            UNNEST ($1::bytea[]) as tx_hash,\n            UNNEST ($2::integer[]) as event_index_in_tx\n        ) AS u\n        WHERE\n            finalization_data.withdrawal_id =\n                (SELECT id FROM withdrawals WHERE tx_hash = u.tx_hash\n                 AND event_index_in_tx = u.event_index_in_tx)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "ByteaArray",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82d76e0f638dabf1fa22e71d3a940bfe49192256976f11b1f159ad2a1a9209e7"
+}

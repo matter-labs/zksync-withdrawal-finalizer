@@ -1350,6 +1350,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "finalizer"
+version = "0.1.11"
+dependencies = [
+ "client",
+ "ethers",
+ "futures",
+ "metrics",
+ "sqlx",
+ "storage",
+ "thiserror",
+ "tokio",
+ "vlog",
+]
+
+[[package]]
 name = "fixed-hash"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3781,6 +3796,7 @@ name = "storage"
 version = "0.1.11"
 dependencies = [
  "bigdecimal",
+ "bincode",
  "chain-events",
  "client",
  "ethers",
@@ -4759,6 +4775,7 @@ dependencies = [
  "envconfig",
  "ethers",
  "eyre",
+ "finalizer",
  "futures",
  "itertools",
  "metrics",

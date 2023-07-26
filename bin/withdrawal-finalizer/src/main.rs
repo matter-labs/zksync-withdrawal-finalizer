@@ -9,7 +9,12 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use clap::Parser;
 use envconfig::Envconfig;
-use ethers::providers::{JsonRpcClient, Middleware, Provider, Ws};
+use ethers::{
+    prelude::SignerMiddleware,
+    providers::{JsonRpcClient, Middleware, Provider, Ws},
+    signers::LocalWallet,
+    types::U256,
+};
 use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
@@ -219,7 +224,7 @@ async fn main() -> Result<()> {
 
     vlog::info!("Starting from L1 block number {from_l1_block}");
 
-    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool).await?;
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
@@ -231,12 +236,7 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(
-        client_l2,
-        pgpool,
-        zksync_contract,
-        l1_bridge,
-    );
+    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2.clone(), pgpool.clone());
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,
@@ -262,6 +262,34 @@ async fn main() -> Result<()> {
         }
     });
 
+    let wallet = config.account_private_key.parse::<LocalWallet>()?;
+
+    let client_l1_with_signer = Arc::new(SignerMiddleware::new(client_l1, wallet));
+
+    let contract = client::withdrawal_finalizer::codegen::WithdrawalFinalizer::new(
+        config.withdrawal_finalizer_addr,
+        client_l1_with_signer,
+    );
+    let batch_finalization_gas_limit = U256::from_dec_str(&config.batch_finalization_gas_limit)?;
+    let one_withdrawal_gas_limit = U256::from_dec_str(&config.one_withdrawal_gas_limit)?;
+
+    vlog::info!(
+        "finalization gas limits one: {}, batch: {}",
+        config.one_withdrawal_gas_limit,
+        config.batch_finalization_gas_limit,
+    );
+
+    let finalizer = finalizer::Finalizer::new(
+        pgpool,
+        one_withdrawal_gas_limit,
+        batch_finalization_gas_limit,
+        contract,
+        zksync_contract,
+        l1_bridge,
+    );
+
+    let actual_finalizer_handle = tokio::spawn(finalizer.run(client_l2));
+
     tokio::select! {
         r = block_events_handle => {
             vlog::error!("Block Events stream ended with {r:?}");
@@ -274,6 +302,9 @@ async fn main() -> Result<()> {
         }
         r = prometheus_exporter_handle => {
             vlog::error!("Prometheus exporter ended with {r:?}");
+        }
+        r = actual_finalizer_handle => {
+            vlog::error!("Finalizer ended with {r:?}");
         }
     }
 

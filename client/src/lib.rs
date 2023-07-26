@@ -14,16 +14,18 @@ pub use error::{Error, Result};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use ethers::{
+    abi::{ParamType, Token},
     contract::EthEvent,
     providers::{JsonRpcClient, Middleware, Provider},
-    types::{Address, Bytes, H160, H256, U64},
+    types::{Address, Bytes, H160, H256, U256, U64},
 };
 
 use l1bridge::codegen::IL1Bridge;
 use l1messenger::codegen::L1MessageSentFilter;
+use withdrawal_finalizer::codegen::RequestFinalizeWithdrawal;
 use zksync_contract::codegen::IZkSync;
 use zksync_types::{
-    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog, Token,
+    BlockDetails, L2ToL1Log, L2ToL1LogProof, Log as ZKSLog,
     TransactionReceipt as ZksyncTransactionReceipt,
 };
 
@@ -65,8 +67,51 @@ pub fn is_eth(address: Address) -> bool {
     address == ETH_TOKEN_ADDRESS || address == ETH_ADDRESS
 }
 
+impl WithdrawalParams {
+    /// Convert `WithdrawalData` into a `RequestFinalizeWithdrawal` given a gas limit.
+    pub fn into_request_with_gaslimit(
+        self,
+        withdrawal_gas_limit: U256,
+    ) -> RequestFinalizeWithdrawal {
+        RequestFinalizeWithdrawal {
+            l_2_block_number: self.l1_batch_number.as_u64().into(),
+            l_2_message_index: self.l2_message_index.into(),
+            l_2_tx_number_in_block: self.l2_tx_number_in_block,
+            message: self.message,
+            merkle_proof: self.proof,
+            is_eth: is_eth(self.sender),
+            gas: withdrawal_gas_limit,
+        }
+    }
+}
+
+/// A key that uniquely identifies each withdrawal
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub struct WithdrawalKey {
+    /// A transaction in which the withdrawal has happened
+    pub tx_hash: H256,
+
+    /// Event index of withdrawal within the transaction
+    pub event_index_in_tx: u32,
+}
+
 /// Withdrawal params
+#[derive(Debug, Clone)]
 pub struct WithdrawalParams {
+    /// Hash of the withdrawal transaction.
+    pub tx_hash: H256,
+
+    /// Event index in the transaction.
+    pub event_index_in_tx: u32,
+
+    /// ID serial number.
+    ///
+    /// A monotonically increasing counter for every withdrawal.
+    pub id: u64,
+
+    /// Block number on l2 withdrawal transaction happened in.
+    pub l2_block_number: u64,
+
     /// The number of batch on L1
     pub l1_batch_number: U64,
 
@@ -84,6 +129,16 @@ pub struct WithdrawalParams {
 
     /// Proof
     pub proof: Vec<[u8; 32]>,
+}
+
+impl WithdrawalParams {
+    /// Get the key of this withdrawal.
+    pub fn key(&self) -> WithdrawalKey {
+        WithdrawalKey {
+            tx_hash: self.tx_hash,
+            event_index_in_tx: self.event_index_in_tx,
+        }
+    }
 }
 
 /// A middleware for interacting with Zksync node.
@@ -258,16 +313,21 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             None => return Ok(None),
         };
 
-        let sender = TryInto::<[u8; 20]>::try_into(&log.topics[1].as_bytes()[..20])
-            .expect("H256 always has enough bytes to fill H160. qed")
-            .into();
+        let sender = log.topics[1].into();
 
         let proof = self
             .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
             .await?
             .expect("Log proof should be present. qed");
 
-        let message = log.data;
+        let message: Bytes = match ethers::abi::decode(&[ParamType::Bytes], &log.data)
+            .expect("log data is valid rlp data; qed")
+            .swap_remove(0)
+        {
+            Token::Bytes(b) => b.into(),
+            b => panic!("log data is expected to be rlp bytes, got {b:?}"),
+        };
+
         let l2_message_index = proof.id;
         let proof: Vec<_> = proof
             .proof
@@ -276,10 +336,17 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .collect();
 
         Ok(Some(WithdrawalParams {
+            tx_hash: withdrawal_hash,
+            event_index_in_tx: index as u32,
+            id: 0,
+            l2_block_number: log
+                .block_number
+                .expect("log always has a block number; qed")
+                .as_u64(),
             l1_batch_number: log.l1_batch_number.unwrap(),
             l2_message_index,
             l2_tx_number_in_block: l1_batch_tx_id.unwrap().as_u32() as u16,
-            message: message.0.into(),
+            message,
             sender,
             proof,
         }))

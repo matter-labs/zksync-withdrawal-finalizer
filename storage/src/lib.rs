@@ -11,12 +11,12 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{Connection, PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalEvent};
+use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, WithdrawalParams};
 
 mod error;
 mod utils;
 
-use utils::{bigdecimal_to_u256, u256_to_big_decimal};
+use utils::u256_to_big_decimal;
 
 pub use error::{Error, Result};
 
@@ -29,9 +29,6 @@ pub struct StoredWithdrawal {
 
     /// Index of this event within the transaction
     pub index_in_tx: usize,
-
-    /// If the event is finalized
-    pub is_finalized: bool,
 }
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
@@ -229,7 +226,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
-    let mut is_finalized = Vec::with_capacity(events.len());
 
     events.iter().for_each(|sw| {
         tx_hashes.push(sw.event.tx_hash.0.to_vec());
@@ -237,7 +233,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         tokens.push(sw.event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(sw.event.amount));
         indices_in_tx.push(sw.index_in_tx as i32);
-        is_finalized.push(sw.is_finalized);
     });
 
     let started_at = Instant::now();
@@ -250,24 +245,21 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
             l2_block_number,
             token,
             amount,
-            event_index_in_tx,
-            is_finalized
+            event_index_in_tx
         )
         SELECT
             u.tx_hash,
             u.l2_block_number,
             u.token,
             u.amount,
-            u.index_in_tx,
-            u.is_finalized
+            u.index_in_tx
         FROM UNNEST(
             $1::bytea[],
             $2::bigint[],
             $3::bytea[],
             $4::numeric[],
-            $5::integer[],
-            $6::boolean[]
-        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx, is_finalized)
+            $5::integer[]
+        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
         ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
         ",
         &tx_hashes,
@@ -275,7 +267,6 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         &tokens,
         &amounts,
         &indices_in_tx,
-        &is_finalized,
     )
     .execute(conn)
     .await?;
@@ -350,84 +341,6 @@ pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<
     );
 
     Ok(res)
-}
-
-/// Get all withdrawals that are not finalized yet
-pub async fn unfinalized_withdrawals(conn: &mut PgConnection) -> Result<Vec<StoredWithdrawal>> {
-    let started_at = Instant::now();
-
-    let res = sqlx::query!(
-        "
-        SELECT * FROM withdrawals
-        WHERE NOT is_finalized
-        ORDER BY l2_block_number ASC
-        LIMIT 30
-        "
-    )
-    .fetch_all(conn)
-    .await?
-    .into_iter()
-    .map(|r| StoredWithdrawal {
-        event: WithdrawalEvent {
-            tx_hash: H256::from_slice(&r.tx_hash),
-            block_number: r.l2_block_number as u64,
-            token: H160::from_slice(&r.token),
-            amount: bigdecimal_to_u256(r.amount),
-        },
-        index_in_tx: r.event_index_in_tx as usize,
-        is_finalized: r.is_finalized,
-    })
-    .collect();
-
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "unfinalized_withdrawals");
-
-    Ok(res)
-}
-
-/// Update the status of a set of withdrawals to finalized.
-pub async fn update_withdrawals_to_finalized(
-    conn: &mut PgConnection,
-    tx_hashes_and_indices_in_tx: &[(H256, usize)],
-) -> Result<()> {
-    let tx_hashes: Vec<_> = tx_hashes_and_indices_in_tx
-        .iter()
-        .map(|h| h.0 .0.to_vec())
-        .collect();
-
-    let event_indices_in_tx: Vec<_> = tx_hashes_and_indices_in_tx
-        .iter()
-        .map(|h| h.1 as i32)
-        .collect();
-
-    let started_at = Instant::now();
-
-    sqlx::query!(
-        "
-        UPDATE withdrawals
-            SET is_finalized = true
-        FROM
-            (
-                SELECT
-                    UNNEST($1::bytea[]) as tx_hash,
-                    UNNEST($2::integer[]) as event_index_in_tx
-            ) as u
-        WHERE
-            withdrawals.tx_hash = u.tx_hash
-        AND
-            withdrawals.event_index_in_tx = u.event_index_in_tx
-        ",
-        &tx_hashes,
-        &event_indices_in_tx,
-    )
-    .execute(conn)
-    .await?;
-
-    metrics::histogram!(
-        "watcher.storage.transactions.update_withdrawals_to_finalized",
-        started_at.elapsed()
-    );
-
-    Ok(())
 }
 
 /// Adds a `L2ToL1Event` set to the DB.
@@ -559,6 +472,263 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
         token.decimals as i64,
         token.l2_block_number as i64,
         token.initialization_transaction.0.to_vec(),
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+#[allow(missing_docs)]
+#[derive(Debug)]
+pub struct WithdrawalWithBlock {
+    pub key: WithdrawalKey,
+    pub id: u64,
+    pub l2_block_number: u64,
+}
+
+/// Adds withdrawal information to the `finalization_data` table.
+pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Result<()> {
+    let mut ids = Vec::with_capacity(wd.len());
+    let mut l2_block_number = Vec::with_capacity(wd.len());
+    let mut l1_batch_number = Vec::with_capacity(wd.len());
+    let mut l2_message_index = Vec::with_capacity(wd.len());
+    let mut l2_tx_number_in_block = Vec::with_capacity(wd.len());
+    let mut message = Vec::with_capacity(wd.len());
+    let mut sender = Vec::with_capacity(wd.len());
+    let mut proof = Vec::with_capacity(wd.len());
+
+    wd.iter().for_each(|d| {
+        ids.push(d.id as i64);
+        l2_block_number.push(d.l2_block_number as i64);
+        l1_batch_number.push(d.l1_batch_number.as_u64() as i64);
+        l2_message_index.push(d.l2_message_index as i32);
+        l2_tx_number_in_block.push(d.l2_tx_number_in_block as i32);
+        message.push(d.message.to_vec());
+        sender.push(d.sender.0.to_vec());
+        proof.push(bincode::serialize(&d.proof).unwrap());
+    });
+
+    let started_at = Instant::now();
+
+    sqlx::query!(
+        "
+        INSERT INTO finalization_data
+        (
+            withdrawal_id,
+            l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        )
+        SELECT
+            u.id,
+            u.l2_block_number,
+            u.l1_batch_number,
+            u.l2_message_index,
+            u.l2_tx_number_in_block,
+            u.message,
+            u.sender,
+            u.proof
+        FROM UNNEST (
+            $1::bigint[],
+            $2::bigint[],
+            $3::bigint[],
+            $4::integer[],
+            $5::integer[],
+            $6::bytea[],
+            $7::bytea[],
+            $8::bytea[]
+        ) AS u(
+            id,
+            l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        )
+        ON CONFLICT (withdrawal_id) DO NOTHING
+        ",
+        &ids,
+        &l2_block_number,
+        &l1_batch_number,
+        &l2_message_index,
+        &l2_tx_number_in_block,
+        &message,
+        &sender,
+        &proof
+    )
+    .execute(pool)
+    .await?;
+
+    metrics::histogram!(
+        "watcher.storage.transactions.add_withdrawal_data",
+        started_at.elapsed(),
+    );
+
+    Ok(())
+}
+
+/// Returns all previously unseen executed events after a given block
+pub async fn get_withdrawals_with_no_data(
+    pool: &PgPool,
+    limit_by: u64,
+) -> Result<Vec<WithdrawalWithBlock>> {
+    let withdrawals = sqlx::query!(
+        "
+        WITH max_committed AS (SELECT MAX(l2_block_number)
+                FROM l2_blocks
+                WHERE commit_l1_block_number IS NOT NULL),
+             max_seen AS (SELECT MAX(withdrawal_id)
+                FROM finalization_data)
+        SELECT tx_hash,event_index_in_tx,id,l2_block_number
+        FROM withdrawals,max_committed,max_seen
+        WHERE
+            id >= COALESCE(max_seen.max, 1)
+            AND l2_block_number <= max_committed.max
+        ORDER BY l2_block_number
+        LIMIT $1
+        ",
+        limit_by as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| WithdrawalWithBlock {
+        key: WithdrawalKey {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            event_index_in_tx: r.event_index_in_tx as u32,
+        },
+        id: r.id as u64,
+        l2_block_number: r.l2_block_number as u64,
+    })
+    .collect();
+
+    Ok(withdrawals)
+}
+
+/// Get the earliest withdrawals never attempted to be finalized before
+pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalParams>> {
+    let data = sqlx::query!(
+        "
+        SELECT
+            w.tx_hash,
+            w.event_index_in_tx,
+            withdrawal_id,
+            finalization_data.l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            sender,
+            proof
+        FROM
+            finalization_data
+            JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+        WHERE
+            finalization_tx IS NULL
+            AND
+            failed_finalization_attempts < 3
+        ORDER BY finalization_data.l2_block_number
+        LIMIT $1
+        ",
+        limit_by as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|record| WithdrawalParams {
+        tx_hash: H256::from_slice(&record.tx_hash),
+        event_index_in_tx: record.event_index_in_tx as u32,
+        id: record.withdrawal_id as u64,
+        l2_block_number: record.l2_block_number as u64,
+        l1_batch_number: record.l1_batch_number.into(),
+        l2_message_index: record.l2_message_index as u32,
+        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+        message: record.message.into(),
+        sender: Address::from_slice(&record.sender),
+        proof: bincode::deserialize(&record.proof)
+            .expect("storage contains data correctly serialized by bincode; qed"),
+    })
+    .collect();
+
+    Ok(data)
+}
+
+/// Set status of a set of withdrawals in `finalization_data` to finalized
+pub async fn finalization_data_set_finalized_in_tx(
+    pool: &PgPool,
+    withdrawals: &[WithdrawalKey],
+    tx_hash: H256,
+) -> Result<()> {
+    let mut tx_hashes = Vec::with_capacity(withdrawals.len());
+    let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
+
+    withdrawals.iter().for_each(|w| {
+        tx_hashes.push(w.tx_hash.0.to_vec());
+        event_index_in_tx.push(w.event_index_in_tx as i32);
+    });
+
+    sqlx::query!(
+        "
+        UPDATE finalization_data
+        SET finalization_tx = $1
+        FROM (
+            SELECT
+            UNNEST ($2::bytea[]) as tx_hash,
+            UNNEST ($3::integer[]) as event_index_in_tx
+        ) AS u
+        WHERE
+            finalization_data.withdrawal_id =
+                (SELECT id from withdrawals
+                    WHERE tx_hash = u.tx_hash
+                    AND event_index_in_tx = u.event_index_in_tx)
+        ",
+        &tx_hash.0.as_ref(),
+        &tx_hashes,
+        &event_index_in_tx,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Increment unsuccessful transaction attempt count for a set
+/// of withdrawals
+pub async fn inc_unsuccessful_finalization_attempts(
+    pool: &PgPool,
+    withdrawals: &[WithdrawalKey],
+) -> Result<()> {
+    let mut tx_hashes = Vec::with_capacity(withdrawals.len());
+    let mut event_index_in_tx = Vec::with_capacity(withdrawals.len());
+
+    withdrawals.iter().for_each(|w| {
+        tx_hashes.push(w.tx_hash.0.to_vec());
+        event_index_in_tx.push(w.event_index_in_tx as i32);
+    });
+
+    sqlx::query!(
+        "
+        UPDATE finalization_data
+        SET failed_finalization_attempts = failed_finalization_attempts + 1
+        FROM (
+            SELECT
+            UNNEST ($1::bytea[]) as tx_hash,
+            UNNEST ($2::integer[]) as event_index_in_tx
+        ) AS u
+        WHERE
+            finalization_data.withdrawal_id =
+                (SELECT id FROM withdrawals WHERE tx_hash = u.tx_hash
+                 AND event_index_in_tx = u.event_index_in_tx)
+        ",
+        &tx_hashes,
+        &event_index_in_tx,
     )
     .execute(pool)
     .await?;
