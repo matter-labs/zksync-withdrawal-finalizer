@@ -98,12 +98,13 @@ where
     where
         M2: ZksyncMiddleware + 'static,
     {
-        let migrator_handle = tokio::spawn(params_fetcher_loop(self.pgpool.clone(), middleware));
+        let params_fetcher_handle =
+            tokio::spawn(params_fetcher_loop(self.pgpool.clone(), middleware));
 
         let finalizer_handle = tokio::spawn(self.finalizer_loop());
 
         tokio::select! {
-            m = migrator_handle => {
+            m = params_fetcher_handle => {
                 vlog::error!("migrator ended with {m:?}");
             }
             f = finalizer_handle => {
