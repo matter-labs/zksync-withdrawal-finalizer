@@ -9,7 +9,8 @@ use std::{collections::HashSet, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
-    providers::Middleware,
+    prelude::ContractError,
+    providers::{Middleware, MiddlewareError},
     types::{H256, U256},
 };
 use futures::TryFutureExt;
@@ -31,6 +32,9 @@ mod error;
 
 /// A limit to cap a transaction fee (in ether) for safety reasons.
 const TX_FEE_LIMIT: f64 = 0.8;
+
+/// When finalizer runs out of money back off this amount of time.
+const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 
 /// Finalizer.
 pub struct Finalizer<M1, M2> {
@@ -132,7 +136,7 @@ where
     }
 
     async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
-        vlog::debug!("finalizeing batch {withdrawals:?}");
+        vlog::debug!("finalizing batch {withdrawals:?}");
 
         let w: Vec<_> = withdrawals
             .iter()
@@ -150,7 +154,17 @@ where
             Ok(e) => e,
             Err(e) => {
                 vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
-                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
+                if !is_gas_required_exceeds_allowance(&e) {
+                    storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
+                        .await?;
+                } else {
+                    metrics::counter!(
+                        "finalizer.finalization_events.failed_to_finalize_low_gas",
+                        withdrawals.len() as u64
+                    );
+
+                    tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
+                }
 
                 return Ok(());
             }
@@ -175,8 +189,13 @@ where
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => (),
             Err(e) => {
-                vlog::error!("finalizing withdrawals failed with an error {:?}", e);
-                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
+                vlog::error!(
+                    "waiting for transaction status withdrawals failed with an error {:?}",
+                    e
+                );
+                // no need to bump the counter here, waiting for tx
+                // has failed becuase of networking or smth, but at
+                // this point tx has already been accepted into tx pool
             }
         }
 
@@ -334,6 +353,16 @@ where
 
         Ok(set)
     }
+}
+
+fn is_gas_required_exceeds_allowance<M: Middleware>(e: &ContractError<M>) -> bool {
+    if let ContractError::MiddlewareError { e } = e {
+        if let Some(e) = e.as_error_response() {
+            return e.code == -32000 && e.message.starts_with("gas required exceeds allowance ");
+        }
+    }
+
+    false
 }
 
 // Request finalization parameters for a set of withdrawals in parallel.

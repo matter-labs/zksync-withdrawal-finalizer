@@ -1356,6 +1356,7 @@ dependencies = [
  "client",
  "ethers",
  "futures",
+ "metrics",
  "sqlx",
  "storage",
  "thiserror",
