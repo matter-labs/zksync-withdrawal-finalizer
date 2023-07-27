@@ -24,10 +24,10 @@ use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, Zk
 use config::Config;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::task::JoinHandle;
+use watcher::Watcher;
 
 mod cli;
 mod config;
-mod withdrawal_finalizer;
 
 const CHANNEL_CAPACITY: usize = 1024;
 
@@ -236,7 +236,7 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let wf = withdrawal_finalizer::WithdrawalFinalizer::new(client_l2.clone(), pgpool.clone());
+    let wf = Watcher::new(client_l2.clone(), pgpool.clone());
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,

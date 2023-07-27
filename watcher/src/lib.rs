@@ -9,14 +9,26 @@ use tokio::pin;
 
 use client::{zksync_contract::L2ToL1Event, BlockEvent, WithdrawalEvent, ZksyncMiddleware};
 
-use crate::Result;
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    PgError(#[from] sqlx::Error),
 
-pub struct WithdrawalFinalizer<M2> {
+    #[error(transparent)]
+    StorageError(#[from] storage::Error),
+
+    #[error(transparent)]
+    ClientError(#[from] client::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+pub struct Watcher<M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
 }
 
-impl<M2> WithdrawalFinalizer<M2>
+impl<M2> Watcher<M2>
 where
     M2: ZksyncMiddleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
