@@ -16,10 +16,8 @@ url = { version = "2.3.1", features = ["serde"] }
 eyre = "0.6.8"
 tokio-stream = "0.1.14"
 envconfig = "0.10.0"
-futures = "0.3.28"
 tokio-util = "0.7.8"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
-itertools = "0.10.5"
 dotenvy = "0.15.7"
 
 client = { path = "../../client" }
@@ -27,5 +25,6 @@ storage = { path = "../../storage" }
 chain-events = { path = "../../chain-events" }
 vlog = { path = "../../vlog" }
 finalizer = { path = "../../finalizer" }
+watcher = { path = "../../watcher" }
 metrics-exporter-prometheus = "0.12.1"
 metrics = "0.21.0"

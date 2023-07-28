@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT MAX(l2_block_number)\n        FROM withdrawals\n        ",
+  "query": "\n        SELECT\n          max(l2_block_number)\n        FROM\n          tokens\n        ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "c7f92ac405cba0f7d91ec691600d2321e78277dbe0f6267d04bbd7c1f4923601"
+  "hash": "e53175dd5038855f11d467bea9445262b1d3cf9c58fa4e39caaa11d1d093a40c"
 }

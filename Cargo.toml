@@ -9,4 +9,5 @@ members = [
     "chain-events",
     "storage",
     "vlog",
+    "watcher",
 ]

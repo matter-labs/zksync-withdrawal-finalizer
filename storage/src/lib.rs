@@ -44,12 +44,19 @@ pub async fn committed_new_batch(
 
     sqlx::query!(
         "
-        INSERT INTO l2_blocks (l2_block_number, commit_l1_block_number)
-        SELECT u.l2_block_number,$2
-        FROM UNNEST ($1::bigint[])
-            AS u(l2_block_number)
-        ON CONFLICT (l2_block_number) DO
-        UPDATE SET commit_l1_block_number = $2
+        INSERT INTO
+          l2_blocks (
+            l2_block_number,
+            commit_l1_block_number
+          )
+        SELECT
+          u.l2_block_number,
+          $2
+        FROM
+          UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
+        UPDATE
+        SET
+          commit_l1_block_number = $2
         ",
         &range,
         l1_block_number as i64,
@@ -76,10 +83,13 @@ pub async fn withdrawal_committed_in_block(
 
     let res = sqlx::query!(
         "
-        SELECT l2_blocks.commit_l1_block_number from
-        withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.l2_block_number
-        WHERE withdrawals.tx_hash = $1
+        SELECT
+          l2_blocks.commit_l1_block_number
+        FROM
+          withdrawals
+          JOIN l2_blocks ON l2_blocks.l2_block_number = withdrawals.l2_block_number
+        WHERE
+          withdrawals.tx_hash = $1
         ",
         tx_hash.as_bytes(),
     )
@@ -101,10 +111,13 @@ pub async fn withdrawal_verified_in_block(
 
     let res = sqlx::query!(
         "
-        SELECT l2_blocks.verify_l1_block_number from
-        withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.l2_block_number
-        WHERE withdrawals.tx_hash = $1
+        SELECT
+          l2_blocks.verify_l1_block_number
+        FROM
+          withdrawals
+          JOIN l2_blocks ON l2_blocks.l2_block_number = withdrawals.l2_block_number
+        WHERE
+          withdrawals.tx_hash = $1
         ",
         tx_hash.as_bytes(),
     )
@@ -126,10 +139,13 @@ pub async fn withdrawal_executed_in_block(
 
     let res = sqlx::query!(
         "
-        SELECT l2_blocks.execute_l1_block_number from
-        withdrawals JOIN l2_blocks ON
-        l2_blocks.l2_block_number = withdrawals.l2_block_number
-        WHERE withdrawals.tx_hash = $1
+        SELECT
+          l2_blocks.execute_l1_block_number
+        FROM
+          withdrawals
+          JOIN l2_blocks ON l2_blocks.l2_block_number = withdrawals.l2_block_number
+        WHERE
+          withdrawals.tx_hash = $1
         ",
         tx_hash.as_bytes(),
     )
@@ -155,12 +171,19 @@ pub async fn verified_new_batch(
 
     sqlx::query!(
         "
-        INSERT INTO l2_blocks (l2_block_number, verify_l1_block_number)
-        SELECT u.l2_block_number,$2
-        FROM UNNEST ($1::bigint[])
-            AS u(l2_block_number)
-        ON CONFLICT (l2_block_number) DO
-        UPDATE SET verify_l1_block_number = $2
+        INSERT INTO
+          l2_blocks (
+            l2_block_number,
+            verify_l1_block_number
+          )
+        SELECT
+          u.l2_block_number,
+          $2
+        FROM
+          UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
+        UPDATE
+        SET
+          verify_l1_block_number = $2
         ",
         &range,
         l1_block_number as i64,
@@ -191,12 +214,19 @@ pub async fn executed_new_batch(
 
     sqlx::query!(
         "
-        INSERT INTO l2_blocks (l2_block_number, execute_l1_block_number)
-        SELECT u.l2_block_number,$2
-        FROM UNNEST ($1::bigint[])
-            AS u(l2_block_number)
-        ON CONFLICT (l2_block_number) DO
-        UPDATE SET execute_l1_block_number = $2
+        INSERT INTO
+          l2_blocks (
+            l2_block_number,
+            execute_l1_block_number
+          )
+        SELECT
+          u.l2_block_number,
+          $2
+        FROM
+          UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
+        UPDATE
+        SET
+          execute_l1_block_number = $2
         ",
         &range,
         l1_block_number as i64,
@@ -239,28 +269,37 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
 
     sqlx::query!(
         "
-        INSERT INTO withdrawals
-        (
+        INSERT INTO
+          withdrawals (
             tx_hash,
             l2_block_number,
             token,
             amount,
             event_index_in_tx
-        )
+          )
         SELECT
-            u.tx_hash,
-            u.l2_block_number,
-            u.token,
-            u.amount,
-            u.index_in_tx
-        FROM UNNEST(
-            $1::bytea[],
-            $2::bigint[],
-            $3::bytea[],
-            $4::numeric[],
-            $5::integer[]
-        ) AS u(tx_hash, l2_block_number, token, amount, index_in_tx)
-        ON CONFLICT (tx_hash, event_index_in_tx) DO NOTHING
+          u.tx_hash,
+          u.l2_block_number,
+          u.token,
+          u.amount,
+          u.index_in_tx
+        FROM
+          unnest(
+            $1 :: BYTEA [],
+            $2 :: bigint [],
+            $3 :: BYTEA [],
+            $4 :: numeric [],
+            $5 :: integer []
+          ) AS u(
+            tx_hash,
+            l2_block_number,
+            token,
+            amount,
+            index_in_tx
+          ) ON CONFLICT (
+            tx_hash,
+            event_index_in_tx
+          ) DO NOTHING
         ",
         &tx_hashes,
         &block_numbers,
@@ -285,8 +324,10 @@ pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
 
     let res = sqlx::query!(
         "
-        SELECT MAX(l2_block_number)
-        FROM withdrawals
+        SELECT
+          max(l2_block_number)
+        FROM
+          withdrawals
         "
     )
     .fetch_one(conn)
@@ -305,8 +346,10 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
 
     let res = sqlx::query!(
         "
-        SELECT MAX(commit_l1_block_number)
-        FROM l2_blocks
+        SELECT
+          max(commit_l1_block_number)
+        FROM
+          l2_blocks
         "
     )
     .fetch_one(conn)
@@ -325,8 +368,10 @@ pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<
 
     let res = sqlx::query!(
         "
-        SELECT MAX(l1_block_number)
-        FROM l2_to_l1_events
+        SELECT
+          max(l1_block_number)
+        FROM
+          l2_to_l1_events
         "
     )
     .fetch_one(conn)
@@ -370,38 +415,42 @@ pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) ->
 
     sqlx::query!(
         "
-        INSERT INTO l2_to_l1_events
-        (
+        INSERT INTO
+          l2_to_l1_events (
             l1_token_addr,
             to_address,
             amount,
             l1_block_number,
             l2_block_number,
             tx_number_in_block
-        )
+          )
         SELECT
-            u.l1_token_addr,
-            u.to_address,
-            u.amount,
-            u.l1_block_number,
-            u.l2_block_number,
-            u.tx_number_in_block
-        FROM UNNEST(
-            $1::bytea[],
-            $2::bytea[],
-            $3::numeric[],
-            $4::bigint[],
-            $5::bigint[],
-            $6::integer[]
-        ) AS u(
+          u.l1_token_addr,
+          u.to_address,
+          u.amount,
+          u.l1_block_number,
+          u.l2_block_number,
+          u.tx_number_in_block
+        FROM
+          unnest(
+            $1 :: BYTEA [],
+            $2 :: BYTEA [],
+            $3 :: numeric [],
+            $4 :: bigint [],
+            $5 :: bigint [],
+            $6 :: integer []
+          ) AS u(
             l1_token_addr,
             to_address,
             amount,
             l1_block_number,
             l2_block_number,
             tx_number_in_block
-        )
-        ON CONFLICT (l1_block_number, l2_block_number, tx_number_in_block) DO NOTHING
+          ) ON CONFLICT (
+            l1_block_number,
+            l2_block_number,
+            tx_number_in_block
+          ) DO NOTHING
         ",
         &l1_token_addrs,
         &to_addrs,
@@ -424,8 +473,10 @@ pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) ->
 pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     let last_l2_block_seen = sqlx::query!(
         "
-        SELECT MAX(l2_block_number)
-        FROM tokens
+        SELECT
+          max(l2_block_number)
+        FROM
+          tokens
         ",
     )
     .fetch_one(pool)
@@ -435,8 +486,10 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
 
     let tokens = sqlx::query!(
         "
-        SELECT l2_token_address
-        FROM tokens
+        SELECT
+          l2_token_address
+        FROM
+          tokens
         "
     )
     .fetch_all(pool)
@@ -452,8 +505,8 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
 pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     sqlx::query!(
         "
-        INSERT INTO tokens
-        (
+        INSERT INTO
+          tokens (
             l1_token_address,
             l2_token_address,
             name,
@@ -461,9 +514,9 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
             decimals,
             l2_block_number,
             initialization_transaction
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
+          )
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
         ",
         token.l1_token_address.0.to_vec(),
         token.l2_token_address.0.to_vec(),
@@ -513,8 +566,8 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
 
     sqlx::query!(
         "
-        INSERT INTO finalization_data
-        (
+        INSERT INTO
+          finalization_data (
             withdrawal_id,
             l2_block_number,
             l1_batch_number,
@@ -523,26 +576,27 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             message,
             sender,
             proof
-        )
+          )
         SELECT
-            u.id,
-            u.l2_block_number,
-            u.l1_batch_number,
-            u.l2_message_index,
-            u.l2_tx_number_in_block,
-            u.message,
-            u.sender,
-            u.proof
-        FROM UNNEST (
-            $1::bigint[],
-            $2::bigint[],
-            $3::bigint[],
-            $4::integer[],
-            $5::integer[],
-            $6::bytea[],
-            $7::bytea[],
-            $8::bytea[]
-        ) AS u(
+          u.id,
+          u.l2_block_number,
+          u.l1_batch_number,
+          u.l2_message_index,
+          u.l2_tx_number_in_block,
+          u.message,
+          u.sender,
+          u.proof
+        FROM
+          UNNEST (
+            $1 :: bigint [],
+            $2 :: bigint [],
+            $3 :: bigint [],
+            $4 :: integer [],
+            $5 :: integer [],
+            $6 :: BYTEA [],
+            $7 :: BYTEA [],
+            $8 :: BYTEA []
+          ) AS u(
             id,
             l2_block_number,
             l1_batch_number,
@@ -551,8 +605,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
             message,
             sender,
             proof
-        )
-        ON CONFLICT (withdrawal_id) DO NOTHING
+          ) ON CONFLICT (withdrawal_id) DO NOTHING
         ",
         &ids,
         &l2_block_number,
@@ -581,18 +634,36 @@ pub async fn get_withdrawals_with_no_data(
 ) -> Result<Vec<WithdrawalWithBlock>> {
     let withdrawals = sqlx::query!(
         "
-        WITH max_committed AS (SELECT MAX(l2_block_number)
-                FROM l2_blocks
-                WHERE commit_l1_block_number IS NOT NULL),
-             max_seen AS (SELECT MAX(withdrawal_id)
-                FROM finalization_data)
-        SELECT tx_hash,event_index_in_tx,id,l2_block_number
-        FROM withdrawals,max_committed,max_seen
+        WITH max_committed AS (
+          SELECT
+            max(l2_block_number)
+          FROM
+            l2_blocks
+          WHERE
+            commit_l1_block_number IS NOT NULL
+        ),
+        max_seen AS (
+          SELECT
+            max(withdrawal_id)
+          FROM
+            finalization_data
+        )
+        SELECT
+          tx_hash,
+          event_index_in_tx,
+          id,
+          l2_block_number
+        FROM
+          withdrawals,
+          max_committed,
+          max_seen
         WHERE
-            id >= COALESCE(max_seen.max, 1)
-            AND l2_block_number <= max_committed.max
-        ORDER BY l2_block_number
-        LIMIT $1
+          id >= coalesce(max_seen.max, 1)
+          AND l2_block_number <= max_committed.max
+        ORDER BY
+          l2_block_number
+        LIMIT
+          $1
         ",
         limit_by as i64,
     )
@@ -617,25 +688,26 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     let data = sqlx::query!(
         "
         SELECT
-            w.tx_hash,
-            w.event_index_in_tx,
-            withdrawal_id,
-            finalization_data.l2_block_number,
-            l1_batch_number,
-            l2_message_index,
-            l2_tx_number_in_block,
-            message,
-            sender,
-            proof
+          w.tx_hash,
+          w.event_index_in_tx,
+          withdrawal_id,
+          finalization_data.l2_block_number,
+          l1_batch_number,
+          l2_message_index,
+          l2_tx_number_in_block,
+          message,
+          sender,
+          proof
         FROM
-            finalization_data
-            JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+          finalization_data
+          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
         WHERE
-            finalization_tx IS NULL
-            AND
-            failed_finalization_attempts < 3
-        ORDER BY finalization_data.l2_block_number
-        LIMIT $1
+          finalization_tx IS NULL
+          AND failed_finalization_attempts < 3
+        ORDER BY
+          finalization_data.l2_block_number
+        LIMIT
+          $1
         ",
         limit_by as i64,
     )
@@ -676,18 +748,26 @@ pub async fn finalization_data_set_finalized_in_tx(
 
     sqlx::query!(
         "
-        UPDATE finalization_data
-        SET finalization_tx = $1
-        FROM (
+        UPDATE
+          finalization_data
+        SET
+          finalization_tx = $1
+        FROM
+          (
             SELECT
-            UNNEST ($2::bytea[]) as tx_hash,
-            UNNEST ($3::integer[]) as event_index_in_tx
-        ) AS u
+              UNNEST ($2 :: BYTEA []) AS tx_hash,
+              UNNEST ($3 :: integer []) AS event_index_in_tx
+          ) AS u
         WHERE
-            finalization_data.withdrawal_id =
-                (SELECT id from withdrawals
-                    WHERE tx_hash = u.tx_hash
-                    AND event_index_in_tx = u.event_index_in_tx)
+          finalization_data.withdrawal_id = (
+            SELECT
+              id
+            FROM
+              withdrawals
+            WHERE
+              tx_hash = u.tx_hash
+              AND event_index_in_tx = u.event_index_in_tx
+          )
         ",
         &tx_hash.0.as_ref(),
         &tx_hashes,
@@ -715,17 +795,26 @@ pub async fn inc_unsuccessful_finalization_attempts(
 
     sqlx::query!(
         "
-        UPDATE finalization_data
-        SET failed_finalization_attempts = failed_finalization_attempts + 1
-        FROM (
+        UPDATE
+          finalization_data
+        SET
+          failed_finalization_attempts = failed_finalization_attempts + 1
+        FROM
+          (
             SELECT
-            UNNEST ($1::bytea[]) as tx_hash,
-            UNNEST ($2::integer[]) as event_index_in_tx
-        ) AS u
+              UNNEST ($1 :: BYTEA []) AS tx_hash,
+              UNNEST ($2 :: integer []) AS event_index_in_tx
+          ) AS u
         WHERE
-            finalization_data.withdrawal_id =
-                (SELECT id FROM withdrawals WHERE tx_hash = u.tx_hash
-                 AND event_index_in_tx = u.event_index_in_tx)
+          finalization_data.withdrawal_id = (
+            SELECT
+              id
+            FROM
+              withdrawals
+            WHERE
+              tx_hash = u.tx_hash
+              AND event_index_in_tx = u.event_index_in_tx
+          )
         ",
         &tx_hashes,
         &event_index_in_tx,
