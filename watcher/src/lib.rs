@@ -95,7 +95,7 @@ where
                     }
                 }
                 else => {
-                    vlog::info!("terminating finalizer");
+                    vlog::info!("terminating watcher");
                     break
                 }
             }
