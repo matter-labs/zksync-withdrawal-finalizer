@@ -236,7 +236,7 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let wf = Watcher::new(client_l2.clone(), pgpool.clone());
+    let watcher = Watcher::new(client_l2.clone(), pgpool.clone());
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,
@@ -244,7 +244,7 @@ async fn main() -> Result<()> {
         we_tx_wrapped,
     ));
 
-    let finalizer_handle = tokio::spawn(wf.run(blocks_rx, we_rx, from_l2_block));
+    let watcher_handle = tokio::spawn(watcher.run(blocks_rx, we_rx, from_l2_block));
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,
@@ -288,7 +288,7 @@ async fn main() -> Result<()> {
         l1_bridge,
     );
 
-    let actual_finalizer_handle = tokio::spawn(finalizer.run(client_l2));
+    let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
     tokio::select! {
         r = block_events_handle => {
@@ -297,13 +297,13 @@ async fn main() -> Result<()> {
         r = withdrawal_events_handle => {
             vlog::error!("Withdrawals Events stream ended with {r:?}");
         }
-        r = finalizer_handle => {
+        r = watcher_handle => {
             vlog::error!("Finalizer main loop ended with {r:?}");
         }
         r = prometheus_exporter_handle => {
             vlog::error!("Prometheus exporter ended with {r:?}");
         }
-        r = actual_finalizer_handle => {
+        r = finalizer_handle => {
             vlog::error!("Finalizer ended with {r:?}");
         }
     }
