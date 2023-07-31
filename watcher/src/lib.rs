@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use chain_events::L2Event;
 use ethers::providers::{JsonRpcClient, Middleware};
@@ -102,7 +105,74 @@ async fn process_l2_to_l1_events(pool: &PgPool, events: Vec<L2ToL1Event>) -> Res
     Ok(())
 }
 
-async fn process_block_event<M2>(pool: &PgPool, event: BlockEvent, l2_middleware: M2) -> Result<()>
+enum BlockRangesParams {
+    Commit {
+        range_begin: u64,
+        range_end: u64,
+        block_number: u64,
+    },
+    Verify {
+        range_begin: u64,
+        range_end: u64,
+        block_number: u64,
+    },
+    Execute {
+        range_begin: u64,
+        range_end: u64,
+        block_number: u64,
+    },
+    L2ToL1Events {
+        events: Vec<L2ToL1Event>,
+    },
+}
+
+impl BlockRangesParams {
+    async fn write_to_storage(self, pool: &PgPool) -> Result<()> {
+        match self {
+            BlockRangesParams::Commit {
+                range_begin,
+                range_end,
+                block_number,
+            } => {
+                storage::committed_new_batch(pool, range_begin, range_end, block_number).await?;
+
+                vlog::info!(
+                    "Changed withdrawals status to committed for range {range_begin}-{range_end}"
+                );
+            }
+            BlockRangesParams::Verify {
+                range_begin,
+                range_end,
+                block_number,
+            } => {
+                storage::verified_new_batch(pool, range_begin, range_end, block_number).await?;
+                vlog::info!(
+                    "Changed withdrawals status to verified for range {range_begin}-{range_end}"
+                );
+            }
+            BlockRangesParams::Execute {
+                range_begin,
+                range_end,
+                block_number,
+            } => {
+                storage::executed_new_batch(pool, range_begin, range_end, block_number).await?;
+
+                vlog::info!(
+                    "Changed withdrawals status to executed for range {range_begin}-{range_end}"
+                );
+            }
+            BlockRangesParams::L2ToL1Events { events } => {
+                process_l2_to_l1_events(pool, events).await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+async fn request_block_ranges<M2>(
+    event: BlockEvent,
+    l2_middleware: M2,
+) -> Result<Option<BlockRangesParams>>
 where
     M2: ZksyncMiddleware,
 {
@@ -116,18 +186,13 @@ where
                 .await?
             {
                 metrics::gauge!("watcher.l2_last_committed_block", range_end.as_u64() as f64);
-
-                storage::committed_new_batch(
-                    pool,
-                    range_begin.as_u64(),
-                    range_end.as_u64(),
+                Ok(Some(BlockRangesParams::Commit {
+                    range_begin: range_begin.as_u64(),
+                    range_end: range_end.as_u64(),
                     block_number,
-                )
-                .await?;
-
-                vlog::info!(
-                    "Changed withdrawals status to committed for range {range_begin}-{range_end}"
-                );
+                }))
+            } else {
+                Ok(None)
             }
         }
         BlockEvent::BlocksVerification {
@@ -148,12 +213,14 @@ where
 
             if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
                 metrics::gauge!("watcher.l2_last_verified_block", range_end as f64);
-                storage::verified_new_batch(pool, range_begin, range_end, block_number).await?;
-                vlog::info!(
-                    "Changed withdrawals status to verified for range {range_begin}-{range_end}"
-                );
+                Ok(Some(BlockRangesParams::Verify {
+                    range_begin,
+                    range_end,
+                    block_number,
+                }))
             } else {
                 vlog::warn!("One of the verified ranges not found: {range_begin:?}, {range_end:?}");
+                Ok(None)
             }
         }
         BlockEvent::BlockExecution {
@@ -165,22 +232,43 @@ where
                 .await?
             {
                 metrics::gauge!("watcher.l2_last_executed_block", range_end.as_u64() as f64);
-
-                storage::executed_new_batch(
-                    pool,
-                    range_begin.as_u64(),
-                    range_end.as_u64(),
+                Ok(Some(BlockRangesParams::Execute {
+                    range_begin: range_begin.as_u64(),
+                    range_end: range_end.as_u64(),
                     block_number,
-                )
-                .await?;
-
-                vlog::info!(
-                    "Changed withdrawals status to executed for range {range_begin}-{range_end}"
-                );
+                }))
+            } else {
+                Ok(None)
             }
         }
         BlockEvent::BlocksRevert { .. } => todo!(),
-        BlockEvent::L2ToL1Events { events } => process_l2_to_l1_events(pool, events).await?,
+        BlockEvent::L2ToL1Events { events } => Ok(Some(BlockRangesParams::L2ToL1Events { events })),
+    }
+}
+
+async fn process_block_events<M2>(
+    pool: &PgPool,
+    events: Vec<BlockEvent>,
+    l2_middleware: M2,
+) -> Result<()>
+where
+    M2: ZksyncMiddleware,
+{
+    let results: Result<Vec<_>> = futures::future::join_all(
+        events
+            .into_iter()
+            .map(|event| request_block_ranges(event, &l2_middleware)),
+    )
+    .await
+    .into_iter()
+    .collect();
+
+    let results = results?;
+
+    for result in results {
+        if let Some(result) = result {
+            result.write_to_storage(pool).await?;
+        }
     }
 
     Ok(())
@@ -220,9 +308,27 @@ where
 {
     pin!(be);
 
+    let mut block_event_batch = vec![];
+    let mut batch_begin = Instant::now();
+    let batch_backoff = Duration::from_secs(5);
+    let batch_size = 1024;
+
     while let Some(event) = be.next().await {
         vlog::debug!("block event {event}");
-        process_block_event(&pool, event, &l2_middleware).await?;
+        block_event_batch.push(event);
+
+        if block_event_batch.len() >= batch_size || batch_begin.elapsed() > batch_backoff {
+            vlog::debug!("processing batch of l1 events {}", block_event_batch.len());
+
+            process_block_events(
+                &pool,
+                std::mem::take(&mut block_event_batch),
+                &l2_middleware,
+            )
+            .await?;
+
+            batch_begin = Instant::now();
+        }
     }
 
     Ok(())
