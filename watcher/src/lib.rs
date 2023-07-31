@@ -265,10 +265,8 @@ where
 
     let results = results?;
 
-    for result in results {
-        if let Some(result) = result {
-            result.write_to_storage(pool).await?;
-        }
+    for result in results.into_iter().flatten() {
+        result.write_to_storage(pool).await?;
     }
 
     Ok(())
