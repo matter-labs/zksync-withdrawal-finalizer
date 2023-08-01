@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.22](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.21...v0.1.22) (2023-08-01)
+
+
+### Features
+
+* adds withdrawal finalizing logic. ([#56](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/56)) ([5297c02](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5297c023d8db0e88166e234b8b91570a7c206f8b))
+* watcher improvements ([#64](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/64)) ([ee52d81](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ee52d8110f7c68e64680f2d4ec6f2e43d482d2f0))
+
+
+### Bug Fixes
+
+* signer has to be configured with concrete chainid ([#65](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/65)) ([44f91e4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/44f91e43a30dbbe45eafb6bed619e33f0e24787a))
+
 ## [0.1.21](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.20...v0.1.21) (2023-07-24)
 
 
