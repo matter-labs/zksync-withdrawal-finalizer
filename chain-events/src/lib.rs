@@ -25,6 +25,9 @@ pub use l2_events::L2EventsListener;
 /// All L2 Events the service is interested in.
 #[derive(Debug)]
 pub enum L2Event {
+    /// There has been a restart from block of given number
+    RestartedFromBlock(u64),
+
     /// A withdrawal event.
     Withdrawal(WithdrawalEvent),
 

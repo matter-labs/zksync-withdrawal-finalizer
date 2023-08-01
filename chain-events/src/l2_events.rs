@@ -211,7 +211,7 @@ impl L2EventsListener {
         mut self,
         from_block: B,
         last_seen_l2_token_block: B,
-        sender: S,
+        mut sender: S,
     ) -> Result<()>
     where
         B: Into<BlockNumber> + Copy,
@@ -273,6 +273,16 @@ impl L2EventsListener {
                     vlog::warn!("Withdrawal events worker failed with {e}");
                 }
             }
+
+            sender
+                .send(L2Event::RestartedFromBlock(
+                    from_block
+                        .as_number()
+                        .expect("block number always exists; qed")
+                        .as_u64(),
+                ))
+                .await
+                .unwrap();
         }
     }
 }

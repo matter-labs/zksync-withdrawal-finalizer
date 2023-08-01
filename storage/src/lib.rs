@@ -8,7 +8,7 @@
 use std::time::Instant;
 
 use ethers::types::{Address, H160, H256};
-use sqlx::{Connection, PgConnection, PgPool};
+use sqlx::{PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
 use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, WithdrawalParams};
@@ -33,12 +33,12 @@ pub struct StoredWithdrawal {
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
 pub async fn committed_new_batch(
-    conn: &mut PgConnection,
+    pool: &PgPool,
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
 ) -> Result<()> {
-    let mut tx = conn.begin().await?;
+    let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
     let started_at = Instant::now();
 
@@ -159,12 +159,12 @@ pub async fn withdrawal_executed_in_block(
 }
 /// A new batch with a given range has been verified, update statuses of withdrawal records.
 pub async fn verified_new_batch(
-    conn: &mut PgConnection,
+    pool: &PgPool,
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
 ) -> Result<()> {
-    let mut tx = conn.begin().await?;
+    let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
 
     let started_at = Instant::now();
@@ -203,12 +203,12 @@ pub async fn verified_new_batch(
 
 /// A new batch with a given range has been executed, update statuses of withdrawal records.
 pub async fn executed_new_batch(
-    conn: &mut PgConnection,
+    pool: &PgPool,
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
 ) -> Result<()> {
-    let mut tx = conn.begin().await?;
+    let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
     let started_at = Instant::now();
 
@@ -250,7 +250,7 @@ pub async fn executed_new_batch(
 ///
 /// * `conn`: Connection to the Postgres DB
 /// * `events`: Withdrawal events grouped with their indices in transcation.
-pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal]) -> Result<()> {
+pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(events.len());
     let mut block_numbers = Vec::with_capacity(events.len());
     let mut tokens = Vec::with_capacity(events.len());
@@ -307,7 +307,7 @@ pub async fn add_withdrawals(conn: &mut PgConnection, events: &[StoredWithdrawal
         &amounts,
         &indices_in_tx,
     )
-    .execute(conn)
+    .execute(pool)
     .await?;
 
     metrics::histogram!(
@@ -394,7 +394,7 @@ pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<
 ///
 /// * `conn`: Connection to the Postgres DB
 /// * `events`: The `L2ToL1Event`s
-pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) -> Result<()> {
+pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()> {
     let mut l1_token_addrs = Vec::with_capacity(events.len());
     let mut to_addrs = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
@@ -459,7 +459,7 @@ pub async fn l2_to_l1_events(conn: &mut PgConnection, events: &[L2ToL1Event]) ->
         &l2_block_numbers,
         &tx_numbers_in_block,
     )
-    .execute(conn)
+    .execute(pool)
     .await?;
 
     metrics::histogram!(

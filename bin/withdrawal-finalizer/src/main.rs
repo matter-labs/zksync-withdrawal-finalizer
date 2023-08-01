@@ -29,7 +29,7 @@ use watcher::Watcher;
 mod cli;
 mod config;
 
-const CHANNEL_CAPACITY: usize = 1024;
+const CHANNEL_CAPACITY: usize = 1024 * 16;
 
 fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
     let builder = {
@@ -291,6 +291,15 @@ async fn main() -> Result<()> {
         zksync_contract,
         l1_bridge,
     );
+
+    let provider_l2 = Provider::<Ws>::connect_with_reconnects(
+        config.api_web3_json_rpc_ws_url.as_str(),
+        usize::MAX,
+    )
+    .await
+    .unwrap();
+
+    let client_l2 = Arc::new(provider_l2);
 
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
