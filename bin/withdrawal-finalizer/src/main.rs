@@ -264,7 +264,11 @@ async fn main() -> Result<()> {
 
     let wallet = config.account_private_key.parse::<LocalWallet>()?;
 
-    let client_l1_with_signer = Arc::new(SignerMiddleware::new(client_l1, wallet));
+    let client_l1_with_signer = Arc::new(
+        SignerMiddleware::new_with_provider_chain(client_l1, wallet)
+            .await
+            .unwrap(),
+    );
 
     let contract = client::withdrawal_finalizer::codegen::WithdrawalFinalizer::new(
         config.withdrawal_finalizer_addr,
