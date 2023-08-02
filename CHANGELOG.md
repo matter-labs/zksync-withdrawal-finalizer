@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.25](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.24...v0.1.25) (2023-08-02)
+
+
+### Features
+
+* adds more debugging statements to the finalizer loop 3 ([#71](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/71)) ([c7906b5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c7906b55418ea4abf4b945cbe6c488923e2e7b71))
+
 ## [0.1.24](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.23...v0.1.24) (2023-08-02)
 
 
