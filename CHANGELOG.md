@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.27](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.26...v0.1.27) (2023-08-02)
+
+
+### Bug Fixes
+
+* backoff after failed finalizer loop iterations ([#75](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/75)) ([1b25e0e](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/1b25e0e098c9a2a484050c791404fabf039fc3e4))
+
 ## [0.1.26](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.25...v0.1.26) (2023-08-02)
 
 
