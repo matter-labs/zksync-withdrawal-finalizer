@@ -139,6 +139,10 @@ where
     async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
         vlog::debug!("finalizing batch {withdrawals:?}");
 
+        let Some(highest_batch_number) = withdrawals.iter().map(|w| w.l1_batch_number).max() else {
+            return Ok(());
+        };
+
         let w: Vec<_> = withdrawals
             .iter()
             .cloned()
@@ -191,6 +195,11 @@ where
                     tx.transaction_hash,
                 )
                 .await?;
+
+                metrics::gauge!(
+                    "finalizer.highest_finalized_batch_number",
+                    highest_batch_number.as_u64() as f64,
+                );
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => (),
