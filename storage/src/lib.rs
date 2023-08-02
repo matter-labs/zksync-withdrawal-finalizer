@@ -658,7 +658,7 @@ pub async fn get_withdrawals_with_no_data(
           max_committed,
           max_seen
         WHERE
-          id >= coalesce(max_seen.max, 1)
+          id > coalesce(max_seen.max, 1)
           AND l2_block_number <= max_committed.max
         ORDER BY
           l2_block_number

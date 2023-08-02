@@ -153,6 +153,16 @@ impl BlockEvents {
             .number
             .expect("last block always has a number; qed");
 
+        vlog::info!(
+            "Filtering logs from {} to {}",
+            from_block
+                .into()
+                .as_number()
+                .expect("always starting from a numbered block; qed")
+                .as_u64(),
+            latest_block.as_u64(),
+        );
+
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)

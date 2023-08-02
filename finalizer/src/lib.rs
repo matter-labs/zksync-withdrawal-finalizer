@@ -280,10 +280,12 @@ where
     // * erc20 has denied a tx for some internal reasons.
     async fn process_unsuccessful(&mut self) -> Result<()> {
         if self.unsuccessful.is_empty() {
+            vlog::debug!("no unsuccessful withdrawals");
             return Ok(());
         }
 
         let predicted = std::mem::take(&mut self.unsuccessful);
+        vlog::debug!("requesting finalization status of withdrawals");
         let are_finalized = self.get_finalized_withdrawals(&predicted).await?;
 
         let mut already_finalized = vec![];
@@ -299,9 +301,19 @@ where
             }
         }
 
+        vlog::debug!(
+            "setting unsuccessful finalization attempts to {} withdrawals",
+            unsuccessful.len()
+        );
+
         // Either finalization tx has failed for these, or they were
         // predicted to fail.
         storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &unsuccessful).await?;
+
+        vlog::debug!(
+            "setting already finalized status to {} withdrawals",
+            already_finalized.len()
+        );
 
         // if the withdrawal has already been finalized set its
         // finalization transaction to zero which is signals exactly this
