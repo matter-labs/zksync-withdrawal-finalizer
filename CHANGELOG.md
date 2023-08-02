@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.26](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.25...v0.1.26) (2023-08-02)
+
+
+### Features
+
+* do not terminate on errors and meter the highest finalized batch number  ([#73](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/73)) ([9ce921b](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/9ce921bb6e20663c8dad9115761ed44d5b5764f8))
+
 ## [0.1.25](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.24...v0.1.25) (2023-08-02)
 
 
