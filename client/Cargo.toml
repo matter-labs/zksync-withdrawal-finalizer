@@ -6,7 +6,7 @@ homepage = "https://zksync.io/"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.7"
+ethers = "2.0.8"
 thiserror = "1.0.40"
 serde = "1.0.160"
 chrono = { version = "0.4.24", features = ["serde"] }
