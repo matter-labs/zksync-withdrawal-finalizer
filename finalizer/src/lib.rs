@@ -418,34 +418,45 @@ where
 // Continiously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
-async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2) -> Result<()>
+async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2)
 where
     M2: ZksyncMiddleware,
 {
     loop {
-        let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(&pool, 1000).await?;
-
-        if newly_executed_withdrawals.is_empty() {
-            tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;
-            continue;
+        if let Err(e) = params_fetcher_loop_iteration(&pool, &middleware).await {
+            vlog::error!("params fetcher iteration ended with {e}");
         }
-
-        vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
-
-        let hash_and_index: Vec<_> = newly_executed_withdrawals
-            .iter()
-            .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
-            .collect();
-
-        let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
-
-        for (param, id) in params
-            .iter_mut()
-            .zip(newly_executed_withdrawals.iter().map(|v| v.id))
-        {
-            param.id = id;
-        }
-
-        storage::add_withdrawals_data(&pool, &params).await?;
     }
+}
+
+async fn params_fetcher_loop_iteration<M2>(pool: &PgPool, middleware: M2) -> Result<()>
+where
+    M2: ZksyncMiddleware,
+{
+    let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(&pool, 1000).await?;
+
+    if newly_executed_withdrawals.is_empty() {
+        tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;
+        return Ok(());
+    }
+
+    vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
+
+    let hash_and_index: Vec<_> = newly_executed_withdrawals
+        .iter()
+        .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
+        .collect();
+
+    let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
+
+    for (param, id) in params
+        .iter_mut()
+        .zip(newly_executed_withdrawals.iter().map(|v| v.id))
+    {
+        param.id = id;
+    }
+
+    storage::add_withdrawals_data(&pool, &params).await?;
+
+    Ok(())
 }
