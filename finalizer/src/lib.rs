@@ -139,6 +139,10 @@ where
     async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
         vlog::debug!("finalizing batch {withdrawals:?}");
 
+        let Some(highest_batch_number) = withdrawals.iter().map(|w| w.l1_batch_number).max() else {
+            return Ok(());
+        };
+
         let w: Vec<_> = withdrawals
             .iter()
             .cloned()
@@ -191,6 +195,11 @@ where
                     tx.transaction_hash,
                 )
                 .await?;
+
+                metrics::gauge!(
+                    "finalizer.highest_finalized_batch_number",
+                    highest_batch_number.as_u64() as f64,
+                );
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => (),
@@ -225,51 +234,56 @@ where
         ))
     }
 
-    async fn finalizer_loop(mut self) -> Result<()>
+    async fn finalizer_loop(mut self)
     where
         S: Middleware,
         M: Middleware,
     {
         loop {
-            vlog::debug!("begin iteration of the finalizer loop");
-
-            let try_finalize_these =
-                storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
-                    .await?;
-
-            vlog::debug!("trying to finalize these {try_finalize_these:?}");
-
-            if try_finalize_these.is_empty() {
-                tokio::time::sleep(self.no_new_withdrawals_backoff).await;
-                continue;
+            if let Err(e) = self.loop_iteration().await {
+                vlog::error!("iteration of finalizer loop has ended with {e}");
             }
+        }
+    }
 
-            let mut accumulator = self.new_accumulator().await?;
-            let mut iter = try_finalize_these.into_iter().peekable();
+    async fn loop_iteration(&mut self) -> Result<()> {
+        vlog::debug!("begin iteration of the finalizer loop");
 
-            while let Some(t) = iter.next() {
-                accumulator.add_withdrawal(t.clone());
+        let try_finalize_these =
+            storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit).await?;
 
-                if accumulator.ready_to_finalize() || iter.peek().is_none() {
-                    let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
+        vlog::debug!("trying to finalize these {try_finalize_these:?}");
 
-                    vlog::debug!("predicted to fail: {predicted_to_fail:?}");
+        if try_finalize_these.is_empty() {
+            tokio::time::sleep(self.no_new_withdrawals_backoff).await;
+            return Ok(());
+        }
 
-                    if !predicted_to_fail.is_empty() {
-                        let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
+        let mut accumulator = self.new_accumulator().await?;
+        let mut iter = try_finalize_these.into_iter().peekable();
 
-                        self.unsuccessful.append(&mut removed);
-                        continue;
-                    } else {
-                        let requests = accumulator.take_withdrawals();
-                        self.finalize_batch(requests).await?;
-                        accumulator = self.new_accumulator().await?;
-                    }
+        while let Some(t) = iter.next() {
+            accumulator.add_withdrawal(t.clone());
+
+            if accumulator.ready_to_finalize() || iter.peek().is_none() {
+                let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
+
+                vlog::debug!("predicted to fail: {predicted_to_fail:?}");
+
+                if !predicted_to_fail.is_empty() {
+                    let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
+
+                    self.unsuccessful.append(&mut removed);
+                    continue;
+                } else {
+                    let requests = accumulator.take_withdrawals();
+                    self.finalize_batch(requests).await?;
+                    accumulator = self.new_accumulator().await?;
                 }
             }
-
-            self.process_unsuccessful().await?;
         }
+
+        self.process_unsuccessful().await
     }
 
     // process withdrawals that have been predicted as unsuccessful.
@@ -413,34 +427,45 @@ where
 // Continiously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
-async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2) -> Result<()>
+async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2)
 where
     M2: ZksyncMiddleware,
 {
     loop {
-        let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(&pool, 1000).await?;
-
-        if newly_executed_withdrawals.is_empty() {
-            tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;
-            continue;
+        if let Err(e) = params_fetcher_loop_iteration(&pool, &middleware).await {
+            vlog::error!("params fetcher iteration ended with {e}");
         }
-
-        vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
-
-        let hash_and_index: Vec<_> = newly_executed_withdrawals
-            .iter()
-            .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
-            .collect();
-
-        let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
-
-        for (param, id) in params
-            .iter_mut()
-            .zip(newly_executed_withdrawals.iter().map(|v| v.id))
-        {
-            param.id = id;
-        }
-
-        storage::add_withdrawals_data(&pool, &params).await?;
     }
+}
+
+async fn params_fetcher_loop_iteration<M2>(pool: &PgPool, middleware: M2) -> Result<()>
+where
+    M2: ZksyncMiddleware,
+{
+    let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(pool, 1000).await?;
+
+    if newly_executed_withdrawals.is_empty() {
+        tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;
+        return Ok(());
+    }
+
+    vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
+
+    let hash_and_index: Vec<_> = newly_executed_withdrawals
+        .iter()
+        .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
+        .collect();
+
+    let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
+
+    for (param, id) in params
+        .iter_mut()
+        .zip(newly_executed_withdrawals.iter().map(|v| v.id))
+    {
+        param.id = id;
+    }
+
+    storage::add_withdrawals_data(pool, &params).await?;
+
+    Ok(())
 }
