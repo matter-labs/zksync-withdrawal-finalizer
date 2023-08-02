@@ -146,6 +146,7 @@ where
             .collect();
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
+        vlog::debug!("sending finalizing transaction");
         let pending_tx = tx.send().await;
 
         // Turn actual withdrawals into info to update db with.
@@ -171,7 +172,11 @@ where
             }
         };
 
+        vlog::debug!("waiting for finalizing transaction");
+
         let mined = pending_tx.await;
+
+        vlog::debug!("mined finalizing transaction {mined:?}");
 
         match mined {
             Ok(Some(tx)) => {
