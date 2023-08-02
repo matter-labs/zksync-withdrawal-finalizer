@@ -36,6 +36,9 @@ const TX_FEE_LIMIT: f64 = 0.8;
 /// When finalizer runs out of money back off this amount of time.
 const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 
+/// Backoff period if one of the loop iterations has failed.
+const LOOP_ITERATION_ERROR_BACKOFF: Duration = Duration::from_secs(5);
+
 /// Finalizer.
 pub struct Finalizer<M1, M2> {
     pgpool: PgPool,
@@ -242,6 +245,7 @@ where
         loop {
             if let Err(e) = self.loop_iteration().await {
                 vlog::error!("iteration of finalizer loop has ended with {e}");
+                tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
             }
         }
     }
@@ -434,6 +438,7 @@ where
     loop {
         if let Err(e) = params_fetcher_loop_iteration(&pool, &middleware).await {
             vlog::error!("params fetcher iteration ended with {e}");
+            tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
         }
     }
 }
