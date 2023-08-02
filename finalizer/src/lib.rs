@@ -231,9 +231,13 @@ where
         M: Middleware,
     {
         loop {
+            vlog::debug!("begin iteration of the finalizer loop");
+
             let try_finalize_these =
                 storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
                     .await?;
+
+            vlog::debug!("trying to finalize these {try_finalize_these:?}");
 
             if try_finalize_these.is_empty() {
                 tokio::time::sleep(self.no_new_withdrawals_backoff).await;
@@ -241,7 +245,7 @@ where
             }
 
             let mut accumulator = self.new_accumulator().await?;
-            let mut iter = try_finalize_these.iter().peekable();
+            let mut iter = try_finalize_these.into_iter().peekable();
 
             while let Some(t) = iter.next() {
                 accumulator.add_withdrawal(t.clone());
@@ -255,7 +259,6 @@ where
                         let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
 
                         self.unsuccessful.append(&mut removed);
-                        vlog::debug!("unsucc {:?}", self.unsuccessful);
                         continue;
                     } else {
                         let requests = accumulator.take_withdrawals();
