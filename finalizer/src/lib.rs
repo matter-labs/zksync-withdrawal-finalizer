@@ -140,11 +140,14 @@ where
     }
 
     async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
-        vlog::debug!("finalizing batch {withdrawals:?}");
-
         let Some(highest_batch_number) = withdrawals.iter().map(|w| w.l1_batch_number).max() else {
             return Ok(());
         };
+
+        vlog::info!(
+            "finalizing batch {:?}",
+            withdrawals.iter().map(|w| w.id).collect::<Vec<_>>()
+        );
 
         let w: Vec<_> = withdrawals
             .iter()
@@ -153,7 +156,9 @@ where
             .collect();
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
-        vlog::debug!("sending finalizing transaction");
+
+        vlog::info!("sending finalizing transaction");
+
         let pending_tx = tx.send().await;
 
         // Turn actual withdrawals into info to update db with.
@@ -179,11 +184,14 @@ where
             }
         };
 
-        vlog::debug!("waiting for finalizing transaction");
+        vlog::info!(
+            "waiting for finalizing transaction {:?}",
+            pending_tx.tx_hash()
+        );
+
+        let pending_tx_hash = pending_tx.tx_hash();
 
         let mined = pending_tx.await;
-
-        vlog::debug!("mined finalizing transaction {mined:?}");
 
         match mined {
             Ok(Some(tx)) => {
@@ -205,7 +213,12 @@ where
                 );
             }
             // TODO: why would a pending tx resolve to `None`?
-            Ok(None) => (),
+            Ok(None) => {
+                vlog::warn!(
+                    "sent transaction {:?} resolved with none result",
+                    pending_tx_hash
+                );
+            }
             Err(e) => {
                 vlog::error!(
                     "waiting for transaction status withdrawals failed with an error {:?}",
