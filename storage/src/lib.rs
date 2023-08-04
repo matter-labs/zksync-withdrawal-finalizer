@@ -634,32 +634,31 @@ pub async fn get_withdrawals_with_no_data(
 ) -> Result<Vec<WithdrawalWithBlock>> {
     let withdrawals = sqlx::query!(
         "
-        WITH max_committed AS (
-          SELECT
-            max(l2_block_number)
-          FROM
-            l2_blocks
-          WHERE
-            commit_l1_block_number IS NOT NULL
-        ),
-        max_seen AS (
-          SELECT
-            max(withdrawal_id)
-          FROM
-            finalization_data
-        )
         SELECT
           tx_hash,
           event_index_in_tx,
           id,
           l2_block_number
         FROM
-          withdrawals,
-          max_committed,
-          max_seen
+          withdrawals
         WHERE
-          id > coalesce(max_seen.max, 1)
-          AND l2_block_number <= max_committed.max
+          id > COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                commit_l1_block_number IS NOT NULL
+            ),
+            1
+          )
+          AND l2_block_number <= (
+            SELECT
+              MAX(withdrawal_id)
+            FROM
+              finalization_data
+          )
         ORDER BY
           l2_block_number
         LIMIT
