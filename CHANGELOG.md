@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.28](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.27...v0.1.28) (2023-08-04)
+
+
+### Bug Fixes
+
+* add correct indices and optimize query ([#77](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/77)) ([a2941f5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a2941f5e5d38763317f3610e6343b7b2231a12c5))
+* adds logs to transaction sending ([#79](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/79)) ([f5c24c0](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/f5c24c0de3136c24ccef80499472f464a9024a24))
+
 ## [0.1.27](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.26...v0.1.27) (2023-08-02)
 
 
