@@ -642,7 +642,7 @@ pub async fn get_withdrawals_with_no_data(
         FROM
           withdrawals
         WHERE
-          id > COALESCE(
+          l2_block_number <= COALESCE(
             (
               SELECT
                 MAX(l2_block_number)
@@ -653,7 +653,7 @@ pub async fn get_withdrawals_with_no_data(
             ),
             1
           )
-          AND l2_block_number <= (
+          AND id > (
             SELECT
               MAX(withdrawal_id)
             FROM
