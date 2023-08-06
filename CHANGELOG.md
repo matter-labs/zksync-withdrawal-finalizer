@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.29](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.28...v0.1.29) (2023-08-06)
+
+
+### Bug Fixes
+
+* use correct query boundaries in the migrator ([#80](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/80)) ([50f9fdb](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/50f9fdb164f0e96f6c961013ca42d9201d726110))
+
 ## [0.1.28](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.27...v0.1.28) (2023-08-04)
 
 
