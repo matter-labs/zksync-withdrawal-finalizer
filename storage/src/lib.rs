@@ -703,6 +703,17 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
         WHERE
           finalization_tx IS NULL
           AND failed_finalization_attempts < 3
+          AND finalization_data.l2_block_number <= COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                execute_l1_block_number IS NOT NULL
+            ),
+            1
+          )
         ORDER BY
           finalization_data.l2_block_number
         LIMIT
