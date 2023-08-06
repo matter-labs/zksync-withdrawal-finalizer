@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.30](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.29...v0.1.30) (2023-08-06)
+
+
+### Bug Fixes
+
+* only select the executed withdrawals to be finalized ([#82](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/82)) ([c954585](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c9545859e83e0dd358d683d6be9f11d683a7e462))
+
 ## [0.1.29](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.28...v0.1.29) (2023-08-06)
 
 
