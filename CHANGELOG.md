@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.32](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.31...v0.1.32) (2023-08-07)
+
+
+### Bug Fixes
+
+* actually print the predictions not requests ([#86](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/86)) ([74bd76c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/74bd76cbf39a9fc35c7f33bc02094193975a930a))
+
 ## [0.1.31](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.30...v0.1.31) (2023-08-07)
 
 
