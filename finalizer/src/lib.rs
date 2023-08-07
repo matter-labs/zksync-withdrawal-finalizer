@@ -127,7 +127,7 @@ where
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        vlog::debug!("predicting results for withdrawals: {w:?}");
+        vlog::info!("predicting results for withdrawals: {w:?}");
 
         Ok(self
             .finalizer_contract
@@ -283,6 +283,11 @@ where
             accumulator.add_withdrawal(t.clone());
 
             if accumulator.ready_to_finalize() || iter.peek().is_none() {
+                vlog::info!(
+                    "predicting results for withdrawals: {:?}",
+                    accumulator.withdrawals().map(|w| w.id).collect::<Vec<_>>()
+                );
+
                 let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
 
                 vlog::debug!("predicted to fail: {predicted_to_fail:?}");
