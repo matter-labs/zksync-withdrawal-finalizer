@@ -127,13 +127,14 @@ where
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        vlog::info!("predicting results for withdrawals: {w:?}");
-
-        Ok(self
+        let results = self
             .finalizer_contract
             .finalize_withdrawals(w)
             .call()
-            .await?
+            .await?;
+        vlog::info!("predicted results for withdrawals: {results:?}");
+
+        Ok(results
             .into_iter()
             .filter(|p| !p.success || p.gas > self.one_withdrawal_gas_limit)
             .collect())
