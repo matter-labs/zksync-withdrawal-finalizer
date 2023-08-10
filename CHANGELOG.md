@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.33](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.32...v0.1.33) (2023-08-10)
+
+
+### Bug Fixes
+
+* try to avoid duplicates in l2 events ([#88](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/88)) ([5a75c64](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5a75c64573a80a45600549ba1489435a149bdf65))
+
 ## [0.1.32](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.31...v0.1.32) (2023-08-07)
 
 
