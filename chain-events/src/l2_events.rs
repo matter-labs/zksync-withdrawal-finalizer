@@ -362,7 +362,7 @@ impl L2EventsListener {
             .topic0(past_topic0.clone());
 
         let filter = Filter::new()
-            .from_block(latest_block)
+            .from_block(latest_block + 1)
             .address(tokens)
             .topic0(topic0);
 

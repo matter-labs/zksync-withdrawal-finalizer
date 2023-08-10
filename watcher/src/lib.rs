@@ -355,13 +355,13 @@ where
                 vlog::debug!("l2 token init event {event:?}");
                 storage::add_token(&pool, &event).await?;
             }
-            L2Event::RestartedFromBlock(block_number) => {
+            L2Event::RestartedFromBlock(_block_number) => {
                 // The event producer has been restarted at a given
                 // block height. It is going to re-send all events
                 // from that block number up. To avoid duplications
-                // already received events of that height and above
-                // have to be removed from the accumulator.
-                in_block_events.retain(|event| event.block_number < block_number)
+                // already received events have to be removed from
+                // the accumulator.
+                in_block_events.clear()
             }
         }
     }
