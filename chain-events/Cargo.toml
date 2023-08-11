@@ -9,7 +9,7 @@ edition = "2021"
 client = { path = "../client" }
 ethers = { version = "2.0.8", features = ["ws"] }
 futures = "0.3.28"
-metrics = "0.21.0"
+metrics = "0.21.1"
 thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["time"] }
 

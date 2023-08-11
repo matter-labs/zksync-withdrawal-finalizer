@@ -7,7 +7,7 @@ edition = "2021"
 ethers = "2.0.8"
 itertools = "0.10.5"
 futures = "0.3.28"
-metrics = "0.21.0"
+metrics = "0.21.1"
 thiserror = "1.0.40"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.28.2", features = ["time"] }
