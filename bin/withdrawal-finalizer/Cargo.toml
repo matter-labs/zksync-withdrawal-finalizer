@@ -27,4 +27,4 @@ vlog = { path = "../../vlog" }
 finalizer = { path = "../../finalizer" }
 watcher = { path = "../../watcher" }
 metrics-exporter-prometheus = "0.12.1"
-metrics = "0.21.0"
+metrics = "0.21.1"
