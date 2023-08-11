@@ -41,7 +41,7 @@ pub const ETH_TOKEN_ADDRESS: Address = H160([
 /// Eth address
 pub const ETH_ADDRESS: Address = Address::zero();
 
-/// Address of ethereum L1 messenger
+/// Address of Ethereum L1 messenger
 pub const L1_MESSENGER_ADDRESS: Address = H160([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x80, 0x08,
@@ -95,7 +95,7 @@ pub struct WithdrawalKey {
     pub event_index_in_tx: u32,
 }
 
-/// Withdrawal params
+/// Withdrawal parameters
 #[derive(Debug, Clone)]
 pub struct WithdrawalParams {
     /// Hash of the withdrawal transaction.
@@ -109,7 +109,7 @@ pub struct WithdrawalParams {
     /// A monotonically increasing counter for every withdrawal.
     pub id: u64,
 
-    /// Block number on l2 withdrawal transaction happened in.
+    /// Block number on L2 withdrawal transaction happened in.
     pub l2_block_number: u64,
 
     /// The number of batch on L1
@@ -118,7 +118,7 @@ pub struct WithdrawalParams {
     /// Index of the message on L2
     pub l2_message_index: u32,
 
-    /// Index of tx number in L2 block
+    /// Index of transaction number in L2 block
     pub l2_tx_number_in_block: u16,
 
     /// Message
@@ -141,7 +141,7 @@ impl WithdrawalParams {
     }
 }
 
-/// A middleware for interacting with Zksync node.
+/// A middleware for interacting with zkSync node.
 #[async_trait]
 #[auto_impl(&, Arc, Box)]
 pub trait ZksyncMiddleware: Middleware {
@@ -153,7 +153,7 @@ pub trait ZksyncMiddleware: Middleware {
     /// * `block_number` - Number of the block
     async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>>;
 
-    /// Get the `zksync` withdrawal proof by tx hash
+    /// Get the `zksync` withdrawal proof by transaction hash
     ///
     /// # Arguments
     ///
@@ -197,7 +197,7 @@ pub trait ZksyncMiddleware: Middleware {
         index: usize,
     ) -> Result<Option<WithdrawalParams>>;
 
-    /// Get the `zksync` withdrawal logs by tx hash.
+    /// Get the `zksync` withdrawal logs by transaction hash.
     ///
     /// # Arguments
     ///

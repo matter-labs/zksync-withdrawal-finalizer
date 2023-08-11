@@ -110,7 +110,7 @@ impl std::fmt::Display for BlockEvent {
     }
 }
 
-/// A wrapper to implement a conpressed ABI encoding used in the project.
+/// A wrapper to implement a compressed ABI encoding used in the project.
 #[derive(Default, Debug)]
 pub struct L2LogCompresed(pub codegen::L2Log);
 
@@ -141,13 +141,13 @@ impl AbiDecode for L2LogCompresed {
 
 const L2_TO_L1_LOG_SERIALIZED_SIZE: usize = 88;
 
-/// Information about withdrawals from L2ToL1 logs.
+/// Information about withdrawals from [`L2ToL1`] logs.
 #[derive(Debug)]
 pub struct L2ToL1Event {
     /// L1 address of the token
     pub token: Address,
 
-    /// Recepient of the withdrawal.
+    /// Recipient of the withdrawal.
     pub to: Address,
 
     /// Amount of the withdrawal.
@@ -159,11 +159,11 @@ pub struct L2ToL1Event {
     /// Block number in which the withdrawal happened on L2.
     pub l2_block_number: u64,
 
-    /// Number of tx in block
+    /// Number of transaction in block
     pub tx_number_in_block: u16,
 }
 
-/// Given a [`CommitBlocksCall`] parse all withdrawal events from L2ToL1 logs.
+/// Given a [`CommitBlocksCall`] parse all withdrawal events from [`L2ToL1`] logs.
 // TODO: rewrite in `nom`.
 pub fn parse_withdrawal_events_l1(
     call: &CommitBlocksCall,

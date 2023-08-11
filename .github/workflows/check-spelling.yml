@@ -1,0 +1,25 @@
+name: Check Spelling
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+env: 
+  CARGO_TERM_COLOR: always
+
+jobs:
+  spellcheck:
+    runs-on: ubuntu-latest
+  steps:
+    - name: Install cargo-spellcheck
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-spellcheck
+        
+    - uses: actions/checkout@v3
+
+    - name: Run cargo-spellcheck
+      run: cargo spellcheck --cfg=.github/spellcheck/finalizer.toml --code 1

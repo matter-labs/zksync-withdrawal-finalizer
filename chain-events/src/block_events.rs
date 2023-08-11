@@ -118,7 +118,7 @@ impl BlockEvents {
 impl BlockEvents {
     /// A convenience function that listens for all `Block`-related and sends them to the user.
     ///
-    /// `ethers` apis have two approaches to querying events from chain:
+    /// `ethers` APIs have two approaches to querying events from chain:
     ///   1. Listen to *all* types of events (will generate a less-performant code)
     ///   2. Listen to a *single* type of event
     ///
