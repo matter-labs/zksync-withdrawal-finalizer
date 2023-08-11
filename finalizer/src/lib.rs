@@ -281,7 +281,7 @@ where
         let mut iter = try_finalize_these.into_iter().peekable();
 
         while let Some(t) = iter.next() {
-            accumulator.add_withdrawal(t.clone());
+            accumulator.add_withdrawal(t);
 
             if accumulator.ready_to_finalize() || iter.peek().is_none() {
                 vlog::info!(
@@ -297,12 +297,13 @@ where
                     let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
 
                     self.unsuccessful.append(&mut removed);
-                    continue;
-                } else {
-                    let requests = accumulator.take_withdrawals();
-                    self.finalize_batch(requests).await?;
-                    accumulator = self.new_accumulator().await?;
                 }
+            }
+
+            if accumulator.ready_to_finalize() || iter.peek().is_none() {
+                let requests = accumulator.take_withdrawals();
+                self.finalize_batch(requests).await?;
+                accumulator = self.new_accumulator().await?;
             }
         }
 
