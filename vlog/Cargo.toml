@@ -11,7 +11,7 @@ categories = ["cryptography"]
 publish = false # This is an utility crate, not to be used by libraries.
 
 [dependencies]
-chrono = "0.4"
+chrono = { version = "0.4.24", default-features = false, features = ["clock", "serde"] }
 tracing = { version = "0.1.26", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "time", "json"] }
 sentry = { version = "0", default-features = false, features = ["reqwest", "rustls", "backtrace", "contexts", "panic", "anyhow"] }

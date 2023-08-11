@@ -3,13 +3,14 @@ name = "client"
 version = "0.1.11"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 homepage = "https://zksync.io/"
+license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
 ethers = "2.0.8"
 thiserror = "1.0.40"
 serde = "1.0.160"
-chrono = { version = "0.4.24", features = ["serde"] }
+chrono = { version = "0.4.24", default-features = false, features = ["clock", "serde"] }
 async-trait = "0.1.68"
 metrics = "0.21.0"
 auto_impl = "1.1.0"
