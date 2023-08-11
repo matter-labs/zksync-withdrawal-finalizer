@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.34](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.33...v0.1.34) (2023-08-11)
+
+
+### Bug Fixes
+
+* fix events processing in the finalizer loop ([#90](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/90)) ([604c0ca](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/604c0ca112232bb27ec19ba315c82c12d1f88aa6))
+
 ## [0.1.33](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.32...v0.1.33) (2023-08-10)
 
 
