@@ -8,6 +8,6 @@ proc-macro = true
 
 [dependencies]
 ethers = "2.0.8"
-proc-macro2 = "1.0.63"
+proc-macro2 = "1.0.66"
 quote = "1.0.29"
 syn = "2.0.23"
