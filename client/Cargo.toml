@@ -12,5 +12,5 @@ thiserror = "1.0.40"
 serde = "1.0.160"
 chrono = { version = "0.4.26", features = ["serde"] }
 async-trait = "0.1.72"
-metrics = "0.21.0"
+metrics = "0.21.1"
 auto_impl = "1.1.0"
