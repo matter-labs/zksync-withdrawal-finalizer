@@ -6,7 +6,7 @@ homepage = "https://zksync.io/"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.2.4", features = ["derive", "string"] }
+clap = { version = "4.3.21", features = ["derive", "string"] }
 color-eyre = "0.6.2"
 ethers = { version = "2.0.8", default-features = false, features = ["ws", "rustls"] }
 serde = "1.0.183"
