@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 ethers = "2.0.8"
 thiserror = "1.0.40"
-serde = "1.0.160"
+serde = "1.0.183"
 chrono = { version = "0.4.26", features = ["serde"] }
 async-trait = "0.1.72"
 metrics = "0.21.1"
