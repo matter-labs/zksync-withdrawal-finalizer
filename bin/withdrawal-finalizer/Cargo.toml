@@ -10,7 +10,7 @@ clap = { version = "4.3.21", features = ["derive", "string"] }
 color-eyre = "0.6.2"
 ethers = { version = "2.0.8", default-features = false, features = ["ws", "rustls"] }
 serde = "1.0.183"
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.30.0", features = ["full"] }
 toml = "0.7.6"
 url = { version = "2.4.0", features = ["serde"] }
 eyre = "0.6.8"
