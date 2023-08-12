@@ -13,7 +13,7 @@ ethers = { version = "2.0.8", default-features = false, features = ["ws", "rustl
 serde = "1.0.183"
 tokio = { version = "1.28.0", features = ["full"] }
 toml = "0.7.6"
-url = { version = "2.3.1", features = ["serde"] }
+url = { version = "2.4.0", features = ["serde"] }
 eyre = "0.6.8"
 tokio-stream = "0.1.14"
 envconfig = "0.10.0"
