@@ -8,8 +8,8 @@ edition = "2021"
 [dependencies]
 ethers = "2.0.8"
 thiserror = "1.0.44"
-serde = "1.0.160"
+serde = "1.0.183"
 chrono = { version = "0.4.26", features = ["serde"] }
-async-trait = "0.1.72"
+async-trait = "0.1.73"
 metrics = "0.21.1"
 auto_impl = "1.1.0"
