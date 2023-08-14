@@ -1,6 +1,6 @@
-use bigdecimal::BigDecimal;
 use ethers::types::U256;
 use num::{bigint::ToBigInt, rational::Ratio, traits::Pow, BigUint};
+use sqlx::types::BigDecimal;
 
 /// Converts `U256` into the corresponding `BigUint` value.
 fn u256_to_biguint(value: U256) -> BigUint {
