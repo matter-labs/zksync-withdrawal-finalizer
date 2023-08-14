@@ -159,7 +159,7 @@ pub struct L2ToL1Event {
     /// Block number in which the withdrawal happened on L2.
     pub l2_block_number: u64,
 
-    /// Number of transaction in block
+    /// Number of tx in block
     pub tx_number_in_block: u16,
 }
 

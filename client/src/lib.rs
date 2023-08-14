@@ -118,7 +118,7 @@ pub struct WithdrawalParams {
     /// Index of the message on L2
     pub l2_message_index: u32,
 
-    /// Index of transaction number in L2 block
+    /// Index of tx number in L2 block
     pub l2_tx_number_in_block: u16,
 
     /// Message
@@ -153,7 +153,7 @@ pub trait ZksyncMiddleware: Middleware {
     /// * `block_number` - Number of the block
     async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>>;
 
-    /// Get the `zksync` withdrawal proof by transaction hash
+    /// Get the `zksync` withdrawal proof by tx hash
     ///
     /// # Arguments
     ///
@@ -197,7 +197,7 @@ pub trait ZksyncMiddleware: Middleware {
         index: usize,
     ) -> Result<Option<WithdrawalParams>>;
 
-    /// Get the `zksync` withdrawal logs by transaction hash.
+    /// Get the `zksync` withdrawal logs by tx hash.
     ///
     /// # Arguments
     ///

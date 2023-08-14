@@ -21,7 +21,7 @@ use utils::u256_to_big_decimal;
 pub use error::{Error, Result};
 
 /// A convenience struct that couples together [`WithdrawalEvent`]
-/// with index in transaction and boolean `is_finalized` value
+/// with index in tx and boolean `is_finalized` value
 #[derive(Debug)]
 pub struct StoredWithdrawal {
     /// Withdrawal event
