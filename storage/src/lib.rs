@@ -304,7 +304,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         &tx_hashes,
         &block_numbers,
         &tokens,
-        &amounts,
+        amounts.as_slice(),
         &indices_in_tx,
     )
     .execute(pool)
