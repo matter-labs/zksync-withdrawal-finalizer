@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.35](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.34...v0.1.35) (2023-08-14)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate async-trait to 0.1.72 ([#97](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/97)) ([f803a00](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/f803a0026f058dc0865a298ad03490b5843a9b3a))
+* **deps:** update rust crate async-trait to 0.1.73 ([#107](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/107)) ([1507c04](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/1507c047e7557f0ddf8722f3220fec4de78901d4))
+* **deps:** update rust crate chrono to 0.4.26 ([#98](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/98)) ([52c8b2d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/52c8b2daf4aec0e60dd2fa36bc9ca49a7d06b74b))
+* **deps:** update rust crate clap to 4.3.21 ([#113](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/113)) ([1271b3d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/1271b3dee948e3ebaddce34999ad7c80db2e63c3))
+* **deps:** update rust crate itertools to 0.11.0 ([#114](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/114)) ([80b1847](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/80b1847cd06ceebd950c41d0662654c052612d5b))
+* **deps:** update rust crate metrics to 0.21.1 ([#101](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/101)) ([879b366](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/879b366b1e56d56e360bfa1100a26878ae9cedab))
+* **deps:** update rust crate num to 0.4.1 ([#102](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/102)) ([7deb151](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7deb151de63d604402dab4ab7d37ccf15f4a9fd7))
+* **deps:** update rust crate proc-macro2 to 1.0.66 ([#103](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/103)) ([0db6f9e](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0db6f9e84871265af6cee645695ad4f0f47505dc))
+* **deps:** update rust crate quote to 1.0.32 ([#104](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/104)) ([1d547ed](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/1d547ed0f5f857ab0eb6f85f16dc4d88634421ab))
+* **deps:** update rust crate serde to 1.0.183 ([#105](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/105)) ([02e9d51](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/02e9d51eef725d96c032e88ae07bc735ff059097))
+* **deps:** update rust crate syn to 2.0.28 ([#106](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/106)) ([e82ff59](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/e82ff590e9dbe4f0dc4f25f1baa249d7a32b12a4))
+* **deps:** update rust crate thiserror to 1.0.44 ([#108](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/108)) ([a312a00](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a312a00a61b43ee50eadbf0b82ec4adf1f60c0b4))
+* **deps:** update rust crate tokio to 1.30.0 ([#115](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/115)) ([8cdaffb](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/8cdaffbd5ce418b39cafb9d0ab62fce52178e627))
+* **deps:** update rust crate tokio to 1.31.0 ([#117](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/117)) ([4159ea4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/4159ea4192a2c5484e1b9fd91e001402d5ccfce2))
+* **deps:** update rust crate toml to 0.7.6 ([#109](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/109)) ([5a68841](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5a688412b7a9ba47b251f964739b65d4c9b0d54e))
+* **deps:** update rust crate tracing to 0.1.37 ([#110](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/110)) ([79e978f](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/79e978fb9b28a431a87c32044fe1a19356c236aa))
+* **deps:** update rust crate url to 2.4.0 ([#116](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/116)) ([be74d3b](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/be74d3b8084a1023cf34ba4b93361a415f06354c))
+* use bigdecimal exported by sqlx ([#121](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/121)) ([7e6cbb3](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7e6cbb34f6bf871b7b448e67f4bec5ef8c143bcd))
+
 ## [0.1.34](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.33...v0.1.34) (2023-08-11)
 
 
