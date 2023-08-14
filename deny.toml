@@ -97,7 +97,7 @@ ignore = [
 # https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html
 [licenses]
 # The lint level for crates which do not have a detectable license
-unlicensed = "allow"
+unlicensed = "deny"
 # List of explicitly allowed licenses
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
@@ -119,7 +119,7 @@ deny = [
     #"Nokia",
 ]
 # Lint level for licenses considered copyleft
-copyleft = "warn"
+copyleft = "deny"
 # Blanket approval or denial for OSI-approved or FSF Free/Libre licenses
 # * both - The license will be approved if it is both OSI-approved *AND* FSF
 # * either - The license will be approved if it is either OSI-approved *OR* FSF
