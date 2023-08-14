@@ -15,7 +15,7 @@ sqlx = { version = "0.7", features = [
     "runtime-tokio-rustls",
     "macros"
 ] }
-bigdecimal = "0.3.1"
+bigdecimal = "0.4.1"
 num = "0.4.1"
 
 client = { path = "../client" }
