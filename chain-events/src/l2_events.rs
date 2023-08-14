@@ -55,7 +55,7 @@ impl L2EventsListener {
     ///
     /// # Arguments
     ///
-    /// * `middleware`: THe middleware to perform requests with.
+    /// * `middleware`: The middleware to perform requests with.
     pub fn new(url: &str, l2_erc20_bridge_addr: Address, mut tokens: HashSet<Address>) -> Self {
         tokens.insert(ETH_TOKEN_ADDRESS);
         tokens.insert(ETH_ADDRESS);

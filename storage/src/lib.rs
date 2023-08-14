@@ -21,7 +21,7 @@ use utils::u256_to_big_decimal;
 pub use error::{Error, Result};
 
 /// A convenience struct that couples together [`WithdrawalEvent`]
-/// with index in tx and boolean is_finalized value
+/// with index in tx and boolean `is_finalized` value
 #[derive(Debug)]
 pub struct StoredWithdrawal {
     /// Withdrawal event
@@ -74,7 +74,7 @@ pub async fn committed_new_batch(
     Ok(())
 }
 
-/// Request the number of L1 block this withdrawal was commited in.
+/// Request the number of L1 block this withdrawal was committed in.
 pub async fn withdrawal_committed_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
@@ -249,7 +249,7 @@ pub async fn executed_new_batch(
 /// # Arguments
 ///
 /// * `conn`: Connection to the Postgres DB
-/// * `events`: Withdrawal events grouped with their indices in transcation.
+/// * `events`: Withdrawal events grouped with their indices in transaction.
 pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Result<()> {
     let mut tx_hashes = Vec::with_capacity(events.len());
     let mut block_numbers = Vec::with_capacity(events.len());
@@ -362,7 +362,7 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     Ok(res)
 }
 
-/// Get the last block seen for the l2_to_l1_events set
+/// Get the last block seen for the `l2_to_l1_events` set
 pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
     let started_at = Instant::now();
 
@@ -469,7 +469,7 @@ pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()
     Ok(())
 }
 
-/// Get addresses of known tokens on L2 + last seen block.
+/// Get addresses of known tokens on L2 and the last seen block.
 pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     let last_l2_block_seen = sqlx::query!(
         "
@@ -501,7 +501,7 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     Ok((tokens, last_l2_block_seen as u64))
 }
 
-/// Insert a token initalization event into the DB.
+/// Insert a token initialization event into the DB.
 pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     sqlx::query!(
         "
