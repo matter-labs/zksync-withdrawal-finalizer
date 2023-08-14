@@ -1,17 +1,17 @@
 #![deny(unused_crate_dependencies)]
 
 //! A set of logging macros that print not only timestamp and log level,
-//! but also filename, line and column.
+//! but also file name, line and column.
 //!
 //! They behave just like usual tracing::warn, tracing::info, etc.
 //! For warn and error macros we are adding file line and column to tracing variables
 //!
-//! The format of the logs in stdout can be `plain` or` json` and is set by the `MISC_LOG_FORMAT` env variable.
+//! The format of the logs in `stdout` can be `plain` or `json` and is set by the `MISC_LOG_FORMAT` env variable.
 //!
-//! Full documentation for the `tracing` crate here https://docs.rs/tracing/
+//! Full documentation for the `tracing` crate here <https://docs.rs/tracing/>
 //!
 //! Integration with sentry for catching errors and react on them immediately
-//! https://docs.sentry.io/platforms/rust/
+//! <https://docs.sentry.io/platforms/rust/>
 //!
 
 use std::{borrow::Cow, str::FromStr};
@@ -146,7 +146,7 @@ pub const DEFAULT_SAMPLING_RATIO: f64 = 0.1;
 ///
 /// If the sentry URL is provided via an environment variable, this function will also initialize sentry.
 /// Returns a sentry client guard. The full description can be found in the official documentation:
-/// https://docs.sentry.io/platforms/rust/#configure
+/// <https://docs.sentry.io/platforms/rust/#configure>
 #[must_use]
 pub fn init() -> Option<ClientInitGuard> {
     let log_format = std::env::var("MISC_LOG_FORMAT").unwrap_or_else(|_| "plain".to_string());

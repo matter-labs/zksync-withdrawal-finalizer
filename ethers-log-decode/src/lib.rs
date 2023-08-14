@@ -4,7 +4,7 @@ use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Error, Fields}
 
 /// Derives the [`EthLogDecode`] trait
 ///
-/// Derivation is only possible for enums with a single-value unnamed variants.
+/// Derivation is only possible for `enum`s with a single-value unnamed variants.
 ///
 /// # Examples:
 ///

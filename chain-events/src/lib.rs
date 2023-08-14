@@ -51,10 +51,10 @@ impl From<L2TokenInitEvent> for L2Event {
 /// `BridgeInitialize` event.
 #[derive(Debug)]
 pub struct L2TokenInitEvent {
-    /// Address of the token on l1
+    /// Address of the token on L1
     pub l1_token_address: Address,
 
-    /// Address of the token on l2
+    /// Address of the token on L2
     pub l2_token_address: Address,
 
     /// Name of the token
@@ -66,10 +66,10 @@ pub struct L2TokenInitEvent {
     /// Decimals
     pub decimals: u8,
 
-    /// Number of miniblock on l2 where this deployment happened
+    /// Number of miniblock on L2 where this deployment happened
     pub l2_block_number: u64,
 
-    /// Transaction on l2 in which the event happened
+    /// Transaction on L2 in which the event happened
     pub initialization_transaction: H256,
 }
 

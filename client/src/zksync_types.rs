@@ -19,7 +19,7 @@ pub struct BaseSystemContractsHashes {
     pub default_aa: H256,
 }
 
-/// A struct with the proof for the L2->L1 log in a specific block.
+/// A struct with the proof for the L2 to L1 log in a specific block.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct L2ToL1LogProof {
@@ -54,12 +54,12 @@ pub struct TransactionReceipt {
     pub l1_batch_number: Option<U64>,
     /// Sender
     /// Note: default address if the client did not return this value
-    /// (maintains backwards compatibility for <= 0.7.0 when this field was missing)
+    /// (maintains backwards compatibility for `<= 0.7.0` when this field was missing)
     #[serde(default)]
     pub from: Address,
     /// Recipient (None when contract creation)
     /// Note: Also `None` if the client did not return this value
-    /// (maintains backwards compatibility for <= 0.7.0 when this field was missing)
+    /// (maintains backwards compatibility for `<= 0.7.0` when this field was missing)
     #[serde(default)]
     pub to: Option<Address>,
     /// Cumulative gas used within the block after this was executed.
@@ -183,10 +183,10 @@ pub struct WithdrawalEvent {
     /// Number of the L2 block this withdrawal happened in.
     pub block_number: u64,
 
-    /// Address of the transfered token
+    /// Address of the transferred token
     pub token: Address,
 
-    /// The amount transfered.
+    /// The amount transferred.
     pub amount: U256,
 }
 
