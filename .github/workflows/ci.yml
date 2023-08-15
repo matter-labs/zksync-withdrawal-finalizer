@@ -47,4 +47,4 @@ jobs:
 
       - name: Run Tests
         run: |
-          cargo test --all --doc
+          cargo test --all
