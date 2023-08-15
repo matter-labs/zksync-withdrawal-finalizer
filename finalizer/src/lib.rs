@@ -87,12 +87,19 @@ where
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
-        let nonce_manager = Arc::new(
+        let nonce_manager = finalizer_contract.client().clone().nonce_manager(
             finalizer_contract
                 .client()
-                .clone()
-                .nonce_manager(finalizer_contract.client().get_accounts().await.unwrap()[0]),
+                .get_accounts()
+                .await
+                .expect("finalizer is expected to have signing account; qed")[0],
         );
+
+        nonce_manager
+            .initialize_nonce(None)
+            .await
+            .expect("always can initialize nonce; qed");
+
         Self {
             pgpool,
             one_withdrawal_gas_limit,
@@ -104,7 +111,7 @@ where
             no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
-            nonce_manager,
+            nonce_manager: nonce_manager.into(),
             tx_retry_times,
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
         }
