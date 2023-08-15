@@ -30,6 +30,10 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install Foundry
+        run: |
+          curl -L https://foundry.paradigm.xyz | bash
+
       - name: Build project
         run: |
           cargo build
@@ -41,6 +45,10 @@ jobs:
       - name: Check formatting
         run: |
           cargo fmt --check
+
+      - name: Doc Tests
+        run: |
+          cargo test
           
       - name: Doc Tests
         run: |

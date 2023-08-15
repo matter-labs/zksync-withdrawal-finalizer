@@ -1,5 +1,5 @@
 [package]
-name = "finalizer"
+name = "tx-sender"
 version = "0.1.11"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 homepage = "https://zksync.io/"
@@ -8,13 +8,11 @@ edition = "2021"
 
 [dependencies]
 ethers = "2.0.8"
-futures = "0.3.28"
-metrics = "0.21.1"
 thiserror = "1.0.44"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.31.0", features = ["time"] }
 
-client = { path = "../client" }
-storage = { path = "../storage" }
 vlog = { path = "../vlog" }
-tx-sender = { path = "../tx-sender" }
+
+[dev-dependencies]
+tokio = { version = "1.31.0", features = ["rt", "rt-multi-thread", "macros"] }
+pretty_assertions = "1"

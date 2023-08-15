@@ -158,6 +158,16 @@ where
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
 
+        tx_sender::send_tx_adjust_gas(
+            self.finalizer_contract.client_ref(),
+            tx.tx.clone(),
+            Duration::from_secs(1),
+            3,
+            None,
+        )
+        .await
+        .unwrap();
+
         vlog::info!("sending finalizing transaction");
 
         let pending_tx = tx.send().await;
