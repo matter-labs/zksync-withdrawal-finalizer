@@ -54,6 +54,8 @@ pub struct Finalizer<M1, M2> {
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
     nonce_manager: Arc<NonceManagerMiddleware<Arc<M1>>>,
+    tx_retry_times: usize,
+    tx_retry_timeout: Duration,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -71,6 +73,7 @@ where
     ///
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
@@ -78,6 +81,8 @@ where
         finalizer_contract: WithdrawalFinalizer<S>,
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
+        tx_retry_times: usize,
+        tx_retry_timeout: usize,
     ) -> Self {
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
@@ -100,6 +105,8 @@ where
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
             nonce_manager,
+            tx_retry_times,
+            tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
         }
     }
 
@@ -170,8 +177,8 @@ where
         tx_sender::send_tx_adjust_gas(
             self.nonce_manager.clone(),
             tx.tx.clone(),
-            Duration::from_secs(1),
-            3,
+            self.tx_retry_timeout,
+            self.tx_retry_times,
             None,
         )
         .await

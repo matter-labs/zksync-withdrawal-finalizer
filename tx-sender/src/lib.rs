@@ -19,11 +19,6 @@ pub use error::{Error, Result};
 
 /// Send a transaction with specified number of retries.
 ///
-///
-/// # Panics
-///
-/// Panics if tx nonce is not set.
-///
 /// # Arguments
 ///
 /// * `m`: [`Middleware`] to perform request with

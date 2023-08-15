@@ -290,6 +290,8 @@ async fn main() -> Result<()> {
         contract,
         zksync_contract,
         l1_bridge,
+        config.tx_retry_times,
+        config.tx_retry_timeout,
     )
     .await;
 
