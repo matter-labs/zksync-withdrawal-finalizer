@@ -5,9 +5,10 @@
 
 //! Wrapper for transaction sending with adjusting a gas price on retries.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use ethers::{
+    prelude::NonceManagerMiddleware,
     providers::Middleware,
     types::{transaction::eip2718::TypedTransaction, TransactionReceipt, U256},
 };
@@ -32,7 +33,7 @@ pub use error::{Error, Result};
 /// * `gas_increase_step`: If present increase gas price by this  number on every step, else ask
 ///    actual gas price from `m` on every retry.
 pub async fn send_tx_adjust_gas<M, T>(
-    m: M,
+    m: Arc<NonceManagerMiddleware<M>>,
     tx: T,
     retry_timeout: Duration,
     retries: usize,
@@ -47,16 +48,12 @@ where
         .await
         .map_err(|e| Error::Middleware(format!("{e}")))?;
 
+    let nonce = m.next();
     for _ in 0..retries {
         let mut submit_tx = tx.clone().into();
 
-        if submit_tx.nonce().is_none() {
-            panic!("tx expected to have a nonce; qed");
-        }
-
         submit_tx.set_gas_price(gas_price);
-
-        println!("sending transaction {submit_tx:?}");
+        submit_tx.set_nonce(nonce);
 
         let sent_tx = m.send_transaction(submit_tx, None).await.unwrap();
         let tx_hash = sent_tx.tx_hash();
@@ -87,7 +84,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
     use ethers::{
         prelude::MiddlewareBuilder,
@@ -118,6 +115,8 @@ mod tests {
             expected_gas_price += gas_bump;
         }
 
+        let nonce_manager = Arc::new(provider.nonce_manager(from));
+
         let tx = TransactionRequest::new()
             .to(to)
             .value(1000)
@@ -125,7 +124,7 @@ mod tests {
             .gas_price(gas_price);
 
         send_tx_adjust_gas(
-            &provider,
+            nonce_manager.clone(),
             Into::<TransactionRequest>::into(tx),
             Duration::from_secs(1),
             3,
@@ -134,7 +133,7 @@ mod tests {
         .await
         .unwrap_err();
 
-        let mut inspect = provider.txpool_content().await.unwrap();
+        let mut inspect = nonce_manager.txpool_content().await.unwrap();
 
         assert_eq!(inspect.pending.len(), 1);
         assert_eq!(inspect.queued.len(), 0);
@@ -163,7 +162,7 @@ mod tests {
         let to_1 = accounts[1];
         let to_2 = accounts[2];
 
-        let nonce_manager = provider.nonce_manager(from);
+        let nonce_manager = Arc::new(provider.nonce_manager(from));
 
         let gas_price = nonce_manager.get_gas_price().await.unwrap();
         let mut expected_gas_price = gas_price;
@@ -177,26 +176,24 @@ mod tests {
             .to(to_1)
             .value(1000)
             .from(from)
-            .gas_price(gas_price)
-            .nonce(nonce_manager.next());
+            .gas_price(gas_price);
 
         let tx_2 = TransactionRequest::new()
             .to(to_2)
             .value(1000)
             .from(from)
-            .gas_price(gas_price)
-            .nonce(nonce_manager.next());
+            .gas_price(gas_price);
 
         let (first, second) = tokio::join!(
             send_tx_adjust_gas(
-                &nonce_manager,
+                nonce_manager.clone(),
                 Into::<TransactionRequest>::into(tx_1),
                 Duration::from_secs(1),
                 3,
                 Some(10_000_u64.into()),
             ),
             send_tx_adjust_gas(
-                &nonce_manager,
+                nonce_manager.clone(),
                 Into::<TransactionRequest>::into(tx_2),
                 Duration::from_secs(1),
                 3,
@@ -208,7 +205,6 @@ mod tests {
         assert_eq!(second.unwrap_err(), Error::Timedout);
 
         let mut inspect = nonce_manager.txpool_content().await.unwrap();
-        println!("inspect {inspect:?}");
 
         assert_eq!(inspect.pending.len(), 1);
         assert_eq!(inspect.queued.len(), 0);

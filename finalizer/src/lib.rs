@@ -5,11 +5,12 @@
 
 //! Finalization logic implementation.
 
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
-    prelude::ContractError,
+    middleware::MiddlewareBuilder,
+    prelude::{ContractError, NonceManagerMiddleware},
     providers::{Middleware, MiddlewareError},
     types::{H256, U256},
 };
@@ -52,6 +53,7 @@ pub struct Finalizer<M1, M2> {
     no_new_withdrawals_backoff: Duration,
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
+    nonce_manager: Arc<NonceManagerMiddleware<Arc<M1>>>,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -69,7 +71,7 @@ where
     ///
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
-    pub fn new(
+    pub async fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
@@ -80,6 +82,12 @@ where
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
+        let nonce_manager = Arc::new(
+            finalizer_contract
+                .client()
+                .clone()
+                .nonce_manager(finalizer_contract.client().get_accounts().await.unwrap()[0]),
+        );
         Self {
             pgpool,
             one_withdrawal_gas_limit,
@@ -91,6 +99,7 @@ where
             no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
+            nonce_manager,
         }
     }
 
@@ -159,7 +168,7 @@ where
         let tx = self.finalizer_contract.finalize_withdrawals(w);
 
         tx_sender::send_tx_adjust_gas(
-            self.finalizer_contract.client_ref(),
+            self.nonce_manager.clone(),
             tx.tx.clone(),
             Duration::from_secs(1),
             3,
