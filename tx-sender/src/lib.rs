@@ -33,15 +33,12 @@ pub async fn send_tx_adjust_gas<M, T>(
     retry_timeout: Duration,
     retries: usize,
     gas_increase_step: Option<U256>,
-) -> Result<Option<TransactionReceipt>>
+) -> Result<Option<TransactionReceipt>, M>
 where
     M: Middleware,
     T: Into<TypedTransaction> + Send + Sync + Clone,
 {
-    let mut gas_price = m
-        .get_gas_price()
-        .await
-        .map_err(|e| Error::Middleware(format!("{e}")))?;
+    let mut gas_price = m.get_gas_price().await?;
 
     let nonce = m.next();
     for _ in 0..retries {
@@ -50,14 +47,15 @@ where
         submit_tx.set_gas_price(gas_price);
         submit_tx.set_nonce(nonce);
 
-        let sent_tx = m.send_transaction(submit_tx, None).await.unwrap();
+        let sent_tx = m.send_transaction(submit_tx, None).await?;
+
         let tx_hash = sent_tx.tx_hash();
 
         let result = tokio::time::timeout(retry_timeout, sent_tx).await;
 
         match result {
             Ok(res) => {
-                return res.map_err(|e| Error::Middleware(format!("{e}")));
+                return Ok(res?);
             }
             Err(_e) => {
                 vlog::info!("waiting for mined transaction {tx_hash:?} timed out",);
@@ -65,10 +63,7 @@ where
                 if let Some(gas_increase_step) = gas_increase_step {
                     gas_price += gas_increase_step;
                 } else {
-                    gas_price = m
-                        .get_gas_price()
-                        .await
-                        .map_err(|e| Error::Middleware(format!("{e}")))?;
+                    gas_price = m.get_gas_price().await?;
                 }
             }
         }
@@ -82,7 +77,7 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use ethers::{
-        prelude::MiddlewareBuilder,
+        middleware::MiddlewareBuilder,
         providers::{Middleware, Provider, ProviderExt},
         types::{TransactionRequest, U256},
         utils::Anvil,
@@ -196,8 +191,14 @@ mod tests {
             )
         );
 
-        assert_eq!(first.unwrap_err(), Error::Timedout);
-        assert_eq!(second.unwrap_err(), Error::Timedout);
+        match first.unwrap_err() {
+            Error::Timedout => (),
+            _ => panic!("Expected Timeout error"),
+        };
+        match second.unwrap_err() {
+            Error::Timedout => (),
+            _ => panic!("Expected Timeout error"),
+        };
 
         let mut inspect = nonce_manager.txpool_content().await.unwrap();
 

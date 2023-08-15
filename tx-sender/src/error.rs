@@ -1,14 +1,33 @@
 use std::fmt::Debug;
 
-#[derive(PartialEq, Eq, Debug, thiserror::Error)]
+use ethers::{
+    prelude::nonce_manager::NonceManagerError,
+    providers::{Middleware, ProviderError},
+};
+
+#[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
-pub enum Error {
-    #[error("Middleware error {0}")]
-    Middleware(String),
+pub enum Error<M>
+where
+    M: Middleware,
+{
+    #[error(transparent)]
+    ProviderError(#[from] ProviderError),
+
+    #[error("Middleware error")]
+    Middleware { e: <M as Middleware>::Error },
 
     #[error("sending a gas adjusted transaction timed out")]
     Timedout,
 }
 
+impl<M: Middleware> From<NonceManagerError<M>> for Error<M> {
+    fn from(value: NonceManagerError<M>) -> Self {
+        match value {
+            NonceManagerError::MiddlewareError(e) => Self::Middleware { e },
+        }
+    }
+}
+
 /// The crate result type.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, M> = std::result::Result<T, Error<M>>;

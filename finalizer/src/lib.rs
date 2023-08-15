@@ -10,7 +10,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
     middleware::MiddlewareBuilder,
-    prelude::{ContractError, NonceManagerMiddleware},
+    prelude::NonceManagerMiddleware,
     providers::{Middleware, MiddlewareError},
     types::{H256, U256},
 };
@@ -181,53 +181,19 @@ where
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
 
-        tx_sender::send_tx_adjust_gas(
+        let tx = tx_sender::send_tx_adjust_gas(
             self.nonce_manager.clone(),
             tx.tx.clone(),
             self.tx_retry_timeout,
             self.tx_retry_times,
             None,
         )
-        .await
-        .unwrap();
-
-        vlog::info!("sending finalizing transaction");
-
-        let pending_tx = tx.send().await;
+        .await;
 
         // Turn actual withdrawals into info to update db with.
         let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
-        let pending_tx = match pending_tx {
-            Ok(e) => e,
-            Err(e) => {
-                vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
-                if !is_gas_required_exceeds_allowance(&e) {
-                    storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
-                        .await?;
-                } else {
-                    metrics::counter!(
-                        "finalizer.finalization_events.failed_to_finalize_low_gas",
-                        withdrawals.len() as u64
-                    );
-
-                    tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
-                }
-
-                return Ok(());
-            }
-        };
-
-        vlog::info!(
-            "waiting for finalizing transaction {:?}",
-            pending_tx.tx_hash()
-        );
-
-        let pending_tx_hash = pending_tx.tx_hash();
-
-        let mined = pending_tx.await;
-
-        match mined {
+        match tx {
             Ok(Some(tx)) => {
                 vlog::info!(
                     "withdrawal transaction {:?} successfully mined",
@@ -248,16 +214,35 @@ where
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => {
-                vlog::warn!(
-                    "sent transaction {:?} resolved with none result",
-                    pending_tx_hash
-                );
+                vlog::warn!("sent transaction resolved with none result",);
             }
             Err(e) => {
                 vlog::error!(
                     "waiting for transaction status withdrawals failed with an error {:?}",
                     e
                 );
+
+                match e {
+                    tx_sender::Error::ProviderError(_) => todo!(),
+                    tx_sender::Error::Middleware { e } => {
+                        vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
+                        if !is_gas_required_exceeds_allowance::<S>(&e) {
+                            storage::inc_unsuccessful_finalization_attempts(
+                                &self.pgpool,
+                                &withdrawals,
+                            )
+                            .await?;
+                        } else {
+                            metrics::counter!(
+                                "finalizer.finalization_events.failed_to_finalize_low_gas",
+                                withdrawals.len() as u64
+                            );
+
+                            tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
+                        }
+                    }
+                    tx_sender::Error::Timedout => todo!(),
+                }
                 // no need to bump the counter here, waiting for tx
                 // has failed becuase of networking or smth, but at
                 // this point tx has already been accepted into tx pool
@@ -447,11 +432,9 @@ where
     }
 }
 
-fn is_gas_required_exceeds_allowance<M: Middleware>(e: &ContractError<M>) -> bool {
-    if let ContractError::MiddlewareError { e } = e {
-        if let Some(e) = e.as_error_response() {
-            return e.code == -32000 && e.message.starts_with("gas required exceeds allowance ");
-        }
+fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error) -> bool {
+    if let Some(e) = e.as_error_response() {
+        return e.code == -32000 && e.message.starts_with("gas required exceeds allowance ");
     }
 
     false
