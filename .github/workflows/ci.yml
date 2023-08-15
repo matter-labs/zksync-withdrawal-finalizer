@@ -30,14 +30,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Download Foundry
-        run: |
-          curl -L https://foundry.paradigm.xyz | bash
-
       - name: Install Foundry
-        run: |
-          foundryup
-
+        uses: foundry-rs/foundry-toolchain@v1
+      
       - name: Build project
         run: |
           cargo build
