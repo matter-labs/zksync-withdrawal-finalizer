@@ -79,7 +79,7 @@ mod tests {
     use ethers::{
         middleware::MiddlewareBuilder,
         providers::{Middleware, Provider, ProviderExt},
-        types::{TransactionRequest, U256},
+        types::{Eip1559TransactionRequest, TransactionRequest, U256},
         utils::Anvil,
     };
     use pretty_assertions::assert_eq;
@@ -115,7 +115,7 @@ mod tests {
 
         send_tx_adjust_gas(
             nonce_manager.clone(),
-            Into::<TransactionRequest>::into(tx),
+            tx,
             Duration::from_secs(1),
             3,
             Some(10_000_u64.into()),
@@ -138,6 +138,9 @@ mod tests {
         assert_eq!(nonce_str.parse::<usize>().unwrap(), 0);
         assert_eq!(tx.nonce, U256::zero());
         assert_eq!(tx.gas_price.unwrap(), expected_gas_price);
+
+        assert_eq!(tx.max_fee_per_gas, None);
+        assert_eq!(tx.max_priority_fee_per_gas, None);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -177,14 +180,14 @@ mod tests {
         let (first, second) = tokio::join!(
             send_tx_adjust_gas(
                 nonce_manager.clone(),
-                Into::<TransactionRequest>::into(tx_1),
+                tx_1,
                 Duration::from_secs(1),
                 3,
                 Some(10_000_u64.into()),
             ),
             send_tx_adjust_gas(
                 nonce_manager.clone(),
-                Into::<TransactionRequest>::into(tx_2),
+                tx_2,
                 Duration::from_secs(1),
                 3,
                 Some(10_000_u64.into()),
@@ -220,5 +223,60 @@ mod tests {
         assert_eq!(nonce_str.parse::<usize>().unwrap(), 1);
         assert_eq!(tx.nonce, U256::one());
         assert_eq!(tx.gas_price.unwrap(), expected_gas_price);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn retry_sending_single_erc1559_tx() {
+        let anvil = Anvil::new().arg("--no-mining").spawn();
+
+        let provider = Provider::<ethers::providers::Http>::connect(&anvil.endpoint()).await;
+
+        // connect to the network
+        let accounts = provider.get_accounts().await.unwrap();
+        let from = accounts[0];
+        let to = accounts[1];
+
+        let gas_price = provider.get_gas_price().await.unwrap();
+        let mut expected_gas_price = gas_price;
+        let gas_bump = 10_000_u64.into();
+
+        for _ in 0..2 {
+            expected_gas_price += gas_bump;
+        }
+
+        let nonce_manager = Arc::new(provider.nonce_manager(from));
+
+        let tx = Eip1559TransactionRequest::new()
+            .to(to)
+            .value(1000)
+            .from(from);
+
+        send_tx_adjust_gas(
+            nonce_manager.clone(),
+            tx,
+            Duration::from_secs(1),
+            3,
+            Some(10_000_u64.into()),
+        )
+        .await
+        .unwrap_err();
+
+        let mut inspect = nonce_manager.txpool_content().await.unwrap();
+
+        assert_eq!(inspect.pending.len(), 1);
+        assert_eq!(inspect.queued.len(), 0);
+
+        let (addr, mut txs) = inspect.pending.pop_first().unwrap();
+        assert_eq!(addr, from);
+
+        assert_eq!(txs.len(), 1);
+
+        let (nonce_str, tx) = txs.pop_first().unwrap();
+
+        assert_eq!(nonce_str.parse::<usize>().unwrap(), 0);
+        assert_eq!(tx.nonce, U256::zero());
+        assert_eq!(tx.gas_price.unwrap(), expected_gas_price);
+        assert_eq!(tx.max_fee_per_gas.unwrap(), expected_gas_price);
+        assert_eq!(tx.max_priority_fee_per_gas.unwrap(), expected_gas_price);
     }
 }
