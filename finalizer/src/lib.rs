@@ -223,7 +223,9 @@ where
                 );
 
                 match e {
-                    tx_sender::Error::ProviderError(_) => todo!(),
+                    tx_sender::Error::ProviderError(e) => {
+                        vlog::error!("failed to send finalization transaction: {e}")
+                    }
                     tx_sender::Error::Middleware { e } => {
                         vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
                         if !is_gas_required_exceeds_allowance::<S>(&e) {
@@ -241,7 +243,9 @@ where
                             tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                         }
                     }
-                    tx_sender::Error::Timedout => todo!(),
+                    tx_sender::Error::Timedout => {
+                        vlog::error!("sending a finalization transaction timedout");
+                    }
                 }
                 // no need to bump the counter here, waiting for tx
                 // has failed becuase of networking or smth, but at
