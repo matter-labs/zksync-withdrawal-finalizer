@@ -21,6 +21,14 @@ pub use error::{Error, Result};
 
 const RETRY_BUMP_FEES_PERCENT: u8 = 15;
 
+/// Bump prices of a `TypedTransaction` depending on its type.
+///
+/// For non-`eip1559` txs the `gas_price` is bumped by the given percentage.
+///
+/// For `eip1559` txs:
+///  * the `max_priority_fee_per_gas` is bumped by the given percentage
+///  * the `max_fee_per_gas` is bumped by the flat value
+///    `max_priority_fee_per_gas` was bumped with.
 fn bump_predicted_fees(tx: &mut TypedTransaction, percent: u8) {
     match tx {
         TypedTransaction::Legacy(ref mut tx)
