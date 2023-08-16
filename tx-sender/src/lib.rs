@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn retry_sending_single_erc1559_tx() {
+    async fn retry_sending_single_eip1559_tx() {
         let anvil = Anvil::new().arg("--no-mining").spawn();
 
         let provider = Provider::<ethers::providers::Http>::connect(&anvil.endpoint()).await;
