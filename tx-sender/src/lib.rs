@@ -25,20 +25,21 @@ fn bump_predicted_fees(tx: &mut TypedTransaction, percent: u8) {
     match tx {
         TypedTransaction::Legacy(ref mut tx)
         | TypedTransaction::Eip2930(Eip2930TransactionRequest { ref mut tx, .. }) => {
-            tx.gas_price
-                .as_mut()
-                .map(|gas_price| *gas_price = *gas_price + inc_u256_percent(*gas_price, percent));
+            if let Some(gas_price) = tx.gas_price.as_mut() {
+                *gas_price = *gas_price + inc_u256_percent(*gas_price, percent);
+            }
         }
         TypedTransaction::Eip1559(ref mut tx) => {
             let mut bump = U256::zero();
-            tx.max_priority_fee_per_gas.as_mut().map(|gas_price| {
-                bump = inc_u256_percent(*gas_price, percent);
-                *gas_price = *gas_price + bump;
-            });
 
-            tx.max_fee_per_gas.as_mut().map(|gas_price| {
+            if let Some(max_priority_fee_per_gas) = tx.max_priority_fee_per_gas.as_mut() {
+                bump = inc_u256_percent(*max_priority_fee_per_gas, percent);
+                *max_priority_fee_per_gas += bump;
+            }
+
+            if let Some(gas_price) = tx.max_fee_per_gas.as_mut() {
                 *gas_price += bump;
-            });
+            }
         }
     }
 }
