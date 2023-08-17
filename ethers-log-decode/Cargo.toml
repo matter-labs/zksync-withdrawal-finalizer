@@ -13,4 +13,4 @@ proc-macro = true
 ethers = "2.0.8"
 proc-macro2 = "1.0.66"
 quote = "1.0.33"
-syn = "2.0.28"
+syn = "2.0.29"
