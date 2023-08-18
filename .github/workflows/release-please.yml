@@ -13,10 +13,18 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v3
+      - name: Run release-please
+        id: release
+        uses: google-github-actions/release-please-action@v3
         with:
           command: manifest
           config-file: .github/release-please/config.json
           manifest-file: .github/release-please/manifest.json
           token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
-
+          
+      - name: Send Release Info
+        if: ${{ steps.release.outputs.releases_created }}
+        uses: matter-labs/format-release-please-for-slack-action@380f282967e3262bfd5509dbed21d1895658405c # v2.0.1
+        with:
+          release-please-output: ${{ toJSON(steps.release.outputs) }}
+          slack-webhook-url: ${{ secrets.MATTERMOST_WEBHOOK_RELEASES }}
