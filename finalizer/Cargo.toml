@@ -17,3 +17,4 @@ tokio = { version = "1.32.0", features = ["time"] }
 client = { path = "../client" }
 storage = { path = "../storage" }
 vlog = { path = "../vlog" }
+tx-sender = { path = "../tx-sender" }

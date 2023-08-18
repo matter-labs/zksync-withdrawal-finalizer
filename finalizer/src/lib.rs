@@ -5,11 +5,12 @@
 
 //! Finalization logic implementation.
 
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
-    prelude::ContractError,
+    middleware::MiddlewareBuilder,
+    prelude::NonceManagerMiddleware,
     providers::{Middleware, MiddlewareError},
     types::{H256, U256},
 };
@@ -52,6 +53,8 @@ pub struct Finalizer<M1, M2> {
     no_new_withdrawals_backoff: Duration,
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
+    nonce_manager: Arc<NonceManagerMiddleware<Arc<M1>>>,
+    tx_retry_timeout: Duration,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -69,16 +72,31 @@ where
     ///
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
-    pub fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub async fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
         finalizer_contract: WithdrawalFinalizer<S>,
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
+        tx_retry_timeout: usize,
     ) -> Self {
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
+
+        let nonce_manager = finalizer_contract.client().clone().nonce_manager(
+            finalizer_contract
+                .client()
+                .get_accounts()
+                .await
+                .expect("finalizer is expected to have signing account; qed")[0],
+        );
+
+        nonce_manager
+            .initialize_nonce(None)
+            .await
+            .expect("always can initialize nonce; qed");
 
         Self {
             pgpool,
@@ -91,6 +109,8 @@ where
             no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
+            nonce_manager: nonce_manager.into(),
+            tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
         }
     }
 
@@ -158,43 +178,17 @@ where
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
 
-        vlog::info!("sending finalizing transaction");
-
-        let pending_tx = tx.send().await;
+        let tx = tx_sender::send_tx_adjust_gas(
+            self.nonce_manager.clone(),
+            tx.tx.clone(),
+            self.tx_retry_timeout,
+        )
+        .await;
 
         // Turn actual withdrawals into info to update db with.
         let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
-        let pending_tx = match pending_tx {
-            Ok(e) => e,
-            Err(e) => {
-                vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
-                if !is_gas_required_exceeds_allowance(&e) {
-                    storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
-                        .await?;
-                } else {
-                    metrics::counter!(
-                        "finalizer.finalization_events.failed_to_finalize_low_gas",
-                        withdrawals.len() as u64
-                    );
-
-                    tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
-                }
-
-                return Ok(());
-            }
-        };
-
-        vlog::info!(
-            "waiting for finalizing transaction {:?}",
-            pending_tx.tx_hash()
-        );
-
-        let pending_tx_hash = pending_tx.tx_hash();
-
-        let mined = pending_tx.await;
-
-        match mined {
+        match tx {
             Ok(Some(tx)) => {
                 vlog::info!(
                     "withdrawal transaction {:?} successfully mined",
@@ -215,16 +209,31 @@ where
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => {
-                vlog::warn!(
-                    "sent transaction {:?} resolved with none result",
-                    pending_tx_hash
-                );
+                vlog::warn!("sent transaction resolved with none result",);
             }
             Err(e) => {
                 vlog::error!(
                     "waiting for transaction status withdrawals failed with an error {:?}",
                     e
                 );
+
+                let ethers::prelude::nonce_manager::NonceManagerError::MiddlewareError(
+                    middleware_error,
+                ) = e;
+                if let Some(provider_error) = middleware_error.as_provider_error() {
+                    vlog::error!("failed to send finalization transaction: {provider_error}");
+                } else if !is_gas_required_exceeds_allowance::<S>(&middleware_error) {
+                    storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
+                        .await?;
+                } else {
+                    vlog::error!("failed to send finalization withdrawal tx: {middleware_error}",);
+                    metrics::counter!(
+                        "finalizer.finalization_events.failed_to_finalize_low_gas",
+                        withdrawals.len() as u64
+                    );
+
+                    tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
+                }
                 // no need to bump the counter here, waiting for tx
                 // has failed becuase of networking or smth, but at
                 // this point tx has already been accepted into tx pool
@@ -414,11 +423,9 @@ where
     }
 }
 
-fn is_gas_required_exceeds_allowance<M: Middleware>(e: &ContractError<M>) -> bool {
-    if let ContractError::MiddlewareError { e } = e {
-        if let Some(e) = e.as_error_response() {
-            return e.code == -32000 && e.message.starts_with("gas required exceeds allowance ");
-        }
+fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error) -> bool {
+    if let Some(e) = e.as_error_response() {
+        return e.code == -32000 && e.message.starts_with("gas required exceeds allowance ");
     }
 
     false

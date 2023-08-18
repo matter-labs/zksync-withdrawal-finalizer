@@ -30,6 +30,9 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+      
       - name: Build project
         run: |
           cargo build
@@ -41,7 +44,7 @@ jobs:
       - name: Check formatting
         run: |
           cargo fmt --check
-          
-      - name: Doc Tests
+
+      - name: Run Tests
         run: |
-          cargo test --doc
+          cargo test --all

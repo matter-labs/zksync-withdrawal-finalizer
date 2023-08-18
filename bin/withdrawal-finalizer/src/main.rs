@@ -290,7 +290,9 @@ async fn main() -> Result<()> {
         contract,
         zksync_contract,
         l1_bridge,
-    );
+        config.tx_retry_timeout,
+    )
+    .await;
 
     let provider_l2 = Provider::<Ws>::connect_with_reconnects(
         config.api_web3_json_rpc_ws_url.as_str(),
