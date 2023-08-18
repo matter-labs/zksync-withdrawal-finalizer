@@ -72,7 +72,7 @@ where
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
