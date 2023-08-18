@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.36](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.35...v0.1.36) (2023-08-18)
+
+
+### Features
+
+* adds tx sender with gas adjustment ([#125](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/125)) ([6c84586](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/6c845861c2d4026c31708cfd70238dcf921fca90))
+
+
+### Bug Fixes
+
+* **deps:** update rust crate clap to 4.3.22 ([#131](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/131)) ([e333291](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/e3332914aac64452d4f0b073b56b07b6fc64599c))
+* **deps:** update rust crate quote to 1.0.33 ([#128](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/128)) ([59ecc83](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/59ecc83394c0dae76f635d145f5708f354549bc8))
+* **deps:** update rust crate syn to 2.0.29 ([#129](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/129)) ([ae452ba](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ae452bab0903c22e382bc9fdd4bead8654117c42))
+* **deps:** update rust crate thiserror to 1.0.45 ([#123](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/123)) ([1b18823](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/1b18823da4a2774212891c2ae20bf39a7023b1d0))
+* **deps:** update rust crate thiserror to 1.0.46 ([#126](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/126)) ([b8b4d2c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/b8b4d2cfec6d2a7d2d9d401dd75748c5c4c08e85))
+* **deps:** update rust crate thiserror to 1.0.47 ([#130](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/130)) ([dc10c2b](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/dc10c2b3136f1234bb10109c474c7d56afaac694))
+* **deps:** update rust crate tokio to 1.32.0 ([#127](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/127)) ([177260f](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/177260fecdecb87078c59a62b5a53e818b9288ac))
+
 ## [0.1.35](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.34...v0.1.35) (2023-08-14)
 
 
