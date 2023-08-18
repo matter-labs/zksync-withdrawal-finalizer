@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.37](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.36...v0.1.37) (2023-08-18)
+
+
+### Bug Fixes
+
+* use correct finalizer account address ([#133](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/133)) ([0689449](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/06894493a1474f1409c63ea3a70232a89dd9b65f))
+
 ## [0.1.36](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.35...v0.1.36) (2023-08-18)
 
 
