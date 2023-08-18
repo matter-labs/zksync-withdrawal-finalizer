@@ -294,8 +294,7 @@ async fn main() -> Result<()> {
         l1_bridge,
         config.tx_retry_timeout,
         finalizer_account_address,
-    )
-    .await;
+    );
 
     let provider_l2 = Provider::<Ws>::connect_with_reconnects(
         config.api_web3_json_rpc_ws_url.as_str(),
