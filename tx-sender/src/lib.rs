@@ -9,16 +9,12 @@ use std::{sync::Arc, time::Duration, u8};
 
 use ethers::{
     prelude::NonceManagerMiddleware,
-    providers::{Middleware, ProviderError},
+    providers::{Middleware, MiddlewareError, ProviderError},
     types::{
         transaction::eip2718::TypedTransaction, BlockNumber, Eip2930TransactionRequest,
         TransactionReceipt, U256,
     },
 };
-
-mod error;
-
-pub use error::{Error, Result};
 
 const RETRY_BUMP_FEES_PERCENT: u8 = 15;
 
@@ -34,7 +30,7 @@ async fn bump_predicted_fees<M: Middleware>(
     tx: &mut TypedTransaction,
     percent: u8,
     m: M,
-) -> Result<()> {
+) -> Result<(), M::Error> {
     match tx {
         TypedTransaction::Legacy(ref mut tx)
         | TypedTransaction::Eip2930(Eip2930TransactionRequest { ref mut tx, .. }) => {
@@ -45,17 +41,23 @@ async fn bump_predicted_fees<M: Middleware>(
         TypedTransaction::Eip1559(ref mut tx) => {
             let base_fee_per_gas = m
                 .get_block(BlockNumber::Latest)
-                .await
-                .map_err(|e| Error::Middleware(format!("{e}")))?
-                .ok_or_else(|| ProviderError::CustomError("Latest block not found".into()))?
+                .await?
+                .ok_or_else(|| {
+                    <M::Error>::from_provider_err(ProviderError::CustomError(
+                        "Latest block not found".into(),
+                    ))
+                })?
                 .base_fee_per_gas
-                .ok_or_else(|| ProviderError::CustomError("EIP-1559 not activated".into()))?;
+                .ok_or_else(|| {
+                    <M::Error>::from_provider_err(ProviderError::CustomError(
+                        "EIP-1559 not activated".into(),
+                    ))
+                })?;
 
             let mut bump = U256::zero();
 
             if let Some(max_priority_fee_per_gas) = tx.max_priority_fee_per_gas.as_mut() {
                 bump = inc_u256_percent(*max_priority_fee_per_gas, percent);
-                println!("{max_priority_fee_per_gas} {bump} {base_fee_per_gas}");
                 *max_priority_fee_per_gas += bump;
             }
 
@@ -89,7 +91,7 @@ pub async fn send_tx_adjust_gas<M, T>(
     m: Arc<NonceManagerMiddleware<M>>,
     tx: T,
     retry_timeout: Duration,
-) -> Result<Option<TransactionReceipt>>
+) -> Result<Option<TransactionReceipt>, <Arc<NonceManagerMiddleware<M>> as Middleware>::Error>
 where
     M: Middleware,
     T: Into<TypedTransaction> + Send + Sync + Clone,
@@ -97,20 +99,15 @@ where
     let nonce = m.next();
 
     let mut submit_tx = tx.clone().into();
-    m.fill_transaction(&mut submit_tx, None)
-        .await
-        .map_err(|e| Error::Middleware(format!("{e}")))?;
+    m.fill_transaction(&mut submit_tx, None).await?;
     submit_tx.set_nonce(nonce);
 
     for retry_num in 0..usize::MAX {
         if retry_num > 0 {
-            bump_predicted_fees(&mut submit_tx, RETRY_BUMP_FEES_PERCENT, m.provider()).await?;
+            bump_predicted_fees(&mut submit_tx, RETRY_BUMP_FEES_PERCENT, &m).await?;
         }
 
-        let sent_tx = m
-            .send_transaction(submit_tx.clone(), None)
-            .await
-            .map_err(|e| Error::Middleware(format!("{e}")))?;
+        let sent_tx = m.send_transaction(submit_tx.clone(), None).await?;
 
         let tx_hash = sent_tx.tx_hash();
 
@@ -118,7 +115,8 @@ where
 
         match result {
             Ok(res) => {
-                return Ok(res?);
+                let res = res.map_err(MiddlewareError::from_provider_err)?;
+                return Ok(res);
             }
             Err(_e) => {
                 vlog::info!("waiting for mined transaction {tx_hash:?} timed out",);

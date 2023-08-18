@@ -4293,7 +4293,6 @@ dependencies = [
  "ethers",
  "metrics",
  "pretty_assertions",
- "thiserror",
  "tokio",
  "vlog",
 ]

@@ -217,30 +217,22 @@ where
                     e
                 );
 
-                match e {
-                    tx_sender::Error::ProviderError(e) => {
-                        vlog::error!("failed to send finalization transaction: {e}")
-                    }
-                    tx_sender::Error::Middleware { e } => {
-                        vlog::error!("failed to send finalization withdrawal tx: {:?}", e);
-                        if !is_gas_required_exceeds_allowance::<S>(&e) {
-                            storage::inc_unsuccessful_finalization_attempts(
-                                &self.pgpool,
-                                &withdrawals,
-                            )
-                            .await?;
-                        } else {
-                            metrics::counter!(
-                                "finalizer.finalization_events.failed_to_finalize_low_gas",
-                                withdrawals.len() as u64
-                            );
+                let ethers::prelude::nonce_manager::NonceManagerError::MiddlewareError(
+                    middleware_error,
+                ) = e;
+                if let Some(provider_error) = middleware_error.as_provider_error() {
+                    vlog::error!("failed to send finalization transaction: {provider_error}");
+                } else if !is_gas_required_exceeds_allowance::<S>(&middleware_error) {
+                    storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
+                        .await?;
+                } else {
+                    vlog::error!("failed to send finalization withdrawal tx: {middleware_error}",);
+                    metrics::counter!(
+                        "finalizer.finalization_events.failed_to_finalize_low_gas",
+                        withdrawals.len() as u64
+                    );
 
-                            tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
-                        }
-                    }
-                    tx_sender::Error::Timedout => {
-                        vlog::error!("sending a finalization transaction timedout");
-                    }
+                    tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                 }
                 // no need to bump the counter here, waiting for tx
                 // has failed becuase of networking or smth, but at
