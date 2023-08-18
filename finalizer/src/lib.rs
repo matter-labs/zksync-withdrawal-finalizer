@@ -5,13 +5,11 @@
 
 //! Finalization logic implementation.
 
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
     abi::Address,
-    middleware::MiddlewareBuilder,
-    prelude::NonceManagerMiddleware,
     providers::{Middleware, MiddlewareError},
     types::{H256, U256},
 };
@@ -54,8 +52,8 @@ pub struct Finalizer<M1, M2> {
     no_new_withdrawals_backoff: Duration,
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
-    nonce_manager: Arc<NonceManagerMiddleware<Arc<M1>>>,
     tx_retry_timeout: Duration,
+    account_address: Address,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -74,7 +72,7 @@ where
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
@@ -87,16 +85,6 @@ where
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
-        let nonce_manager = finalizer_contract
-            .client()
-            .clone()
-            .nonce_manager(account_address);
-
-        nonce_manager
-            .initialize_nonce(None)
-            .await
-            .expect("always can initialize nonce; qed");
-
         Self {
             pgpool,
             one_withdrawal_gas_limit,
@@ -108,8 +96,8 @@ where
             no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
-            nonce_manager: nonce_manager.into(),
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
+            account_address,
         }
     }
 
@@ -176,11 +164,18 @@ where
             .collect();
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
+        let nonce = self
+            .finalizer_contract
+            .client()
+            .get_transaction_count(self.account_address, None)
+            .await
+            .map_err(|e| Error::Middleware(format!("{e}")))?;
 
         let tx = tx_sender::send_tx_adjust_gas(
-            self.nonce_manager.clone(),
+            self.finalizer_contract.client(),
             tx.tx.clone(),
             self.tx_retry_timeout,
+            nonce,
         )
         .await;
 
@@ -216,16 +211,13 @@ where
                     e
                 );
 
-                let ethers::prelude::nonce_manager::NonceManagerError::MiddlewareError(
-                    middleware_error,
-                ) = e;
-                if let Some(provider_error) = middleware_error.as_provider_error() {
+                if let Some(provider_error) = e.as_provider_error() {
                     vlog::error!("failed to send finalization transaction: {provider_error}");
-                } else if !is_gas_required_exceeds_allowance::<S>(&middleware_error) {
+                } else if !is_gas_required_exceeds_allowance::<S>(&e) {
                     storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
                         .await?;
                 } else {
-                    vlog::error!("failed to send finalization withdrawal tx: {middleware_error}",);
+                    vlog::error!("failed to send finalization withdrawal tx: {e}");
                     metrics::counter!(
                         "finalizer.finalization_events.failed_to_finalize_low_gas",
                         withdrawals.len() as u64

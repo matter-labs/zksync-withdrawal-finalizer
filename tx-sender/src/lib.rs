@@ -5,10 +5,9 @@
 
 //! Wrapper for transaction sending with adjusting a gas price on retries.
 
-use std::{sync::Arc, time::Duration, u8};
+use std::{time::Duration, u8};
 
 use ethers::{
-    prelude::NonceManagerMiddleware,
     providers::{Middleware, MiddlewareError, ProviderError},
     types::{
         transaction::eip2718::TypedTransaction, BlockNumber, Eip2930TransactionRequest,
@@ -88,23 +87,23 @@ fn inc_u256_percent(num: U256, percent: u8) -> U256 {
 /// * `gas_increase_step`: If present increase gas price by this  number on every step, else ask
 ///    actual gas price from `m` on every retry.
 pub async fn send_tx_adjust_gas<M, T>(
-    m: Arc<NonceManagerMiddleware<M>>,
+    m: M,
     tx: T,
     retry_timeout: Duration,
-) -> Result<Option<TransactionReceipt>, <Arc<NonceManagerMiddleware<M>> as Middleware>::Error>
+    nonce: U256,
+) -> Result<Option<TransactionReceipt>, <M as Middleware>::Error>
 where
     M: Middleware,
     T: Into<TypedTransaction> + Send + Sync + Clone,
 {
-    let nonce = m.next();
-
-    let mut submit_tx = tx.clone().into();
+    let mut submit_tx = tx.into();
     m.fill_transaction(&mut submit_tx, None).await?;
     submit_tx.set_nonce(nonce);
 
     for retry_num in 0..usize::MAX {
         if retry_num > 0 {
             bump_predicted_fees(&mut submit_tx, RETRY_BUMP_FEES_PERCENT, &m).await?;
+            submit_tx.set_nonce(nonce);
         }
 
         let sent_tx = m.send_transaction(submit_tx.clone(), None).await?;
@@ -133,7 +132,6 @@ mod tests {
     use std::{sync::Arc, time::Duration};
 
     use ethers::{
-        middleware::MiddlewareBuilder,
         providers::{Middleware, Provider, ProviderExt},
         types::{
             transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, TransactionRequest,
@@ -163,7 +161,7 @@ mod tests {
             expected_gas_price += inc_u256_percent(expected_gas_price, RETRY_BUMP_FEES_PERCENT);
         }
 
-        let nonce_manager = Arc::new(provider.nonce_manager(from));
+        let provider = Arc::new(provider);
 
         let tx = TransactionRequest::new()
             .to(to)
@@ -172,14 +170,14 @@ mod tests {
             .gas_price(gas_price);
 
         tokio::time::timeout(Duration::from_secs(3), async {
-            send_tx_adjust_gas(nonce_manager.clone(), tx, Duration::from_secs(1))
+            send_tx_adjust_gas(provider.clone(), tx, Duration::from_secs(1), 0.into())
                 .await
                 .unwrap_err()
         })
         .await
         .ok();
 
-        let mut inspect = nonce_manager.txpool_content().await.unwrap();
+        let mut inspect = provider.txpool_content().await.unwrap();
 
         assert_eq!(inspect.pending.len(), 1);
         assert_eq!(inspect.queued.len(), 0);
@@ -211,9 +209,9 @@ mod tests {
         let to_1 = accounts[1];
         let to_2 = accounts[2];
 
-        let nonce_manager = Arc::new(provider.nonce_manager(from));
+        let provider = Arc::new(provider);
 
-        let gas_price = nonce_manager.get_gas_price().await.unwrap();
+        let gas_price = provider.get_gas_price().await.unwrap();
         let mut expected_gas_price = gas_price;
 
         for _ in 0..2 {
@@ -224,18 +222,20 @@ mod tests {
             .to(to_1)
             .value(1000)
             .from(from)
-            .gas_price(gas_price);
+            .gas_price(gas_price)
+            .nonce(0);
 
         let tx_2 = TransactionRequest::new()
             .to(to_2)
             .value(1000)
             .from(from)
-            .gas_price(gas_price);
+            .gas_price(gas_price)
+            .nonce(1);
 
         tokio::time::timeout(Duration::from_secs(3), async {
             let (first, second) = tokio::join!(
-                send_tx_adjust_gas(nonce_manager.clone(), tx_1, Duration::from_secs(1)),
-                send_tx_adjust_gas(nonce_manager.clone(), tx_2, Duration::from_secs(1))
+                send_tx_adjust_gas(provider.clone(), tx_1, Duration::from_secs(1), 0.into()),
+                send_tx_adjust_gas(provider.clone(), tx_2, Duration::from_secs(1), 1.into())
             );
             first.unwrap();
             second.unwrap();
@@ -243,7 +243,7 @@ mod tests {
         .await
         .ok();
 
-        let mut inspect = nonce_manager.txpool_content().await.unwrap();
+        let mut inspect = provider.txpool_content().await.unwrap();
 
         assert_eq!(inspect.pending.len(), 1);
         assert_eq!(inspect.queued.len(), 0);
@@ -365,7 +365,7 @@ mod tests {
             max_fee += bump;
         }
 
-        let nonce_manager = Arc::new(provider.nonce_manager(from));
+        let provider = Arc::new(provider);
 
         let tx = Eip1559TransactionRequest::new()
             .to(to)
@@ -373,14 +373,14 @@ mod tests {
             .from(from);
 
         tokio::time::timeout(Duration::from_secs(3), async {
-            send_tx_adjust_gas(nonce_manager.clone(), tx, Duration::from_secs(1))
+            send_tx_adjust_gas(provider.clone(), tx, Duration::from_secs(1), 0.into())
                 .await
                 .unwrap()
         })
         .await
         .ok();
 
-        let mut inspect = nonce_manager.txpool_content().await.unwrap();
+        let mut inspect = provider.txpool_content().await.unwrap();
         println!("inspect {inspect:?}");
 
         assert_eq!(inspect.pending.len(), 1);
