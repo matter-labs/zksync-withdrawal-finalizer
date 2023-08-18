@@ -9,6 +9,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
+    abi::Address,
     middleware::MiddlewareBuilder,
     prelude::NonceManagerMiddleware,
     providers::{Middleware, MiddlewareError},
@@ -81,17 +82,15 @@ where
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
+        account_address: Address,
     ) -> Self {
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
-        let nonce_manager = finalizer_contract.client().clone().nonce_manager(
-            finalizer_contract
-                .client()
-                .get_accounts()
-                .await
-                .expect("finalizer is expected to have signing account; qed")[0],
-        );
+        let nonce_manager = finalizer_contract
+            .client()
+            .clone()
+            .nonce_manager(account_address);
 
         nonce_manager
             .initialize_nonce(None)

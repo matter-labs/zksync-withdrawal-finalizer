@@ -270,6 +270,8 @@ async fn main() -> Result<()> {
             .unwrap(),
     );
 
+    let finalizer_account_address = client_l1_with_signer.address();
+
     let contract = client::withdrawal_finalizer::codegen::WithdrawalFinalizer::new(
         config.withdrawal_finalizer_addr,
         client_l1_with_signer,
@@ -291,6 +293,7 @@ async fn main() -> Result<()> {
         zksync_contract,
         l1_bridge,
         config.tx_retry_timeout,
+        finalizer_account_address,
     )
     .await;
 
