@@ -4291,6 +4291,7 @@ name = "tx-sender"
 version = "0.1.11"
 dependencies = [
  "ethers",
+ "metrics",
  "pretty_assertions",
  "thiserror",
  "tokio",

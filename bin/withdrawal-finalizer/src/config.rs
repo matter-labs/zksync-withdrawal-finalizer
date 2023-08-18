@@ -58,9 +58,6 @@ pub struct Config {
     #[envconfig(from = "WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY")]
     pub account_private_key: String,
 
-    #[envconfig(from = "TX_RETRY_TIMES")]
-    pub tx_retry_times: usize,
-
     #[envconfig(from = "TX_RETRY_TIMEOUT_SECS")]
     pub tx_retry_timeout: usize,
 }

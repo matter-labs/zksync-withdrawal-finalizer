@@ -54,7 +54,6 @@ pub struct Finalizer<M1, M2> {
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
     nonce_manager: Arc<NonceManagerMiddleware<Arc<M1>>>,
-    tx_retry_times: usize,
     tx_retry_timeout: Duration,
 }
 
@@ -81,7 +80,6 @@ where
         finalizer_contract: WithdrawalFinalizer<S>,
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
-        tx_retry_times: usize,
         tx_retry_timeout: usize,
     ) -> Self {
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
@@ -112,7 +110,6 @@ where
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
             tx_fee_limit,
             nonce_manager: nonce_manager.into(),
-            tx_retry_times,
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
         }
     }
@@ -185,7 +182,6 @@ where
             self.nonce_manager.clone(),
             tx.tx.clone(),
             self.tx_retry_timeout,
-            self.tx_retry_times,
         )
         .await;
 

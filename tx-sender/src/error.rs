@@ -16,9 +16,6 @@ where
 
     #[error("Middleware error")]
     Middleware { e: <M as Middleware>::Error },
-
-    #[error("sending a gas adjusted transaction timed out")]
-    Timedout,
 }
 
 impl<M: Middleware> From<NonceManagerError<M>> for Error<M> {
