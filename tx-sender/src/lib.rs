@@ -9,9 +9,10 @@ use std::{sync::Arc, time::Duration, u8};
 
 use ethers::{
     prelude::NonceManagerMiddleware,
-    providers::Middleware,
+    providers::{Middleware, ProviderError},
     types::{
-        transaction::eip2718::TypedTransaction, Eip2930TransactionRequest, TransactionReceipt, U256,
+        transaction::eip2718::TypedTransaction, BlockNumber, Eip2930TransactionRequest,
+        TransactionReceipt, U256,
     },
 };
 
@@ -29,7 +30,11 @@ const RETRY_BUMP_FEES_PERCENT: u8 = 15;
 ///  * the `max_priority_fee_per_gas` is bumped by the given percentage
 ///  * the `max_fee_per_gas` is bumped by the flat value
 ///    `max_priority_fee_per_gas` was bumped with.
-fn bump_predicted_fees(tx: &mut TypedTransaction, percent: u8) {
+async fn bump_predicted_fees<M: Middleware>(
+    tx: &mut TypedTransaction,
+    percent: u8,
+    m: M,
+) -> Result<()> {
     match tx {
         TypedTransaction::Legacy(ref mut tx)
         | TypedTransaction::Eip2930(Eip2930TransactionRequest { ref mut tx, .. }) => {
@@ -38,18 +43,32 @@ fn bump_predicted_fees(tx: &mut TypedTransaction, percent: u8) {
             }
         }
         TypedTransaction::Eip1559(ref mut tx) => {
+            let base_fee_per_gas = m
+                .get_block(BlockNumber::Latest)
+                .await
+                .map_err(|e| Error::Middleware(format!("{e}")))?
+                .ok_or_else(|| ProviderError::CustomError("Latest block not found".into()))?
+                .base_fee_per_gas
+                .ok_or_else(|| ProviderError::CustomError("EIP-1559 not activated".into()))?;
+
             let mut bump = U256::zero();
 
             if let Some(max_priority_fee_per_gas) = tx.max_priority_fee_per_gas.as_mut() {
                 bump = inc_u256_percent(*max_priority_fee_per_gas, percent);
+                println!("{max_priority_fee_per_gas} {bump} {base_fee_per_gas}");
                 *max_priority_fee_per_gas += bump;
             }
 
-            if let Some(gas_price) = tx.max_fee_per_gas.as_mut() {
-                *gas_price += bump;
+            if let Some(max_fee_per_gas) = tx.max_fee_per_gas.as_mut() {
+                *max_fee_per_gas = std::cmp::max(
+                    *max_fee_per_gas + bump,
+                    base_fee_per_gas + tx.max_priority_fee_per_gas.unwrap_or(U256::zero()),
+                );
             }
         }
     }
+
+    Ok(())
 }
 
 fn inc_u256_percent(num: U256, percent: u8) -> U256 {
@@ -70,7 +89,7 @@ pub async fn send_tx_adjust_gas<M, T>(
     m: Arc<NonceManagerMiddleware<M>>,
     tx: T,
     retry_timeout: Duration,
-) -> Result<Option<TransactionReceipt>, M>
+) -> Result<Option<TransactionReceipt>>
 where
     M: Middleware,
     T: Into<TypedTransaction> + Send + Sync + Clone,
@@ -78,15 +97,20 @@ where
     let nonce = m.next();
 
     let mut submit_tx = tx.clone().into();
-    m.fill_transaction(&mut submit_tx, None).await?;
+    m.fill_transaction(&mut submit_tx, None)
+        .await
+        .map_err(|e| Error::Middleware(format!("{e}")))?;
     submit_tx.set_nonce(nonce);
 
     for retry_num in 0..usize::MAX {
         if retry_num > 0 {
-            bump_predicted_fees(&mut submit_tx, RETRY_BUMP_FEES_PERCENT);
+            bump_predicted_fees(&mut submit_tx, RETRY_BUMP_FEES_PERCENT, m.provider()).await?;
         }
 
-        let sent_tx = m.send_transaction(submit_tx.clone(), None).await?;
+        let sent_tx = m
+            .send_transaction(submit_tx.clone(), None)
+            .await
+            .map_err(|e| Error::Middleware(format!("{e}")))?;
 
         let tx_hash = sent_tx.tx_hash();
 
@@ -272,7 +296,9 @@ mod tests {
             _ => panic!("expected eip1559 tx"),
         };
 
-        super::bump_predicted_fees(&mut eip_1559_tx, 10);
+        super::bump_predicted_fees(&mut eip_1559_tx, 10, &provider)
+            .await
+            .unwrap();
 
         let (bumped_max_priority_fee_per_gas, bumped_max_fee_per_gas) = match eip_1559_tx {
             TypedTransaction::Eip1559(ref tx) => (
@@ -307,7 +333,9 @@ mod tests {
             _ => panic!("expecged legacy tx"),
         };
 
-        super::bump_predicted_fees(&mut legacy_tx, 10);
+        super::bump_predicted_fees(&mut legacy_tx, 10, &provider)
+            .await
+            .unwrap();
 
         let bumped_gas_price = match legacy_tx {
             TypedTransaction::Legacy(ref tx) => tx.gas_price.unwrap(),
@@ -349,7 +377,7 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(3), async {
             send_tx_adjust_gas(nonce_manager.clone(), tx, Duration::from_secs(1))
                 .await
-                .unwrap_err()
+                .unwrap()
         })
         .await
         .ok();
@@ -369,7 +397,7 @@ mod tests {
 
         assert_eq!(nonce_str.parse::<usize>().unwrap(), 0);
         assert_eq!(tx.nonce, U256::zero());
-        assert_eq!(tx.max_fee_per_gas.unwrap(), max_fee);
         assert_eq!(tx.max_priority_fee_per_gas.unwrap(), priority_fee);
+        assert_eq!(tx.max_fee_per_gas.unwrap(), max_fee);
     }
 }
