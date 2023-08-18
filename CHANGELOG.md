@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.38](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.37...v0.1.38) (2023-08-18)
+
+
+### Bug Fixes
+
+* remove noncemanager ([#136](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/136)) ([5e0d488](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5e0d488c18d0bd327b51bb20f3d9ccf92e8caf0f))
+
 ## [0.1.37](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.36...v0.1.37) (2023-08-18)
 
 
