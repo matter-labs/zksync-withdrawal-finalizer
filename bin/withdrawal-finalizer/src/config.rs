@@ -1,11 +1,5 @@
-#![allow(unused)]
-use std::{env, fs, path::Path, str::FromStr, time::Duration};
-
 use envconfig::Envconfig;
-use ethers::{
-    abi::ethereum_types::FromStrRadixErr,
-    types::{Address, H160, U256},
-};
+use ethers::types::Address;
 use serde::Deserialize;
 use url::Url;
 
@@ -60,14 +54,4 @@ pub struct Config {
 
     #[envconfig(from = "TX_RETRY_TIMEOUT_SECS")]
     pub tx_retry_timeout: usize,
-}
-
-impl Config {
-    pub fn from_file<P: AsRef<Path>>(config_path: P) -> eyre::Result<Self> {
-        let contents = fs::read_to_string(config_path)?;
-
-        let config: Config = toml::from_str(&contents)?;
-
-        Ok(config)
-    }
 }
