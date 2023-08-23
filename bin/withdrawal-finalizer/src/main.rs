@@ -7,7 +7,6 @@
 
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use clap::Parser;
 use envconfig::Envconfig;
 use ethers::{
     prelude::SignerMiddleware,
@@ -19,14 +18,12 @@ use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
 use chain_events::{BlockEvents, L2EventsListener};
-use cli::Args;
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::task::JoinHandle;
 use watcher::Watcher;
 
-mod cli;
 mod config;
 
 const CHANNEL_CAPACITY: usize = 1024 * 16;
@@ -146,15 +143,8 @@ async fn start_from_l2_block<M: Middleware>(
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let args = Args::parse();
-
-    let config = match args.config_path {
-        Some(path) => Config::from_file(path)?,
-        None => {
-            dotenvy::dotenv().ok();
-            Config::init_from_env()?
-        }
-    };
+    dotenvy::dotenv().ok();
+    let config = Config::init_from_env()?;
 
     let sentry_guard = vlog::init();
 
