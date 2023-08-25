@@ -495,10 +495,8 @@ fn should_attempt_pagination_increase(pagination_step: u64, successful_logs: i32
 }
 
 fn look_for_bridge_initialize_event(tx: ZksyncTransactionReceipt) -> Option<ZksyncLog> {
-    let bridge_init_topics = vec![
-        BridgeInitializeFilter::signature(),
-        BridgeInitializationFilter::signature(),
-    ];
+    let bridge_init_topics = [BridgeInitializeFilter::signature(),
+        BridgeInitializationFilter::signature()];
 
     tx.logs
         .into_iter()
