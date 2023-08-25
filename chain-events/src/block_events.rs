@@ -92,7 +92,7 @@ impl BlockEvents {
         loop {
             let Some(provider_l1) = self.connect().await else {
                 tokio::time::sleep(RECONNECT_BACKOFF).await;
-                continue
+                continue;
             };
 
             let middleware = Arc::new(provider_l1);
@@ -198,8 +198,8 @@ impl BlockEvents {
                 }
                 Ok(log) => log,
             };
-            let Some(block_number) = log.block_number.map(|bn|  bn.as_u64()) else {
-               continue
+            let Some(block_number) = log.block_number.map(|bn| bn.as_u64()) else {
+                continue;
             };
 
             last_seen_block = block_number.into();
@@ -235,19 +235,20 @@ async fn process_l1_event<M, S>(
     S: Sink<BlockEvent> + Unpin,
     <S as Sink<BlockEvent>>::Error: std::fmt::Debug,
 {
-    let Some(block_number) = log.block_number.map(|bn|  bn.as_u64()) else {
-        return
+    let Some(block_number) = log.block_number.map(|bn| bn.as_u64()) else {
+        return;
     };
 
     match l1_event {
         L1Events::BlockCommit(bc) => {
             let Ok(tx) = middleware
-                .get_transaction(
-                    log.transaction_hash
-                        .unwrap_or_else(|| panic!("log always has a related transaction {:?}; qed", log)),
-                )
+                .get_transaction(log.transaction_hash.unwrap_or_else(|| {
+                    panic!("log always has a related transaction {:?}; qed", log)
+                }))
                 .await
-                else { return };
+            else {
+                return;
+            };
 
             let tx = tx.unwrap_or_else(|| {
                 panic!("mined transaction exists {:?}; qed", log.transaction_hash)

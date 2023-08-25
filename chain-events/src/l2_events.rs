@@ -134,7 +134,7 @@ impl L2EventsListener {
                 .map_err(|e| Error::Middleware(e.to_string()))?;
 
             let Some(bridge_init_log) = look_for_bridge_initialize_event(tx) else {
-                    continue;
+                continue;
             };
 
             if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log)? {
@@ -161,7 +161,9 @@ impl L2EventsListener {
     ) -> Result<Option<(L2TokenInitEvent, Address)>> {
         let raw_log: RawLog = bridge_init_log.clone().into();
 
-        let Ok(bridge_initialize) = BridgeInitEvents::decode_log(&raw_log) else { return Ok(None) };
+        let Ok(bridge_initialize) = BridgeInitEvents::decode_log(&raw_log) else {
+            return Ok(None);
+        };
 
         if self.tokens.contains(&bridge_init_log.address) {
             return Ok(None);
@@ -224,7 +226,7 @@ impl L2EventsListener {
         loop {
             let Some(provider_l1) = self.connect().await else {
                 tokio::time::sleep(RECONNECT_BACKOFF).await;
-                continue
+                continue;
             };
 
             let middleware = Arc::new(provider_l1);
@@ -495,8 +497,10 @@ fn should_attempt_pagination_increase(pagination_step: u64, successful_logs: i32
 }
 
 fn look_for_bridge_initialize_event(tx: ZksyncTransactionReceipt) -> Option<ZksyncLog> {
-    let bridge_init_topics = [BridgeInitializeFilter::signature(),
-        BridgeInitializationFilter::signature()];
+    let bridge_init_topics = [
+        BridgeInitializeFilter::signature(),
+        BridgeInitializationFilter::signature(),
+    ];
 
     tx.logs
         .into_iter()
