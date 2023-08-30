@@ -1,10 +1,10 @@
-# zksync-withdrawal-finalizer
+# zksync-era-withdrawal-finalizer
 
 A Withdrawal Finalizer in Rust.
 
 ## Purpose
 
-Withdrawal Finalizer is a component of `zksync-era` responsible for monitoring and finalizing [L2->L1 withdrawals](https://github.com/matter-labs/zksync-era/blob/a98e454221da7d6ecad9b317cf44b0786e819659/docs/advanced/03_withdrawals.md). It does so by continiously monitoring events happening on both L2 and L1, keeping some state in persisting storage (which is PostgreSQL) and sending withdrawal finalization transactions whenever necessary.
+Withdrawal Finalizer is a component of `zksync-era` responsible for monitoring and finalizing [L2->L1 withdrawals](https://github.com/matter-labs/zksync-era/blob/main/docs/advanced/03_withdrawals.md). It does so by continiously monitoring events happening on both L2 and L1, keeping some state in persistent storage (which is PostgreSQL) and sending withdrawal finalization transactions whenever necessary.
 
 ## Building
 
@@ -64,3 +64,18 @@ zkSync Withdrawal Finalizer is distributed under the terms of either
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
+
+## Official Links
+
+- [Website](https://zksync.io/)
+- [GitHub](https://github.com/matter-labs)
+- [Twitter](https://twitter.com/zksync)
+- [Twitter for Devs](https://twitter.com/zkSyncDevs)
+- [Discord](https://discord.gg/nMaPGrDDwk)
+
+## Disclaimer
+
+zkSync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
+through more audits and bug bounties programs. We would love to hear our community's thoughts and suggestions about it!
+It is important to state that forking it now can potentially lead to missing important security updates, critical
+features, and performance improvements.
