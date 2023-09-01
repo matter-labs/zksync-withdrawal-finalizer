@@ -15,6 +15,8 @@ async-trait = "0.1.73"
 metrics = "0.21.1"
 auto_impl = "1.1.0"
 
+ethers-log-decode = { path = "../ethers-log-decode" }
+
 [dev-dependencies]
 hex = "0.4"
 pretty_assertions = "1"

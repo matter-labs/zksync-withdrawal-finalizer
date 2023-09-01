@@ -14,16 +14,17 @@ pub use error::{Error, Result};
 use async_trait::async_trait;
 use auto_impl::auto_impl;
 use ethers::{
-    abi::{AbiEncode, ParamType, Token},
-    contract::{EthCall, EthEvent},
+    abi::{AbiDecode, AbiEncode, ParamType, RawLog, Token},
+    contract::{EthCall, EthEvent, EthLogDecode},
     providers::{JsonRpcClient, Middleware, Provider},
-    types::{Address, Bytes, H160, H256, U256, U64},
+    types::{transaction::eip2718::TypedTransaction, Address, Bytes, H160, H256, U256, U64},
 };
 
+use ethers_log_decode::EthLogDecode;
 use ethtoken::codegen::WithdrawalFilter;
 use l1bridge::codegen::{FinalizeWithdrawalCall, IL1Bridge};
 use l1messenger::codegen::L1MessageSentFilter;
-use l2standard_token::codegen::BridgeBurnFilter;
+use l2standard_token::codegen::{BridgeBurnFilter, L1AddressCall};
 use withdrawal_finalizer::codegen::RequestFinalizeWithdrawal;
 use zksync_contract::codegen::{FinalizeEthWithdrawalCall, IZkSync};
 use zksync_types::{
@@ -67,6 +68,12 @@ pub mod zksync_types;
 /// is this eth?
 pub fn is_eth(address: Address) -> bool {
     address == ETH_TOKEN_ADDRESS || address == ETH_ADDRESS
+}
+
+#[derive(EthLogDecode)]
+enum WithdrawalEvents {
+    BridgeBurnFilter(BridgeBurnFilter),
+    Withdrawal(WithdrawalFilter),
 }
 
 impl WithdrawalParams {
@@ -308,15 +315,42 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         index: usize,
     ) -> Result<Option<WithdrawalParams>> {
         let receipt = self.zks_get_transaction_receipt(withdrawal_hash).await?;
-
-        let withdrawal_event = receipt
+        let withdrawal_log = receipt
             .logs
             .iter()
             .filter(|log| {
                 log.topics[0] == BridgeBurnFilter::signature()
                     || log.topics[1] == WithdrawalFilter::signature()
             })
-            .nth(index);
+            .nth(index)
+            .ok_or(Error::WithdrawalLogNotFound(index, withdrawal_hash))?;
+
+        let raw_log: RawLog = withdrawal_log.clone().into();
+        let withdrawal_event = WithdrawalEvents::decode_log(&raw_log)?;
+
+        let l2_to_l1_message_hash = match withdrawal_event {
+            WithdrawalEvents::BridgeBurnFilter(b) => {
+                // Send manually the call to the erc20 token address to call `l1Address`.
+                // Manual call has to be done instead of `abigen`-generated typesafe one
+                // since it is impossible to wrap a reference to `self` into the `Arc`.
+                let l1_address_call = L1AddressCall;
+
+                let mut call = TypedTransaction::default();
+                call.set_to(withdrawal_log.address);
+                call.set_data(l1_address_call.encode().into());
+
+                let l1_address: Address = Address::decode(self.call(&call, None).await?)?;
+
+                get_l1_bridge_burn_message_keccak(&b, l1_address)?
+            }
+            WithdrawalEvents::Withdrawal(w) => get_l1_withdraw_message_keccak(&w)?,
+        };
+
+        let index = receipt
+            .l2_to_l1_logs
+            .iter()
+            .position(|l| l.value.0 == l2_to_l1_message_hash)
+            .unwrap();
 
         let (log, l1_batch_tx_id) = match self.get_withdrawal_log(withdrawal_hash, index).await? {
             Some(l) => l,
@@ -477,25 +511,27 @@ where
     }
 }
 
-#[allow(unused)]
-fn get_l1_bridge_burn_message(burn: &BridgeBurnFilter, l1_token: Address) -> Result<Vec<u8>> {
-    ethers::abi::encode_packed(&[
+fn get_l1_bridge_burn_message_keccak(
+    burn: &BridgeBurnFilter,
+    l1_token: Address,
+) -> Result<[u8; 32]> {
+    let message = ethers::abi::encode_packed(&[
         Token::FixedBytes(FinalizeWithdrawalCall::selector().to_vec()),
         Token::Address(burn.account),
         Token::Address(l1_token),
         Token::Bytes(burn.amount.encode()),
-    ])
-    .map_err(Into::into)
+    ])?;
+    Ok(ethers::utils::keccak256(message))
 }
 
-#[allow(unused)]
-fn get_l1_withdraw_message(withdraw: &WithdrawalFilter) -> Result<Vec<u8>> {
-    ethers::abi::encode_packed(&[
+fn get_l1_withdraw_message_keccak(withdraw: &WithdrawalFilter) -> Result<[u8; 32]> {
+    let message = ethers::abi::encode_packed(&[
         Token::FixedBytes(FinalizeEthWithdrawalCall::selector().to_vec()),
         Token::Address(withdraw.l_1_receiver),
         Token::Bytes(withdraw.amount.encode()),
-    ])
-    .map_err(Into::into)
+    ])?;
+
+    Ok(ethers::utils::keccak256(message))
 }
 
 #[cfg(test)]
@@ -517,8 +553,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let a = super::get_l1_bridge_burn_message(&bridge_burn, dai_l1_addr).unwrap();
-        let a = ethers::utils::keccak256(&a);
+        let a = super::get_l1_bridge_burn_message_keccak(&bridge_burn, dai_l1_addr).unwrap();
 
         assert_eq!(
             hex::encode(a),
@@ -541,8 +576,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let a = super::get_l1_withdraw_message(&withdrawal).unwrap();
-        let a = ethers::utils::keccak256(&a);
+        let a = super::get_l1_withdraw_message_keccak(&withdrawal).unwrap();
 
         assert_eq!(
             hex::encode(a),

@@ -447,6 +447,7 @@ dependencies = [
  "auto_impl",
  "chrono",
  "ethers",
+ "ethers-log-decode",
  "hex",
  "metrics",
  "pretty_assertions",

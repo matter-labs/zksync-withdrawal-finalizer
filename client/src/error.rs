@@ -1,10 +1,17 @@
 use ethers::{
     abi::EncodePackedError, contract::ContractError, prelude::Middleware, providers::ProviderError,
+    types::H256,
 };
 
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    #[error(transparent)]
+    AbiError(#[from] ethers::abi::Error),
+
+    #[error(transparent)]
+    ContractAbiError(#[from] ethers::contract::AbiError),
+
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
 
@@ -19,6 +26,12 @@ pub enum Error {
 
     #[error("Channel is closed")]
     ChannelClosed,
+
+    #[error("Withdrawal event with index {0} not found in transaction {1:?}")]
+    WithdrawalLogNotFound(usize, H256),
+
+    #[error("Failed to decode withdrawal event from log")]
+    FailedToDecodeLog,
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {
