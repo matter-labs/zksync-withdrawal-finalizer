@@ -447,7 +447,9 @@ dependencies = [
  "auto_impl",
  "chrono",
  "ethers",
+ "hex",
  "metrics",
+ "pretty_assertions",
  "serde",
  "thiserror",
 ]

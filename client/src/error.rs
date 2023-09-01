@@ -1,10 +1,15 @@
-use ethers::{contract::ContractError, prelude::Middleware, providers::ProviderError};
+use ethers::{
+    abi::EncodePackedError, contract::ContractError, prelude::Middleware, providers::ProviderError,
+};
 
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum Error {
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
+
+    #[error(transparent)]
+    EncodePackedError(#[from] EncodePackedError),
 
     #[error("Contract error {0}")]
     ContractError(String),
