@@ -8,7 +8,7 @@ edition = "2021"
 
 [dependencies]
 ethers = "2.0.9"
-thiserror = "1.0.47"
+thiserror = "1.0.48"
 serde = "1.0.188"
 chrono = { version = "0.4.28", default-features = false, features = ["serde"] }
 async-trait = "0.1.73"
