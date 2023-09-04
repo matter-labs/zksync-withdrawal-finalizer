@@ -16,7 +16,6 @@ metrics = "0.21.1"
 auto_impl = "1.1.0"
 
 ethers-log-decode = { path = "../ethers-log-decode" }
-hex = "0.4"
 
 [dev-dependencies]
 hex = "0.4"
