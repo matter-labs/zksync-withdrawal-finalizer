@@ -573,6 +573,7 @@ mod tests {
 
         let a = super::get_l1_bridge_burn_message_keccak(
             &bridge_burn,
+            // withdraws to the same account on L1, so can take this value.
             bridge_burn.account,
             dai_l1_addr,
         )
@@ -604,6 +605,33 @@ mod tests {
         assert_eq!(
             hex::encode(a),
             "4a4c388f10244d8c96b8723aa654231ae43eed5bc382d46a803937421923414e"
+        );
+    }
+
+    // https://goerli.explorer.zksync.io/tx/0xe423e38d66b8ad79c963a6855488f6f3e9eae907ce30d09fd1fb39a0c9631420
+    #[test]
+    fn bridge_burn_correctly_encodes_to_message_with_different_l1_address() {
+        let dai_l1_addr: Address = "0x5C221E77624690FFF6DD741493D735A17716C26B"
+            .parse()
+            .unwrap();
+
+        let bridge_burn = BridgeBurnFilter {
+            account: "769F2B14f36E248F3D9A7151a7F0e8A3D0903dF5".parse().unwrap(),
+            amount: "0x0000000000000000000000000000000000000000000000d8d726b7177a800000"
+                .parse()
+                .unwrap(),
+        };
+
+        let a = super::get_l1_bridge_burn_message_keccak(
+            &bridge_burn,
+            "d1ced2fBDFa24daa9920D37237ca2D4d5616a6e2".parse().unwrap(),
+            dai_l1_addr,
+        )
+        .unwrap();
+
+        assert_eq!(
+            hex::encode(a),
+            "70fb2e243d0ec70adf97f4941ca257a34f01d39f5ee20b4b1795304d656a9751"
         );
     }
 }
