@@ -11,7 +11,7 @@ ethers = "2.0.9"
 itertools = "0.11.0"
 futures = "0.3.28"
 metrics = "0.21.1"
-thiserror = "1.0.47"
+thiserror = "1.0.48"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.32.0", features = ["time"] }
 
