@@ -465,7 +465,7 @@ async fn params_fetcher_loop_iteration<M2>(pool: &PgPool, middleware: M2) -> Res
 where
     M2: ZksyncMiddleware,
 {
-    let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(pool, 1000).await?;
+    let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(pool, 10).await?;
 
     if newly_executed_withdrawals.is_empty() {
         tokio::time::sleep(NO_NEW_WITHDRAWALS_BACKOFF).await;

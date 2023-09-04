@@ -653,11 +653,14 @@ pub async fn get_withdrawals_with_no_data(
             ),
             1
           )
-          AND id > (
-            SELECT
-              MAX(withdrawal_id)
-            FROM
-              finalization_data
+          AND id > COALESCE(
+            (
+              SELECT
+                MAX(withdrawal_id)
+              FROM
+                finalization_data
+            ),
+            1
           )
         ORDER BY
           l2_block_number

@@ -1,4 +1,4 @@
-#![deny(unused_crate_dependencies)]
+//#![deny(unused_crate_dependencies)]
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 #![warn(unused_imports)]
@@ -34,6 +34,8 @@ use zksync_types::{
 
 pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
+
+use crate::l2bridge::codegen::WithdrawalInitiatedFilter;
 
 /// Eth token address
 pub const ETH_TOKEN_ADDRESS: Address = H160([
@@ -315,12 +317,13 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         index: usize,
     ) -> Result<Option<WithdrawalParams>> {
         let receipt = self.zks_get_transaction_receipt(withdrawal_hash).await?;
+
         let withdrawal_log = receipt
             .logs
             .iter()
             .filter(|log| {
                 log.topics[0] == BridgeBurnFilter::signature()
-                    || log.topics[1] == WithdrawalFilter::signature()
+                    || log.topics[0] == WithdrawalFilter::signature()
             })
             .nth(index)
             .ok_or(Error::WithdrawalLogNotFound(index, withdrawal_hash))?;
@@ -341,34 +344,48 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
 
                 let l1_address: Address = Address::decode(self.call(&call, None).await?)?;
 
-                get_l1_bridge_burn_message_keccak(&b, l1_address)?
+                // Get the `l1_receiver` address that receives the withdrawal on L1;
+                // it is available only in the `WithdrawalInitiatedFilter` event, look for it.
+                let withdrawal_initiated_event = receipt
+                    .logs
+                    .iter()
+                    .filter_map(|log| {
+                        let raw_log: RawLog = log.clone().into();
+                        <WithdrawalInitiatedFilter as EthEvent>::decode_log(&raw_log).ok()
+                    })
+                    .nth(index)
+                    .unwrap();
+
+                let l1_receiver = withdrawal_initiated_event.l_1_receiver;
+
+                get_l1_bridge_burn_message_keccak(&b, l1_receiver, l1_address)?
             }
             WithdrawalEvents::Withdrawal(w) => get_l1_withdraw_message_keccak(&w)?,
         };
 
-        let index = receipt
+        let a: H256 = l2_to_l1_message_hash.into();
+
+        let l2_to_l1_log_index = receipt
             .l2_to_l1_logs
             .iter()
             .position(|l| l.value.0 == l2_to_l1_message_hash)
+            .unwrap_or_else(|| panic!("{withdrawal_hash:?}, {a:?}"));
+
+        let l1_batch_tx_id = receipt.l1_batch_tx_index;
+        let log = receipt
+            .logs
+            .into_iter()
+            .filter(|entry| {
+                entry.address == L1_MESSENGER_ADDRESS
+                    && entry.topics[0] == L1MessageSentFilter::signature()
+            })
+            .nth(index)
             .unwrap();
-
-        let (log, l1_batch_tx_id) = match self.get_withdrawal_log(withdrawal_hash, index).await? {
-            Some(l) => l,
-            None => return Ok(None),
-        };
-
-        let (_, l2_to_l1_log_index) = match self
-            .get_withdrawal_l2_to_l1_log(withdrawal_hash, index)
-            .await?
-        {
-            Some(l) => l,
-            None => return Ok(None),
-        };
 
         let sender = log.topics[1].into();
 
         let proof = self
-            .get_log_proof(withdrawal_hash, l2_to_l1_log_index.map(|idx| idx.as_u64()))
+            .get_log_proof(withdrawal_hash, Some(l2_to_l1_log_index as u64))
             .await?
             .expect("Log proof should be present. qed");
 
@@ -513,11 +530,12 @@ where
 
 fn get_l1_bridge_burn_message_keccak(
     burn: &BridgeBurnFilter,
+    l1_receiver: Address,
     l1_token: Address,
 ) -> Result<[u8; 32]> {
     let message = ethers::abi::encode_packed(&[
         Token::FixedBytes(FinalizeWithdrawalCall::selector().to_vec()),
-        Token::Address(burn.account),
+        Token::Address(l1_receiver),
         Token::Address(l1_token),
         Token::Bytes(burn.amount.encode()),
     ])?;
@@ -553,7 +571,12 @@ mod tests {
                 .unwrap(),
         };
 
-        let a = super::get_l1_bridge_burn_message_keccak(&bridge_burn, dai_l1_addr).unwrap();
+        let a = super::get_l1_bridge_burn_message_keccak(
+            &bridge_burn,
+            bridge_burn.account,
+            dai_l1_addr,
+        )
+        .unwrap();
 
         assert_eq!(
             hex::encode(a),
