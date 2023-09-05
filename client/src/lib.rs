@@ -1,4 +1,4 @@
-//#![deny(unused_crate_dependencies)]
+#![deny(unused_crate_dependencies)]
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 #![warn(unused_imports)]
@@ -354,7 +354,11 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                         <WithdrawalInitiatedFilter as EthEvent>::decode_log(&raw_log).ok()
                     })
                     .nth(index)
-                    .unwrap();
+                    .unwrap_or_else(|| panic!(
+                        "A matching WithdrawalInitiatedFilter event is not found for {:?} at index {}",
+                        withdrawal_hash,
+                        index)
+                    );
 
                 let l1_receiver = withdrawal_initiated_event.l_1_receiver;
 
@@ -369,7 +373,9 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .l2_to_l1_logs
             .iter()
             .position(|l| l.value.0 == l2_to_l1_message_hash)
-            .unwrap_or_else(|| panic!("{withdrawal_hash:?}, {a:?}"));
+            .unwrap_or_else(|| {
+                panic!("An L2ToL1 message for {withdrawal_hash:?} with value {a:?} not found")
+            });
 
         let l1_batch_tx_id = receipt.l1_batch_tx_index;
         let log = receipt
@@ -380,7 +386,12 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                     && entry.topics[0] == L1MessageSentFilter::signature()
             })
             .nth(index)
-            .unwrap();
+            .unwrap_or_else(|| {
+                panic!(
+                    "A L1MessageSent log is not found for {:?} at index {}",
+                    withdrawal_hash, index
+                )
+            });
 
         let sender = log.topics[1].into();
 
