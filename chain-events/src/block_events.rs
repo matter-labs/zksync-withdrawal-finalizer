@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use ethers::{
     abi::{AbiDecode, Address, RawLog},
     contract::EthEvent,
     prelude::EthLogDecode,
     providers::{Middleware, Provider, PubsubClient, Ws},
-    types::{BlockNumber, Filter, Log, ValueOrArray},
+    types::{BlockNumber, Filter, Log, Transaction, ValueOrArray, H256},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
@@ -21,6 +21,9 @@ use client::{
 use ethers_log_decode::EthLogDecode;
 
 use crate::{Error, Result, RECONNECT_BACKOFF};
+
+const PENDING_TX_RETRY: usize = 5;
+const PENDING_TX_RETRY_BACKOFF: Duration = Duration::from_secs(3);
 
 #[derive(EthLogDecode)]
 enum L1Events {
@@ -223,6 +226,27 @@ impl BlockEvents {
     }
 }
 
+async fn get_tx_with_retries<M>(
+    middleware: &M,
+    tx_hash: H256,
+    retries: usize,
+) -> Result<Option<Transaction>>
+where
+    M: Middleware,
+{
+    for _ in 0..retries {
+        if let Ok(Some(tx)) = middleware.get_transaction(tx_hash).await {
+            if tx.block_number.is_some() {
+                return Ok(Some(tx));
+            }
+        }
+
+        tokio::time::sleep(PENDING_TX_RETRY_BACKOFF).await;
+    }
+
+    Ok(None)
+}
+
 async fn process_l1_event<M, S>(
     l2_erc20_bridge_addr: Address,
     log: &Log,
@@ -241,15 +265,17 @@ async fn process_l1_event<M, S>(
 
     match l1_event {
         L1Events::BlockCommit(bc) => {
-            let Ok(tx) = middleware
-                .get_transaction(log.transaction_hash.unwrap_or_else(|| {
+            let Ok(tx) = get_tx_with_retries(
+                &middleware,
+                log.transaction_hash.unwrap_or_else(|| {
                     panic!("log always has a related transaction {:?}; qed", log)
-                }))
-                .await
+                }),
+                PENDING_TX_RETRY,
+            )
+            .await
             else {
                 return;
             };
-
             let tx = tx.unwrap_or_else(|| {
                 panic!("mined transaction exists {:?}; qed", log.transaction_hash)
             });
