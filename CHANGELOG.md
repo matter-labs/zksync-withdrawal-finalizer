@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.40](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.39...v0.1.40) (2023-09-05)
+
+
+### Bug Fixes
+
+* broken glibc in outdated debian image ([#158](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/158)) ([96b8744](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/96b8744e52947800f30b48098c246435f6350881))
+
 ## [0.1.39](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.38...v0.1.39) (2023-09-05)
 
 
