@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.9"
+ethers = "2.0.10"
 futures = "0.3.28"
 metrics = "0.21.1"
 thiserror = "1.0.48"

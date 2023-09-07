@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.9"
+ethers = "2.0.10"
 thiserror = "1.0.48"
 serde = "1.0.188"
 chrono = { version = "0.4.29", default-features = false, features = ["serde"] }
