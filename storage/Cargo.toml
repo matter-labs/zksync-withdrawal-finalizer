@@ -19,7 +19,7 @@ num = "0.4.1"
 
 client = { path = "../client" }
 chain-events = { path = "../chain-events" }
-ethers = "2.0.9"
+ethers = "2.0.10"
 thiserror = "1.0.48"
 metrics = "0.21.1"
 bincode = "1.3.3"
