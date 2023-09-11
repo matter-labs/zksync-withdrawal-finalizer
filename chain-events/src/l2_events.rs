@@ -224,8 +224,6 @@ impl L2EventsListener {
         let mut from_block: BlockNumber = from_block.into();
         let mut last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
         loop {
-            tokio::time::sleep(RECONNECT_BACKOFF).await;
-            continue;
             let Some(provider_l1) = self.connect().await else {
                 tokio::time::sleep(RECONNECT_BACKOFF).await;
                 continue;
