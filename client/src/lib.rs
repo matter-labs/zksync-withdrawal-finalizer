@@ -342,32 +342,28 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
 
         let l2_to_l1_message_hash = match withdrawal_event {
             WithdrawalEvents::BridgeBurn(b) => {
-                let l1_address = if let Some(l1_address) = TOKEN_ADDRS
-                    .lock()
-                    .await
-                    .get(&withdrawal_log.address)
-                    .cloned()
-                {
-                    l1_address
-                } else {
-                    // Send manually the call to the erc20 token address to call `l1Address`.
-                    // Manual call has to be done instead of `abigen`-generated typesafe one
-                    // since it is impossible to wrap a reference to `self` into the `Arc`.
-                    let l1_address_call = L1AddressCall;
-                    let mut call = TypedTransaction::default();
+                let mut addr_lock = TOKEN_ADDRS.lock().await;
 
-                    call.set_to(withdrawal_log.address);
-                    call.set_data(l1_address_call.encode().into());
+                let l1_address =
+                    if let Some(l1_address) = addr_lock.get(&withdrawal_log.address).cloned() {
+                        l1_address
+                    } else {
+                        // Send manually the call to the erc20 token address to call `l1Address`.
+                        // Manual call has to be done instead of `abigen`-generated typesafe one
+                        // since it is impossible to wrap a reference to `self` into the `Arc`.
+                        let l1_address_call = L1AddressCall;
+                        let mut call = TypedTransaction::default();
 
-                    let l1_address = Address::decode(self.call(&call, None).await?)?;
+                        call.set_to(withdrawal_log.address);
+                        call.set_data(l1_address_call.encode().into());
 
-                    TOKEN_ADDRS
-                        .lock()
-                        .await
-                        .put(withdrawal_log.address, l1_address);
+                        let l1_address = Address::decode(self.call(&call, None).await?)?;
 
-                    l1_address
-                };
+                        addr_lock.put(withdrawal_log.address, l1_address);
+
+                        l1_address
+                    };
+                drop(addr_lock);
 
                 // Get the `l1_receiver` address that receives the withdrawal on L1;
                 // it is available only in the `WithdrawalInitiatedFilter` event, look for it.
