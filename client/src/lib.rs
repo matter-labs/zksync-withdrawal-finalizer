@@ -7,7 +7,8 @@
 
 mod error;
 
-use std::time::Instant;
+use std::sync::Arc;
+use std::{num::NonZeroUsize, time::Instant};
 
 pub use error::{Error, Result};
 
@@ -25,6 +26,9 @@ use ethtoken::codegen::WithdrawalFilter;
 use l1bridge::codegen::{FinalizeWithdrawalCall, IL1Bridge};
 use l1messenger::codegen::L1MessageSentFilter;
 use l2standard_token::codegen::{BridgeBurnFilter, L1AddressCall};
+use lazy_static::lazy_static;
+use lru::LruCache;
+use tokio::sync::Mutex;
 use withdrawal_finalizer::codegen::RequestFinalizeWithdrawal;
 use zksync_contract::codegen::{FinalizeEthWithdrawalCall, IZkSync};
 use zksync_types::{
@@ -74,8 +78,13 @@ pub fn is_eth(address: Address) -> bool {
 
 #[derive(EthLogDecode)]
 enum WithdrawalEvents {
-    BridgeBurnFilter(BridgeBurnFilter),
+    BridgeBurn(BridgeBurnFilter),
     Withdrawal(WithdrawalFilter),
+}
+
+lazy_static! {
+    static ref TOKEN_ADDRS: Arc<Mutex<LruCache<Address, Address>>> =
+        Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(64).unwrap())));
 }
 
 impl WithdrawalParams {
@@ -332,17 +341,33 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         let withdrawal_event = WithdrawalEvents::decode_log(&raw_log)?;
 
         let l2_to_l1_message_hash = match withdrawal_event {
-            WithdrawalEvents::BridgeBurnFilter(b) => {
-                // Send manually the call to the erc20 token address to call `l1Address`.
-                // Manual call has to be done instead of `abigen`-generated typesafe one
-                // since it is impossible to wrap a reference to `self` into the `Arc`.
-                let l1_address_call = L1AddressCall;
+            WithdrawalEvents::BridgeBurn(b) => {
+                let l1_address = if let Some(l1_address) = TOKEN_ADDRS
+                    .lock()
+                    .await
+                    .get(&withdrawal_log.address)
+                    .cloned()
+                {
+                    l1_address
+                } else {
+                    // Send manually the call to the erc20 token address to call `l1Address`.
+                    // Manual call has to be done instead of `abigen`-generated typesafe one
+                    // since it is impossible to wrap a reference to `self` into the `Arc`.
+                    let l1_address_call = L1AddressCall;
+                    let mut call = TypedTransaction::default();
 
-                let mut call = TypedTransaction::default();
-                call.set_to(withdrawal_log.address);
-                call.set_data(l1_address_call.encode().into());
+                    call.set_to(withdrawal_log.address);
+                    call.set_data(l1_address_call.encode().into());
 
-                let l1_address: Address = Address::decode(self.call(&call, None).await?)?;
+                    let l1_address = Address::decode(self.call(&call, None).await?)?;
+
+                    TOKEN_ADDRS
+                        .lock()
+                        .await
+                        .put(withdrawal_log.address, l1_address);
+
+                    l1_address
+                };
 
                 // Get the `l1_receiver` address that receives the withdrawal on L1;
                 // it is available only in the `WithdrawalInitiatedFilter` event, look for it.
@@ -367,14 +392,18 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             WithdrawalEvents::Withdrawal(w) => get_l1_withdraw_message_keccak(&w)?,
         };
 
-        let a: H256 = l2_to_l1_message_hash.into();
-
         let l2_to_l1_log_index = receipt
             .l2_to_l1_logs
             .iter()
-            .position(|l| l.value.0 == l2_to_l1_message_hash)
+            .enumerate()
+            .filter(|(_, log)| log.value == l2_to_l1_message_hash)
+            .nth(index)
+            .map(|(i, _)| i)
             .unwrap_or_else(|| {
-                panic!("An L2ToL1 message for {withdrawal_hash:?} with value {a:?} not found")
+                panic!(
+                    "An L2ToL1 message for {:?} with value {:?} not found",
+                    withdrawal_hash, l2_to_l1_message_hash,
+                )
             });
 
         let l1_batch_tx_id = receipt.l1_batch_tx_index;
@@ -543,24 +572,24 @@ fn get_l1_bridge_burn_message_keccak(
     burn: &BridgeBurnFilter,
     l1_receiver: Address,
     l1_token: Address,
-) -> Result<[u8; 32]> {
+) -> Result<H256> {
     let message = ethers::abi::encode_packed(&[
         Token::FixedBytes(FinalizeWithdrawalCall::selector().to_vec()),
         Token::Address(l1_receiver),
         Token::Address(l1_token),
         Token::Bytes(burn.amount.encode()),
     ])?;
-    Ok(ethers::utils::keccak256(message))
+    Ok(ethers::utils::keccak256(message).into())
 }
 
-fn get_l1_withdraw_message_keccak(withdraw: &WithdrawalFilter) -> Result<[u8; 32]> {
+fn get_l1_withdraw_message_keccak(withdraw: &WithdrawalFilter) -> Result<H256> {
     let message = ethers::abi::encode_packed(&[
         Token::FixedBytes(FinalizeEthWithdrawalCall::selector().to_vec()),
         Token::Address(withdraw.l_1_receiver),
         Token::Bytes(withdraw.amount.encode()),
     ])?;
 
-    Ok(ethers::utils::keccak256(message))
+    Ok(ethers::utils::keccak256(message).into())
 }
 
 #[cfg(test)]

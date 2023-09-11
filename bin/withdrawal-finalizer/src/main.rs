@@ -205,12 +205,13 @@ async fn main() -> Result<()> {
     let we_tx_wrapped = tokio_util::sync::PollSender::new(we_tx.clone());
     let we_rx = tokio_stream::wrappers::ReceiverStream::new(we_rx);
 
-    let from_l1_block = start_from_l1_block(
+    let mut from_l1_block = start_from_l1_block(
         client_l1.clone(),
         client_l2.clone(),
         &mut pgpool.acquire().await?.detach(),
     )
     .await?;
+    from_l1_block = 10484273u64.into();
 
     vlog::info!("Starting from L1 block number {from_l1_block}");
 
