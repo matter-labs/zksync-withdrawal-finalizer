@@ -14,3 +14,12 @@ chrono = { version = "0.4.30", default-features = false, features = ["serde"] }
 async-trait = "0.1.73"
 metrics = "0.21.1"
 auto_impl = "1.1.0"
+
+ethers-log-decode = { path = "../ethers-log-decode" }
+lru = "0.11.1"
+lazy_static = "1.4.0"
+tokio = "1.32.0"
+
+[dev-dependencies]
+hex = "0.4"
+pretty_assertions = "1"
