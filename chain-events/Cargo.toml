@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 client = { path = "../client" }
-ethers = { version = "2.0.9", features = ["ws"] }
+ethers = { version = "2.0.10", features = ["ws"] }
 futures = "0.3.28"
 metrics = "0.21.1"
 thiserror = "1.0.48"
