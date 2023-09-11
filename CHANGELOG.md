@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.41](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.40...v0.1.41) (2023-09-11)
+
+
+### Bug Fixes
+
+* correctly calculate the indices of events for withdrawal parameters ([#153](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/153)) ([7678531](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/767853130bc483995955afa134b674d40a9a9f2e))
+* **deps:** update rust crate chrono to 0.4.29 ([#160](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/160)) ([f295670](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/f2956702c8e5b4cf5ea9fe08710fb0b944c7bd9a))
+* **deps:** update rust crate chrono to 0.4.30 ([#162](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/162)) ([40c58cd](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/40c58cd7b088e9d2eb2e233d2ab42f14902f9af0))
+* **deps:** update rust crate ethers to 2.0.10 ([#163](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/163)) ([9ebf2a9](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/9ebf2a97e5aa09f139c8feff20275a4922739160))
+* **deps:** update rust crate syn to 2.0.32 ([#165](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/165)) ([d433cfe](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/d433cfea5c072072f876952aa3b5f6e88c0f99ee))
+
 ## [0.1.40](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.39...v0.1.40) (2023-09-05)
 
 
