@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.43](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.42...v0.1.43) (2023-09-12)
+
+
+### Bug Fixes
+
+* revert query withdrawals without data ([#173](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/173)) ([dc2ade5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/dc2ade51a90fc1323a0b20b94e1d41c151952f5a))
+
 ## [0.1.42](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.41...v0.1.42) (2023-09-12)
 
 
