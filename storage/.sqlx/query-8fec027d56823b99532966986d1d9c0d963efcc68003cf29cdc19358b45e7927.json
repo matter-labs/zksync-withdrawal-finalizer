@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n          tx_hash,\n          event_index_in_tx,\n          id,\n          l2_block_number\n        FROM\n          withdrawals\n        WHERE\n          l2_block_number <= COALESCE(\n            (\n              SELECT\n                MAX(l2_block_number)\n              FROM\n                l2_blocks\n              WHERE\n                commit_l1_block_number IS NOT NULL\n            ),\n            1\n          )\n          AND id NOT IN (\n            SELECT\n              withdrawal_id\n            FROM\n              finalization_data\n          )\n        ORDER BY\n          l2_block_number\n        LIMIT\n          $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tx_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_index_in_tx",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "l2_block_number",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8fec027d56823b99532966986d1d9c0d963efcc68003cf29cdc19358b45e7927"
+}
