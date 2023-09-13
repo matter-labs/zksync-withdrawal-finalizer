@@ -24,7 +24,7 @@ jobs:
           
       - name: Send Release Info
         if: ${{ steps.release.outputs.releases_created }}
-        uses: matter-labs/format-release-please-for-slack-action@70c1239394ac0ad50b6f1b175e63f5dc6e04d2d1
+        uses: matter-labs/format-release-please-for-slack-action@69e6fe9e4ec531b7b5fb0d826f73c190db83cf42 # v2.1.0
         with:
           release-please-output: ${{ toJSON(steps.release.outputs) }}
           slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_RELEASES }}
