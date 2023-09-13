@@ -1,0 +1,42 @@
+name: Migrate Production database
+
+on:
+  workflow_dispatch:
+    inputs:
+      custom_rust_migration:
+        type: string
+        description: "Custom rust migration name"
+        required: false
+      custom_rust_migration_params:
+        type: string
+        description: "Params for custom migration"
+        required: false
+
+jobs:
+  deployment:
+    name: Perform migration
+    environment: production
+    runs-on: ["self-hosted", "deployer-32-128", "mainnet2"]
+    timeout-minutes: 1800
+    container:
+      image: matterlabs/zk-environment:latest2.0
+      options: --user root
+    steps:
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        with:
+          submodules: "recursive"
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+
+      - name: setup-env
+        shell: bash
+        run: |
+          echo "database_url=${{secrets.DATABASE_URL}}" >> $GITHUB_ENV
+
+      - name: Migrate
+        shell: bash
+        run: |
+          export SQLX_OFFLINE=true
+          cd storage && DATABASE_URL=${{ env.database_url }} cargo sqlx migrate run && cd -
+          echo "Migrations complete"
+          if [[ "${{github.event.inputs.custom_rust_migration}}" != "" ]]; then DATABASE_URL=${{ env.database_url }} cargo run --release --bin ${{github.event.inputs.custom_rust_migration}} -- ${{github.event.inputs.custom_rust_migration_params}}
+          fi
