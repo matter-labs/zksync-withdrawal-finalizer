@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM\n              withdrawals\n            WHERE\n              id in (\n                SELECT\n                  id\n                from\n                  withdrawals\n                LIMIT\n                  $1\n              )\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0fa6ebcd275b249c6bbc46a40824b366527f5c69f958ae499ce198838d7e899a"
+}

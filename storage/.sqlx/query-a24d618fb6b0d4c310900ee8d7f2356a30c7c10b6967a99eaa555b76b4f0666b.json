@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM\n              l2_blocks\n            WHERE\n              l2_block_number in (\n                SELECT\n                  l2_block_number\n                from\n                  l2_blocks\n                LIMIT\n                  $1\n              )\n            RETURNING l2_block_number\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "l2_block_number",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a24d618fb6b0d4c310900ee8d7f2356a30c7c10b6967a99eaa555b76b4f0666b"
+}

@@ -840,7 +840,7 @@ pub async fn inc_unsuccessful_finalization_attempts(
 
 async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
-        sqlx::query!(
+        let deleted_ids = sqlx::query!(
             "
             DELETE FROM
               finalization_data
@@ -853,25 +853,14 @@ async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Resu
                 LIMIT
                   $1
               )
+            RETURNING withdrawal_id
             ",
             delete_batch_size as i64,
         )
-        .execute(pool)
+        .fetch_all(pool)
         .await?;
 
-        let remaining = sqlx::query!(
-            "
-            SELECT
-              count(*)
-            from
-              finalization_data
-            "
-        )
-        .fetch_one(pool)
-        .await?
-        .count;
-
-        if remaining == Some(0) || remaining.is_none() {
+        if deleted_ids.is_empty() {
             return Ok(());
         }
     }
@@ -879,7 +868,7 @@ async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Resu
 
 async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
-        sqlx::query!(
+        let deleted_ids = sqlx::query!(
             "
             DELETE FROM
               l2_blocks
@@ -892,25 +881,14 @@ async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
                 LIMIT
                   $1
               )
+            RETURNING l2_block_number
             ",
             delete_batch_size as i64,
         )
-        .execute(pool)
+        .fetch_all(pool)
         .await?;
 
-        let remaining = sqlx::query!(
-            "
-            SELECT
-              count(*)
-            from
-              l2_blocks 
-            "
-        )
-        .fetch_one(pool)
-        .await?
-        .count;
-
-        if remaining == Some(0) || remaining.is_none() {
+        if deleted_ids.is_empty() {
             return Ok(());
         }
     }
@@ -918,7 +896,7 @@ async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
 
 async fn wipe_l2_to_l1_events(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
-        sqlx::query!(
+        let deleted_ids = sqlx::query!(
             "
             DELETE FROM
               l2_to_l1_events
@@ -931,25 +909,14 @@ async fn wipe_l2_to_l1_events(pool: &PgPool, delete_batch_size: usize) -> Result
                 LIMIT
                   $1
               )
+            RETURNING l1_block_number
             ",
             delete_batch_size as i64,
         )
-        .execute(pool)
+        .fetch_all(pool)
         .await?;
 
-        let remaining = sqlx::query!(
-            "
-            SELECT
-              count(*)
-            from
-              l2_to_l1_events 
-            "
-        )
-        .fetch_one(pool)
-        .await?
-        .count;
-
-        if remaining == Some(0) || remaining.is_none() {
+        if deleted_ids.is_empty() {
             return Ok(());
         }
     }
@@ -963,7 +930,7 @@ async fn wipe_tokens(pool: &PgPool) -> Result<()> {
 
 async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
-        sqlx::query!(
+        let deleted_ids = sqlx::query!(
             "
             DELETE FROM
               withdrawals
@@ -976,25 +943,14 @@ async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()>
                 LIMIT
                   $1
               )
+            RETURNING id
             ",
             delete_batch_size as i64,
         )
-        .execute(pool)
+        .fetch_all(pool)
         .await?;
 
-        let remaining = sqlx::query!(
-            "
-            SELECT
-              count(*)
-            from
-              withdrawals
-            "
-        )
-        .fetch_one(pool)
-        .await?
-        .count;
-
-        if remaining == Some(0) || remaining.is_none() {
+        if deleted_ids.is_empty() {
             return Ok(());
         }
     }
