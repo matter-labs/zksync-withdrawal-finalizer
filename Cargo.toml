@@ -3,6 +3,7 @@ resolver = "1"
 
 members = [
     "bin/withdrawal-finalizer",
+    "bin/delete-db-content-migration",
     "ethers-log-decode",
     "finalizer",
     "client",

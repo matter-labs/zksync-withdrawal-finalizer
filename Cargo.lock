@@ -711,6 +711,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "delete-db-content-migration"
+version = "0.1.11"
+dependencies = [
+ "color-eyre",
+ "dotenvy",
+ "eyre",
+ "sqlx",
+ "storage",
+ "tokio",
+]
+
+[[package]]
 name = "der"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"

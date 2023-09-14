@@ -837,3 +837,136 @@ pub async fn inc_unsuccessful_finalization_attempts(
 
     Ok(())
 }
+
+async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        let deleted_ids = sqlx::query!(
+            "
+            DELETE FROM
+              finalization_data
+            WHERE
+              withdrawal_id in (
+                SELECT
+                  withdrawal_id
+                from
+                  finalization_data
+                LIMIT
+                  $1
+              )
+            RETURNING withdrawal_id
+            ",
+            delete_batch_size as i64,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if deleted_ids.is_empty() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        let deleted_ids = sqlx::query!(
+            "
+            DELETE FROM
+              l2_blocks
+            WHERE
+              l2_block_number in (
+                SELECT
+                  l2_block_number
+                from
+                  l2_blocks
+                LIMIT
+                  $1
+              )
+            RETURNING l2_block_number
+            ",
+            delete_batch_size as i64,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if deleted_ids.is_empty() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_l2_to_l1_events(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        let deleted_ids = sqlx::query!(
+            "
+            DELETE FROM
+              l2_to_l1_events
+            WHERE
+              l1_block_number in (
+                SELECT
+                  l1_block_number
+                from
+                  l2_to_l1_events
+                LIMIT
+                  $1
+              )
+            RETURNING l1_block_number
+            ",
+            delete_batch_size as i64,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if deleted_ids.is_empty() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_tokens(pool: &PgPool) -> Result<()> {
+    sqlx::query!("DELETE FROM tokens").execute(pool).await?;
+
+    Ok(())
+}
+
+async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        let deleted_ids = sqlx::query!(
+            "
+            DELETE FROM
+              withdrawals
+            WHERE
+              id in (
+                SELECT
+                  id
+                from
+                  withdrawals
+                LIMIT
+                  $1
+              )
+            RETURNING id
+            ",
+            delete_batch_size as i64,
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if deleted_ids.is_empty() {
+            return Ok(());
+        }
+    }
+}
+
+/// Delete all content from finalizer db tables
+pub async fn delete_db_content(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    wipe_finalization_data(pool, delete_batch_size).await?;
+
+    wipe_l2_blocks(pool, delete_batch_size).await?;
+
+    wipe_l2_to_l1_events(pool, delete_batch_size).await?;
+
+    wipe_tokens(pool).await?;
+
+    wipe_withdrawals(pool, delete_batch_size).await?;
+
+    Ok(())
+}
