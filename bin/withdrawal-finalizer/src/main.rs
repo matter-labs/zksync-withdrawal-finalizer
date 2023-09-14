@@ -10,7 +10,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 use envconfig::Envconfig;
 use ethers::{
     prelude::SignerMiddleware,
-    providers::{JsonRpcClient, Middleware, Provider, Ws},
+    providers::{Http, JsonRpcClient, Middleware, Provider},
     signers::LocalWallet,
     types::U256,
 };
@@ -165,18 +165,11 @@ async fn main() -> Result<()> {
     // `ethers-rs`. In the logic of reconnections have to happen as long
     // as the application exists; below code configures that number to
     // be `usize::MAX` as such.
-    let provider_l1 =
-        Provider::<Ws>::connect_with_reconnects(config.eth_client_ws_url.as_ref(), usize::MAX)
-            .await
-            .unwrap();
+    let provider_l1 = Provider::<Http>::try_from(config.eth_client_http_url.as_ref()).unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let provider_l2 = Provider::<Ws>::connect_with_reconnects(
-        config.api_web3_json_rpc_ws_url.as_str(),
-        usize::MAX,
-    )
-    .await
-    .unwrap();
+    let provider_l2 =
+        Provider::<Http>::try_from(config.api_web3_json_rpc_http_url.as_str()).unwrap();
 
     let client_l2 = Arc::new(provider_l2);
 
@@ -285,16 +278,6 @@ async fn main() -> Result<()> {
         config.tx_retry_timeout,
         finalizer_account_address,
     );
-
-    let provider_l2 = Provider::<Ws>::connect_with_reconnects(
-        config.api_web3_json_rpc_ws_url.as_str(),
-        usize::MAX,
-    )
-    .await
-    .unwrap();
-
-    let client_l2 = Arc::new(provider_l2);
-
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
     tokio::select! {

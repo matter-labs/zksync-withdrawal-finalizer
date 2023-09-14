@@ -14,6 +14,10 @@ pub struct Config {
     #[envconfig(from = "ETH_CLIENT_WS_URL")]
     pub eth_client_ws_url: Url,
 
+    /// L1 HTTP url.
+    #[envconfig(from = "ETH_CLIENT_HTTP_URL")]
+    pub eth_client_http_url: Url,
+
     /// Address of the `L1Bridge` contract.
     #[envconfig(from = "CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR")]
     pub l1_erc20_bridge_proxy_addr: Address,
@@ -33,6 +37,10 @@ pub struct Config {
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub api_web3_json_rpc_ws_url: Url,
+
+    /// L2 HTTP Endpoint
+    #[envconfig(from = "API_WEB3_JSON_RPC_HTTP_URL")]
+    pub api_web3_json_rpc_http_url: Url,
 
     #[envconfig(from = "DATABASE_URL")]
     pub database_url: Url,
