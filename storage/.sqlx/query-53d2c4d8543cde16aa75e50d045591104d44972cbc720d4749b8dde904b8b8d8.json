@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM\n          withdrawals\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "53d2c4d8543cde16aa75e50d045591104d44972cbc720d4749b8dde904b8b8d8"
+}

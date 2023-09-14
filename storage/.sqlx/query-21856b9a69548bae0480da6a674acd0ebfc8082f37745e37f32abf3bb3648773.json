@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM\n          l2_to_l1_events\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "21856b9a69548bae0480da6a674acd0ebfc8082f37745e37f32abf3bb3648773"
+}

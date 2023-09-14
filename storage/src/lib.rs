@@ -837,3 +837,57 @@ pub async fn inc_unsuccessful_finalization_attempts(
 
     Ok(())
 }
+
+/// Delete all content from finalizer db tables
+pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query!(
+        "
+        DELETE FROM
+          finalization_data
+    "
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "
+        DELETE FROM
+          l2_blocks
+    "
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "
+        DELETE FROM
+          l2_to_l1_events
+    "
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "
+        DELETE FROM
+          tokens
+    "
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query!(
+        "
+        DELETE FROM
+          withdrawals
+    "
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
