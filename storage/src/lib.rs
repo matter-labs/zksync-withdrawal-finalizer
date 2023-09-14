@@ -846,7 +846,7 @@ pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
         "
         DELETE FROM
           finalization_data
-    "
+        "
     )
     .execute(&mut *tx)
     .await?;
@@ -855,7 +855,7 @@ pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
         "
         DELETE FROM
           l2_blocks
-    "
+        "
     )
     .execute(&mut *tx)
     .await?;
@@ -864,7 +864,7 @@ pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
         "
         DELETE FROM
           l2_to_l1_events
-    "
+        "
     )
     .execute(&mut *tx)
     .await?;
@@ -873,7 +873,7 @@ pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
         "
         DELETE FROM
           tokens
-    "
+        "
     )
     .execute(&mut *tx)
     .await?;
@@ -882,7 +882,7 @@ pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
         "
         DELETE FROM
           withdrawals
-    "
+        "
     )
     .execute(&mut *tx)
     .await?;

@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "delete-db-content-migration"
-version = "0.1.0"
+version = "0.1.11"
 dependencies = [
  "color-eyre",
  "dotenvy",
