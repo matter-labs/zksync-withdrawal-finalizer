@@ -903,7 +903,7 @@ async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
             SELECT
               count(*)
             from
-              finalization_data
+              l2_blocks 
             "
         )
         .fetch_one(pool)
@@ -942,7 +942,7 @@ async fn wipe_l2_to_l1_events(pool: &PgPool, delete_batch_size: usize) -> Result
             SELECT
               count(*)
             from
-              finalization_data
+              l2_to_l1_events 
             "
         )
         .fetch_one(pool)
