@@ -838,56 +838,179 @@ pub async fn inc_unsuccessful_finalization_attempts(
     Ok(())
 }
 
+async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        sqlx::query!(
+            "
+            DELETE FROM
+              finalization_data
+            WHERE
+              withdrawal_id in (
+                SELECT
+                  withdrawal_id
+                from
+                  finalization_data
+                LIMIT
+                  $1
+              )
+            ",
+            delete_batch_size as i64,
+        )
+        .execute(pool)
+        .await?;
+
+        let remaining = sqlx::query!(
+            "
+            SELECT
+              count(*)
+            from
+              finalization_data
+            "
+        )
+        .fetch_one(pool)
+        .await?
+        .count;
+
+        if remaining == Some(0) || remaining.is_none() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_l2_blocks(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        sqlx::query!(
+            "
+            DELETE FROM
+              l2_blocks
+            WHERE
+              l2_block_number in (
+                SELECT
+                  l2_block_number
+                from
+                  l2_blocks
+                LIMIT
+                  $1
+              )
+            ",
+            delete_batch_size as i64,
+        )
+        .execute(pool)
+        .await?;
+
+        let remaining = sqlx::query!(
+            "
+            SELECT
+              count(*)
+            from
+              finalization_data
+            "
+        )
+        .fetch_one(pool)
+        .await?
+        .count;
+
+        if remaining == Some(0) || remaining.is_none() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_l2_to_l1_events(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        sqlx::query!(
+            "
+            DELETE FROM
+              l2_to_l1_events
+            WHERE
+              l1_block_number in (
+                SELECT
+                  l1_block_number
+                from
+                  l2_to_l1_events
+                LIMIT
+                  $1
+              )
+            ",
+            delete_batch_size as i64,
+        )
+        .execute(pool)
+        .await?;
+
+        let remaining = sqlx::query!(
+            "
+            SELECT
+              count(*)
+            from
+              finalization_data
+            "
+        )
+        .fetch_one(pool)
+        .await?
+        .count;
+
+        if remaining == Some(0) || remaining.is_none() {
+            return Ok(());
+        }
+    }
+}
+
+async fn wipe_tokens(pool: &PgPool) -> Result<()> {
+    sqlx::query!("DELETE FROM tokens").execute(pool).await?;
+
+    Ok(())
+}
+
+async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    loop {
+        sqlx::query!(
+            "
+            DELETE FROM
+              withdrawals
+            WHERE
+              id in (
+                SELECT
+                  id
+                from
+                  withdrawals
+                LIMIT
+                  $1
+              )
+            ",
+            delete_batch_size as i64,
+        )
+        .execute(pool)
+        .await?;
+
+        let remaining = sqlx::query!(
+            "
+            SELECT
+              count(*)
+            from
+              withdrawals
+            "
+        )
+        .fetch_one(pool)
+        .await?
+        .count;
+
+        if remaining == Some(0) || remaining.is_none() {
+            return Ok(());
+        }
+    }
+}
+
 /// Delete all content from finalizer db tables
-pub async fn delete_db_content(pool: &PgPool) -> Result<()> {
-    let mut tx = pool.begin().await?;
+pub async fn delete_db_content(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
+    wipe_finalization_data(pool, delete_batch_size).await?;
 
-    sqlx::query!(
-        "
-        DELETE FROM
-          finalization_data
-        "
-    )
-    .execute(&mut *tx)
-    .await?;
+    wipe_l2_blocks(pool, delete_batch_size).await?;
 
-    sqlx::query!(
-        "
-        DELETE FROM
-          l2_blocks
-        "
-    )
-    .execute(&mut *tx)
-    .await?;
+    wipe_l2_to_l1_events(pool, delete_batch_size).await?;
 
-    sqlx::query!(
-        "
-        DELETE FROM
-          l2_to_l1_events
-        "
-    )
-    .execute(&mut *tx)
-    .await?;
+    wipe_tokens(pool).await?;
 
-    sqlx::query!(
-        "
-        DELETE FROM
-          tokens
-        "
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query!(
-        "
-        DELETE FROM
-          withdrawals
-        "
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
+    wipe_withdrawals(pool, delete_batch_size).await?;
 
     Ok(())
 }
