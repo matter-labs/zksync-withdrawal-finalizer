@@ -39,11 +39,13 @@ Deployment is done by deploying a dockerized image of the service.
 | Variable | Description |
 | -------- | ----------- |
 | `ETH_CLIENT_WS_URL` | The address of Ethereum WebSocket RPC endpoint |
+| `ETH_CLIENT_HTTP_URL` | The address of Ethereum HTTP RPC endpoint |
 | `CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR` | Address of the L1 ERC20 bridge contract** |
 | `CONTRACTS_L2_ERC20_BRIDGE_ADDR` | Address of the L2 ERC20 bridge contract** |
 | `CONTRACTS_DIAMOND_PROXY_ADDR` | Address of the L1 diamond proxy contract** |
 | `CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT` | Address of the Withdrawal Finalizer contract ** |
 | `API_WEB3_JSON_RPC_WS_URL` | Address of the zkSync Era WebSocket RPC endpoint |
+| `API_WEB3_JSON_RPC_HTTP_URL` | Address of the zkSync Era HTTP RPC endpoint |
 | `DATABSE_URL` | The url of PostgreSQL database the service stores its state into |
 | `GAS_LIMIT` | The gas limit of a single withdrawal finalization within the batch of withdrawals finalized in a call to `finalizeWithdrawals` in WithdrawalFinalizerContract |
 | `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalizastion of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
