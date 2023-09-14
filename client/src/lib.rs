@@ -375,11 +375,10 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                         <WithdrawalInitiatedFilter as EthEvent>::decode_log(&raw_log).ok()
                     })
                     .nth(index)
-                    .unwrap_or_else(|| panic!(
-                        "A matching WithdrawalInitiatedFilter event is not found for {:?} at index {}",
+                    .ok_or(Error::WithdrawalInitiatedFilterNotFound(
                         withdrawal_hash,
-                        index)
-                    );
+                        index,
+                    ))?;
 
                 let l1_receiver = withdrawal_initiated_event.l_1_receiver;
 
@@ -395,12 +394,10 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .filter(|(_, log)| log.value == l2_to_l1_message_hash)
             .nth(index)
             .map(|(i, _)| i)
-            .unwrap_or_else(|| {
-                panic!(
-                    "An L2ToL1 message for {:?} with value {:?} not found",
-                    withdrawal_hash, l2_to_l1_message_hash,
-                )
-            });
+            .ok_or(Error::L2ToL1WithValueNotFound(
+                withdrawal_hash,
+                l2_to_l1_message_hash,
+            ))?;
 
         let l1_batch_tx_id = receipt.l1_batch_tx_index;
         let log = receipt
@@ -411,12 +408,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                     && entry.topics[0] == L1MessageSentFilter::signature()
             })
             .nth(index)
-            .unwrap_or_else(|| {
-                panic!(
-                    "A L1MessageSent log is not found for {:?} at index {}",
-                    withdrawal_hash, index
-                )
-            });
+            .ok_or(Error::L1MessageSentNotFound(withdrawal_hash, index))?;
 
         let sender = log.topics[1].into();
 
@@ -430,7 +422,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .swap_remove(0)
         {
             Token::Bytes(b) => b.into(),
-            b => panic!("log data is expected to be rlp bytes, got {b:?}"),
+            b => return Err(Error::MessageNotRlpBytes(format!("{b:?}"))),
         };
 
         let l2_message_index = proof.id;
