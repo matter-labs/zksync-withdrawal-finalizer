@@ -343,7 +343,7 @@ where
     while let Some(event) = we.next().await {
         match event {
             L2Event::Withdrawal(event) => {
-                vlog::debug!("withdrawal event {event:?}");
+                vlog::info!("received withdrawal event {event:?}");
                 if event.block_number > curr_l2_block_number {
                     process_withdrawals_in_block(&pool, std::mem::take(&mut in_block_events))
                         .await?;

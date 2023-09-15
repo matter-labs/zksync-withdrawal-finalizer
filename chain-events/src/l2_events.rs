@@ -139,7 +139,13 @@ impl L2EventsListener {
 
             if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log)? {
                 if self.tokens.insert(address) {
-                    sender.send(l2_event.into()).await.unwrap();
+                    let event = l2_event.into();
+
+                    vlog::info!("sending token event {event:?}");
+                    sender
+                        .send(event)
+                        .await
+                        .map_err(|_| Error::ChannelClosing)?;
                 }
             }
         }
@@ -284,7 +290,7 @@ impl L2EventsListener {
                         .as_u64(),
                 ))
                 .await
-                .unwrap();
+                .map_err(|_| Error::ChannelClosing)?;
         }
     }
 }
@@ -448,13 +454,19 @@ impl L2EventsListener {
                 L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
                 | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
                     metrics::increment_counter!("watcher.chain_events.withdrawal_events");
+
                     let we = WithdrawalEvent {
                         tx_hash,
                         block_number: block_number.as_u64(),
                         token: log.address,
                         amount: *amount,
                     };
-                    sender.send(we.into()).await.unwrap();
+                    let event = we.into();
+                    vlog::info!("sending withdrawal event {event:?}");
+                    sender
+                        .send(event)
+                        .await
+                        .map_err(|_| Error::ChannelClosing)?;
                 }
                 L2Events::ContractDeployed(_) => {
                     let tx = middleware
@@ -479,7 +491,12 @@ impl L2EventsListener {
                                 "watcher.chain_events.new_token_added_events"
                             );
 
-                            sender.send(l2_event.into()).await.unwrap();
+                            let event = l2_event.into();
+                            vlog::info!("sending new token event {event:?}");
+                            sender
+                                .send(event)
+                                .await
+                                .map_err(|_| Error::ChannelClosing)?;
                             vlog::info!("Restarting on the token added event {address}");
                             return Ok(Some(NewTokenAdded));
                         }
