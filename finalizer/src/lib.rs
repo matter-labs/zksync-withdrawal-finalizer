@@ -425,25 +425,45 @@ fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error
 // Request finalization parameters for a set of withdrawals in parallel.
 async fn request_finalize_params<M2>(
     middleware: M2,
-    hash_and_indices: &[(H256, u16)],
-) -> Result<Vec<WithdrawalParams>>
+    hash_and_indices: &[(H256, u16, u64)],
+) -> Vec<WithdrawalParams>
 where
     M2: ZksyncMiddleware,
 {
-    let results: Result<Vec<_>> =
-        futures::future::join_all(hash_and_indices.iter().map(|(h, i)| {
-            middleware
-                .finalize_withdrawal_params(*h, *i as usize)
-                .map_ok(|r| r.expect("always able to ask withdrawal params; qed"))
-                .map_err(|e| e.into())
-        }))
-        .await
-        .into_iter()
-        .collect();
+    let mut ok_results = Vec::with_capacity(hash_and_indices.len());
 
-    let results = results?;
+    // Run all parametere fetching in parallel.
+    // Filter out errors and log them and increment a metric counter.
+    // Return successful fetches.
+    for (i, result) in futures::future::join_all(hash_and_indices.iter().map(|(h, i, id)| {
+        middleware
+            .finalize_withdrawal_params(*h, *i as usize)
+            .map_ok(|r| {
+                let mut r = r.expect("always able to ask withdrawal params; qed");
+                r.id = *id;
+                r
+            })
+            .map_err(crate::Error::from)
+    }))
+    .await
+    .into_iter()
+    .enumerate()
+    {
+        match result {
+            Ok(r) => ok_results.push(r),
+            Err(e) => {
+                metrics::increment_counter!(
+                    "finalizer.params_fetcher.failed_to_fetch_withdrawal_params"
+                );
+                vlog::error!(
+                    "failed to fetch withdrawal parameters: {e} {:?}",
+                    hash_and_indices[i]
+                );
+            }
+        }
+    }
 
-    Ok(results)
+    ok_results
 }
 
 // Continiously query the new withdrawals that have been seen by watcher
@@ -474,19 +494,12 @@ where
 
     vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
 
-    let hash_and_index: Vec<_> = newly_executed_withdrawals
+    let hash_and_index_and_id: Vec<_> = newly_executed_withdrawals
         .iter()
-        .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16))
+        .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16, p.id))
         .collect();
 
-    let mut params = request_finalize_params(&middleware, &hash_and_index).await?;
-
-    for (param, id) in params
-        .iter_mut()
-        .zip(newly_executed_withdrawals.iter().map(|v| v.id))
-    {
-        param.id = id;
-    }
+    let params = request_finalize_params(&middleware, &hash_and_index_and_id).await;
 
     storage::add_withdrawals_data(pool, &params).await?;
 
