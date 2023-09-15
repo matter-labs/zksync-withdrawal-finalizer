@@ -142,7 +142,10 @@ impl L2EventsListener {
                     let event = l2_event.into();
 
                     vlog::info!("sending token event {event:?}");
-                    sender.send(event).await.unwrap();
+                    sender
+                        .send(event)
+                        .await
+                        .map_err(|_| Error::ChannelClosing)?;
                 }
             }
         }
@@ -287,7 +290,7 @@ impl L2EventsListener {
                         .as_u64(),
                 ))
                 .await
-                .unwrap();
+                .map_err(|_| Error::ChannelClosing)?;
         }
     }
 }
@@ -460,7 +463,10 @@ impl L2EventsListener {
                     };
                     let event = we.into();
                     vlog::info!("sending withdrawal event {event:?}");
-                    sender.send(event).await.unwrap();
+                    sender
+                        .send(event)
+                        .await
+                        .map_err(|_| Error::ChannelClosing)?;
                 }
                 L2Events::ContractDeployed(_) => {
                     let tx = middleware
@@ -487,7 +493,10 @@ impl L2EventsListener {
 
                             let event = l2_event.into();
                             vlog::info!("sending new token event {event:?}");
-                            sender.send(event).await.unwrap();
+                            sender
+                                .send(event)
+                                .await
+                                .map_err(|_| Error::ChannelClosing)?;
                             vlog::info!("Restarting on the token added event {address}");
                             return Ok(Some(NewTokenAdded));
                         }

@@ -10,6 +10,9 @@ pub enum Error {
 
     #[error("LogQuery error {0}")]
     LogQuery(String),
+
+    #[error("Channel closing")]
+    ChannelClosing,
 }
 
 impl<E: Debug + Display> From<LogQueryError<E>> for Error {

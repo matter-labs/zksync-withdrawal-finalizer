@@ -216,7 +216,7 @@ impl BlockEvents {
                     &middleware,
                     &mut sender,
                 )
-                .await;
+                .await?;
             }
         }
 
@@ -253,14 +253,15 @@ async fn process_l1_event<M, S>(
     l1_event: &L1Events,
     middleware: M,
     sender: &mut S,
-) where
+) -> Result<()>
+where
     M: Middleware,
     <M as Middleware>::Provider: PubsubClient,
     S: Sink<BlockEvent> + Unpin,
     <S as Sink<BlockEvent>>::Error: std::fmt::Debug,
 {
     let Some(block_number) = log.block_number.map(|bn| bn.as_u64()) else {
-        return;
+        return Ok(());
     };
 
     match l1_event {
@@ -274,7 +275,7 @@ async fn process_l1_event<M, S>(
             )
             .await
             else {
-                return;
+                return Ok(());
             };
             let tx = tx.unwrap_or_else(|| {
                 panic!("mined transaction exists {:?}; qed", log.transaction_hash)
@@ -297,7 +298,7 @@ async fn process_l1_event<M, S>(
             sender
                 .send(BlockEvent::L2ToL1Events { events })
                 .await
-                .unwrap();
+                .map_err(|_| Error::ChannelClosing)?;
 
             metrics::increment_counter!("watcher.chain_events.block_commit_events");
             sender
@@ -306,7 +307,7 @@ async fn process_l1_event<M, S>(
                     event: bc.clone(),
                 })
                 .await
-                .unwrap()
+                .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksVerification(event) => {
             metrics::increment_counter!("watcher.chain_events.block_verification_events");
@@ -316,7 +317,7 @@ async fn process_l1_event<M, S>(
                     event: event.clone(),
                 })
                 .await
-                .unwrap();
+                .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksExecution(event) => {
             metrics::increment_counter!("watcher.chain_events.block_execution_events");
@@ -326,7 +327,8 @@ async fn process_l1_event<M, S>(
                     event: event.clone(),
                 })
                 .await
-                .unwrap()
+                .map_err(|_| Error::ChannelClosing)?;
         }
     }
+    Ok(())
 }
