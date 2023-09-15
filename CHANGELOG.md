@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.44](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.43...v0.1.44) (2023-09-15)
+
+
+### Bug Fixes
+
+* adds logging to l2 events and removes panics on closed channels ([#188](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/188)) ([73f0f2a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/73f0f2a3b6a35493d0987de44883c582bcb77652))
+* **deps:** update rust crate proc-macro2 to 1.0.67 ([#181](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/181)) ([46c4909](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/46c4909b3d79ccca90f70a6b4da3972c69efc5aa))
+* **deps:** update rust crate syn to 2.0.33 ([#182](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/182)) ([05b48a8](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/05b48a84a1ca4047f667b2889d7202c4d0957bbe))
+* everything but subscriptions is now http ([#186](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/186)) ([831bdf4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/831bdf439cda7fb40ab51baa382a257a77194c50))
+* if some withdrawals params fetching fails, do not derail whole service ([#187](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/187)) ([d6403c3](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/d6403c3c2d9f860c912d4ae4d595c4eb688d56ea))
+* removes panics from client code ([#185](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/185)) ([c06651c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c06651c52c3f590600bc084b1fa170c958fb958c))
+
 ## [0.1.43](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.42...v0.1.43) (2023-09-12)
 
 
