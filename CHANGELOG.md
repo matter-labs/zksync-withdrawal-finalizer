@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.45](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.44...v0.1.45) (2023-09-20)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate chrono to 0.4.31 ([#189](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/189)) ([0983090](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0983090b22b6ba96964da2d8803155d7be88b0fa))
+* **deps:** update rust crate syn to 2.0.35 ([#191](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/191)) ([7b9a911](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7b9a911c8f8b225ff0a61432745aa0639a158bf2))
+* **deps:** update rust crate syn to 2.0.37 ([#192](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/192)) ([c1940f9](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c1940f9433ecbbfad40ab2cf3aa15b1c4f0c2928))
+* request finalization status of withdrawal on the fetch params phase ([#193](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/193)) ([426bcd5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/426bcd561e1f663cbf4f49f630f4684bd9fdc762))
+
 ## [0.1.44](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.43...v0.1.44) (2023-09-15)
 
 
