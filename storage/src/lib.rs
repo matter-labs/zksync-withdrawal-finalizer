@@ -970,3 +970,13 @@ pub async fn delete_db_content(pool: &PgPool, delete_batch_size: usize) -> Resul
 
     Ok(())
 }
+
+/// Delete all content from `finalization_data` table.
+pub async fn delete_finalization_data_content(
+    pool: &PgPool,
+    delete_batch_size: usize,
+) -> Result<()> {
+    wipe_finalization_data(pool, delete_batch_size).await?;
+
+    Ok(())
+}

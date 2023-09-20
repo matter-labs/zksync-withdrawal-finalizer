@@ -108,8 +108,12 @@ where
     where
         M2: ZksyncMiddleware + 'static,
     {
-        let params_fetcher_handle =
-            tokio::spawn(params_fetcher_loop(self.pgpool.clone(), middleware));
+        let params_fetcher_handle = tokio::spawn(params_fetcher_loop(
+            self.pgpool.clone(),
+            middleware,
+            self.zksync_contract.clone(),
+            self.l1_bridge.clone(),
+        ));
 
         let finalizer_handle = tokio::spawn(self.finalizer_loop());
 
@@ -324,7 +328,8 @@ where
 
         let predicted = std::mem::take(&mut self.unsuccessful);
         vlog::debug!("requesting finalization status of withdrawals");
-        let are_finalized = self.get_finalized_withdrawals(&predicted).await?;
+        let are_finalized =
+            get_finalized_withdrawals(&predicted, &self.zksync_contract, &self.l1_bridge).await?;
 
         let mut already_finalized = vec![];
         let mut unsuccessful = vec![];
@@ -373,45 +378,49 @@ where
 
         Ok(())
     }
+}
 
-    async fn get_finalized_withdrawals(
-        &self,
-        withdrawals: &[WithdrawalParams],
-    ) -> Result<HashSet<WithdrawalKey>> {
-        let results: Result<Vec<_>> =
-            futures::future::join_all(withdrawals.iter().map(|wd| async move {
-                let l1_batch_number = U256::from(wd.l1_batch_number.as_u64());
-                let l2_message_index = U256::from(wd.l2_message_index);
+async fn get_finalized_withdrawals<M>(
+    withdrawals: &[WithdrawalParams],
+    zksync_contract: &IZkSync<M>,
+    l1_bridge: &IL1Bridge<M>,
+) -> Result<HashSet<WithdrawalKey>>
+where
+    M: Middleware,
+{
+    let results: Result<Vec<_>> =
+        futures::future::join_all(withdrawals.iter().map(|wd| async move {
+            let l1_batch_number = U256::from(wd.l1_batch_number.as_u64());
+            let l2_message_index = U256::from(wd.l2_message_index);
 
-                if is_eth(wd.sender) {
-                    self.zksync_contract
-                        .is_eth_withdrawal_finalized(l1_batch_number, l2_message_index)
-                        .call()
-                        .await
-                        .map_err(|e| e.into())
-                } else {
-                    self.l1_bridge
-                        .is_withdrawal_finalized(l1_batch_number, l2_message_index)
-                        .call()
-                        .await
-                        .map_err(|e| e.into())
-                }
-            }))
-            .await
-            .into_iter()
-            .collect();
-
-        let results = results?;
-
-        let mut set = HashSet::new();
-        for i in 0..results.len() {
-            if results[i] {
-                set.insert(withdrawals[i].key());
+            if is_eth(wd.sender) {
+                zksync_contract
+                    .is_eth_withdrawal_finalized(l1_batch_number, l2_message_index)
+                    .call()
+                    .await
+                    .map_err(|e| e.into())
+            } else {
+                l1_bridge
+                    .is_withdrawal_finalized(l1_batch_number, l2_message_index)
+                    .call()
+                    .await
+                    .map_err(|e| e.into())
             }
-        }
+        }))
+        .await
+        .into_iter()
+        .collect();
 
-        Ok(set)
+    let results = results?;
+
+    let mut set = HashSet::new();
+    for i in 0..results.len() {
+        if results[i] {
+            set.insert(withdrawals[i].key());
+        }
     }
+
+    Ok(set)
 }
 
 fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error) -> bool {
@@ -469,20 +478,33 @@ where
 // Continiously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
-async fn params_fetcher_loop<M2>(pool: PgPool, middleware: M2)
-where
+async fn params_fetcher_loop<M1, M2>(
+    pool: PgPool,
+    middleware: M2,
+    zksync_contract: IZkSync<M1>,
+    l1_bridge: IL1Bridge<M1>,
+) where
+    M1: Middleware,
     M2: ZksyncMiddleware,
 {
     loop {
-        if let Err(e) = params_fetcher_loop_iteration(&pool, &middleware).await {
+        if let Err(e) =
+            params_fetcher_loop_iteration(&pool, &middleware, &zksync_contract, &l1_bridge).await
+        {
             vlog::error!("params fetcher iteration ended with {e}");
             tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
         }
     }
 }
 
-async fn params_fetcher_loop_iteration<M2>(pool: &PgPool, middleware: M2) -> Result<()>
+async fn params_fetcher_loop_iteration<M1, M2>(
+    pool: &PgPool,
+    middleware: &M2,
+    zksync_contract: &IZkSync<M1>,
+    l1_bridge: &IL1Bridge<M1>,
+) -> Result<()>
 where
+    M1: Middleware,
     M2: ZksyncMiddleware,
 {
     let newly_executed_withdrawals = storage::get_withdrawals_with_no_data(pool, 1000).await?;
@@ -492,7 +514,7 @@ where
         return Ok(());
     }
 
-    vlog::info!("newly executed withdrawals {newly_executed_withdrawals:?}");
+    vlog::debug!("newly committed withdrawals {newly_executed_withdrawals:?}");
 
     let hash_and_index_and_id: Vec<_> = newly_executed_withdrawals
         .iter()
@@ -501,7 +523,13 @@ where
 
     let params = request_finalize_params(&middleware, &hash_and_index_and_id).await;
 
+    let already_finalized: Vec<_> = get_finalized_withdrawals(&params, zksync_contract, l1_bridge)
+        .await?
+        .into_iter()
+        .collect();
+
     storage::add_withdrawals_data(pool, &params).await?;
+    storage::finalization_data_set_finalized_in_tx(pool, &already_finalized, H256::zero()).await?;
 
     Ok(())
 }
