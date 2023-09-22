@@ -390,10 +390,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         let l2_to_l1_log_index = receipt
             .l2_to_l1_logs
             .iter()
-            .enumerate()
-            .filter(|(_, log)| log.value == l2_to_l1_message_hash)
-            .nth(index)
-            .map(|(i, _)| i)
+            .position(|l| l.value == l2_to_l1_message_hash)
             .ok_or(Error::L2ToL1WithValueNotFound(
                 withdrawal_hash,
                 l2_to_l1_message_hash,
