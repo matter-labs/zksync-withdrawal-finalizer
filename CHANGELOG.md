@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.46](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.45...v0.1.46) (2023-09-22)
+
+
+### Bug Fixes
+
+* **deps:** update rust crate tokio-util to 0.7.9 ([#194](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/194)) ([c069c50](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c069c502227162106d83a664aafb68bf02841a66))
+* l2 to l1 message should be searched by hash only ([#197](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/197)) ([eae85c1](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/eae85c11d5b59426dbffa49cd55000229f71d73e))
+
 ## [0.1.45](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.44...v0.1.45) (2023-09-20)
 
 
