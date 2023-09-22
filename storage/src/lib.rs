@@ -838,6 +838,21 @@ pub async fn inc_unsuccessful_finalization_attempts(
     Ok(())
 }
 
+/// Fetch decimals for a token.
+pub async fn token_decimals(pool: &PgPool, token: Address) -> Result<Option<u32>> {
+    let result = sqlx::query!(
+        "
+        SELECT decimals FROM tokens WHERE l1_token_address = $1
+        ",
+        token.as_bytes(),
+    )
+    .fetch_optional(pool)
+    .await?
+    .map(|r| r.decimals as u32);
+
+    Ok(result)
+}
+
 async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
         let deleted_ids = sqlx::query!(
@@ -942,8 +957,7 @@ async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()>
                   withdrawals
                 LIMIT
                   $1
-              )
-            RETURNING id
+              ) RETURNING id
             ",
             delete_batch_size as i64,
         )
