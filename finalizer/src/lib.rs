@@ -295,6 +295,11 @@ where
 
                 let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
 
+                metrics::counter!(
+                    "finalizer.predicted_to_fail_withdrawals",
+                    predicted_to_fail.len() as u64
+                );
+
                 vlog::debug!("predicted to fail: {predicted_to_fail:?}");
 
                 if !predicted_to_fail.is_empty() {
