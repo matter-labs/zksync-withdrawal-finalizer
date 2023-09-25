@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.47](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.46...v0.1.47) (2023-09-25)
+
+
+### Bug Fixes
+
+* adds a predicted to fail metrics ([#198](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/198)) ([9116faa](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/9116faa1c7dad57390523036a673e789ba3cf619))
+
 ## [0.1.46](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.45...v0.1.46) (2023-09-22)
 
 
