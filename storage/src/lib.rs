@@ -244,6 +244,38 @@ pub async fn executed_new_batch(
     Ok(())
 }
 
+/// Gets withdrawal events from the db by a set of IDs.
+///
+/// # Arguments
+///
+/// * `conn`: Connection to the Postgres DB
+/// * `ids`: ID fields of the withdrawals to be returned.
+pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWithdrawal>> {
+    let events = sqlx::query!(
+        "
+        SELECT * FROM
+            withdrawals
+        WHERE id in (SELECT * FROM unnest( $1 :: bigint[] ))
+        ",
+        ids
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| StoredWithdrawal {
+        event: WithdrawalEvent {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            block_number: r.l2_block_number as u64,
+            token: Address::from_slice(&r.token),
+            amount: utils::bigdecimal_to_u256(r.amount),
+        },
+        index_in_tx: r.event_index_in_tx as usize,
+    })
+    .collect();
+
+    Ok(events)
+}
+
 /// Adds a withdrawal event to the DB.
 ///
 /// # Arguments
