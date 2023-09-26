@@ -5,7 +5,11 @@
 
 //! Finalization logic implementation.
 
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+    time::Duration,
+};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
@@ -18,7 +22,7 @@ use sqlx::PgPool;
 
 use client::{
     is_eth, withdrawal_finalizer::codegen::withdrawal_finalizer::Result as FinalizeResult,
-    WithdrawalKey,
+    WithdrawalKey, ETH_TOKEN_ADDRESS,
 };
 use client::{
     l1bridge::codegen::IL1Bridge, withdrawal_finalizer::codegen::WithdrawalFinalizer,
@@ -53,7 +57,9 @@ pub struct Finalizer<M1, M2> {
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
     tx_retry_timeout: Duration,
+
     account_address: Address,
+    token_decimals: HashMap<Address, u32>,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -85,6 +91,9 @@ where
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
+        let mut token_decimals = HashMap::new();
+        token_decimals.insert(ETH_TOKEN_ADDRESS, 18_u64);
+
         Self {
             pgpool,
             one_withdrawal_gas_limit,
@@ -98,6 +107,7 @@ where
             tx_fee_limit,
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
+            token_decimals,
         }
     }
 
@@ -183,6 +193,8 @@ where
         )
         .await;
 
+        let ids: Vec<_> = withdrawals.iter().map(|w| w.id as i64).collect();
+
         // Turn actual withdrawals into info to update db with.
         let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
@@ -204,6 +216,8 @@ where
                     "finalizer.highest_finalized_batch_number",
                     highest_batch_number.as_u64() as f64,
                 );
+
+                self.meter_finalized_withdrawals(ids).await?;
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => {
@@ -266,6 +280,52 @@ where
                 tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
             }
         }
+    }
+
+    async fn meter_finalized_withdrawals(&mut self, ids: Vec<i64>) -> Result<()> {
+        let withdrawals = storage::get_withdrawals(&self.pgpool, &ids).await?;
+
+        for w in withdrawals {
+            let decimals = match self.token_decimals.get(&w.event.token) {
+                None => {
+                    let decimals = storage::token_decimals(&self.pgpool, w.event.token)
+                        .await?
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "received withdrawal event from an unknown token {:?}; qed",
+                                w.event.token
+                            )
+                        });
+                    self.token_decimals.insert(w.event.token, decimals);
+                    decimals
+                }
+                Some(decimals) => *decimals,
+            };
+
+            let formatted = match ethers::utils::format_units(w.event.amount, decimals) {
+                Ok(f) => f,
+                Err(e) => {
+                    vlog::error!("failed to format units: {e}");
+                    continue;
+                }
+            };
+
+            let formatted_f64 = match f64::from_str(&formatted) {
+                Ok(f) => f,
+                Err(e) => {
+                    vlog::error!("failed to format units: {e}");
+                    continue;
+                }
+            };
+
+            metrics::increment_gauge!(
+                "era_withdrawal_finalizer_withdrawn_tokens",
+                formatted_f64,
+                "token" => format!("{:?}", w.event.token)
+            )
+        }
+
+        Ok(())
     }
 
     async fn loop_iteration(&mut self) -> Result<()> {
