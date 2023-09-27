@@ -871,10 +871,15 @@ pub async fn inc_unsuccessful_finalization_attempts(
 }
 
 /// Fetch decimals for a token.
+///
+/// # Arguments
+///
+/// * `pool` - PgPool
+/// * `token` - L2 token address.
 pub async fn token_decimals(pool: &PgPool, token: Address) -> Result<Option<u32>> {
     let result = sqlx::query!(
         "
-        SELECT decimals FROM tokens WHERE l1_token_address = $1
+        SELECT decimals FROM tokens WHERE l2_token_address = $1
         ",
         token.as_bytes(),
     )
