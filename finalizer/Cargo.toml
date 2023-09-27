@@ -18,3 +18,4 @@ client = { path = "../client" }
 storage = { path = "../storage" }
 vlog = { path = "../vlog" }
 tx-sender = { path = "../tx-sender" }
+withdrawals-meterer = { path = "../withdrawals-meterer" }

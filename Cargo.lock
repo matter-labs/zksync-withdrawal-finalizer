@@ -1354,6 +1354,7 @@ dependencies = [
  "tokio",
  "tx-sender",
  "vlog",
+ "withdrawals-meterer",
 ]
 
 [[package]]
@@ -4610,6 +4611,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "vlog",
+ "withdrawals-meterer",
 ]
 
 [[package]]
@@ -4819,6 +4821,21 @@ dependencies = [
  "url",
  "vlog",
  "watcher",
+]
+
+[[package]]
+name = "withdrawals-meterer"
+version = "0.1.11"
+dependencies = [
+ "client",
+ "ethers",
+ "lazy_static",
+ "metrics",
+ "sqlx",
+ "storage",
+ "thiserror",
+ "tokio",
+ "vlog",
 ]
 
 [[package]]

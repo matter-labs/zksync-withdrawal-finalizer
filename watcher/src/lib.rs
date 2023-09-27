@@ -295,6 +295,16 @@ async fn process_withdrawals_in_block(pool: &PgPool, events: Vec<WithdrawalEvent
         });
     }
 
+    if let Err(e) = withdrawals_meterer::meter_finalized_withdrawals(
+        pool,
+        &stored_withdrawals,
+        "era_withdrawn_tokens_amounts_tracker",
+    )
+    .await
+    {
+        vlog::error!("Failed to meter requested withdrawals: {e}");
+    }
+
     storage::add_withdrawals(pool, &stored_withdrawals).await?;
     Ok(())
 }
