@@ -874,7 +874,7 @@ pub async fn inc_unsuccessful_finalization_attempts(
 ///
 /// # Arguments
 ///
-/// * `pool` - PgPool
+/// * `pool` - `PgPool`
 /// * `token` - L2 token address.
 pub async fn token_decimals(pool: &PgPool, token: Address) -> Result<Option<u32>> {
     let result = sqlx::query!(
