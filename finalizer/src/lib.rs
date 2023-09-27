@@ -1,6 +1,7 @@
 #![deny(unused_crate_dependencies)]
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
+#![warn(unused_imports)]
 
 //! Finalization logic implementation.
 
@@ -52,7 +53,6 @@ pub struct Finalizer<M1, M2> {
     query_db_pagination_limit: u64,
     tx_fee_limit: U256,
     tx_retry_timeout: Duration,
-
     account_address: Address,
 }
 

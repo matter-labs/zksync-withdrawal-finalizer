@@ -4833,7 +4833,6 @@ dependencies = [
  "metrics",
  "sqlx",
  "storage",
- "thiserror",
  "tokio",
  "vlog",
 ]

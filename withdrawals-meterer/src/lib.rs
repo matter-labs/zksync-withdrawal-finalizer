@@ -1,3 +1,10 @@
+#![deny(unused_crate_dependencies)]
+#![warn(missing_docs)]
+#![warn(unused_extern_crates)]
+#![warn(unused_imports)]
+
+//! A utility crate that meters withdrawals amounts.
+
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use client::ETH_TOKEN_ADDRESS;
@@ -16,21 +23,13 @@ lazy_static! {
     };
 }
 
-#[derive(Debug, thiserror::Error)]
-#[allow(missing_docs)]
-pub enum Error {
-    #[error(transparent)]
-    Storage(#[from] storage::Error),
-
-    #[error("Received withdrawal for unknown token {0:?}")]
-    UnknownToken(Address),
-}
-
+/// Given a set of withdrawal ids meter all of them to a metric
+/// with a given name.
 pub async fn meter_finalized_withdrawals_storage(
     pool: &PgPool,
     ids: Vec<i64>,
     metric_name: &'static str,
-) -> Result<(), Error> {
+) -> Result<(), storage::Error> {
     let withdrawals = storage::get_withdrawals(pool, &ids).await?;
 
     meter_finalized_withdrawals(pool, &withdrawals, metric_name).await?;
@@ -38,11 +37,16 @@ pub async fn meter_finalized_withdrawals_storage(
     Ok(())
 }
 
+/// Given a set of [`StoredWithdrawal`], meter all of them to a
+/// metric with a given name.
+///
+/// This function returns only storage error, all formatting, etc
+/// errors will be just logged.
 pub async fn meter_finalized_withdrawals(
     pool: &PgPool,
     withdrawals: &[StoredWithdrawal],
     metric_name: &'static str,
-) -> Result<(), Error> {
+) -> Result<(), storage::Error> {
     for w in withdrawals {
         let guard = TOKEN_DECIMALS.read().await;
         let decimals = guard.get(&w.event.token).copied();
@@ -50,9 +54,10 @@ pub async fn meter_finalized_withdrawals(
 
         let decimals = match decimals {
             None => {
-                let decimals = storage::token_decimals(pool, w.event.token)
-                    .await?
-                    .ok_or(Error::UnknownToken(w.event.token))?;
+                let Some(decimals) = storage::token_decimals(pool, w.event.token).await? else {
+                    vlog::error!("Received withdrawal from unknown token {:?}", w.event.token);
+                    continue;
+                };
 
                 TOKEN_DECIMALS.write().await.insert(w.event.token, decimals);
                 decimals
