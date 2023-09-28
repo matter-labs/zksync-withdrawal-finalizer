@@ -24,6 +24,7 @@ use client::{
     l1bridge::codegen::IL1Bridge, withdrawal_finalizer::codegen::WithdrawalFinalizer,
     zksync_contract::codegen::IZkSync, WithdrawalParams, ZksyncMiddleware,
 };
+use withdrawals_meterer::WithdrawalsMeter;
 
 use crate::error::{Error, Result};
 
@@ -54,6 +55,7 @@ pub struct Finalizer<M1, M2> {
     tx_fee_limit: U256,
     tx_retry_timeout: Duration,
     account_address: Address,
+    withdrawals_meterer: WithdrawalsMeter,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -82,6 +84,10 @@ where
         tx_retry_timeout: usize,
         account_address: Address,
     ) -> Self {
+        let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
+            pgpool.clone(),
+            "era_withdrawal_finalizer_meter",
+        );
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
@@ -98,6 +104,7 @@ where
             tx_fee_limit,
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
+            withdrawals_meterer,
         }
     }
 
@@ -183,6 +190,8 @@ where
         )
         .await;
 
+        let ids: Vec<_> = withdrawals.iter().map(|w| w.id as i64).collect();
+
         // Turn actual withdrawals into info to update db with.
         let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
@@ -204,6 +213,14 @@ where
                     "finalizer.highest_finalized_batch_number",
                     highest_batch_number.as_u64() as f64,
                 );
+
+                if let Err(e) = self
+                    .withdrawals_meterer
+                    .meter_withdrawals_storage(&ids)
+                    .await
+                {
+                    vlog::error!("Failed to meter the withdrawals: {e}");
+                }
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => {

@@ -244,6 +244,38 @@ pub async fn executed_new_batch(
     Ok(())
 }
 
+/// Gets withdrawal events from the db by a set of IDs.
+///
+/// # Arguments
+///
+/// * `conn`: Connection to the Postgres DB
+/// * `ids`: ID fields of the withdrawals to be returned.
+pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWithdrawal>> {
+    let events = sqlx::query!(
+        "
+        SELECT * FROM
+            withdrawals
+        WHERE id in (SELECT id FROM unnest( $1 :: bigint[] ))
+        ",
+        ids
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| StoredWithdrawal {
+        event: WithdrawalEvent {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            block_number: r.l2_block_number as u64,
+            token: Address::from_slice(&r.token),
+            amount: utils::bigdecimal_to_u256(r.amount),
+        },
+        index_in_tx: r.event_index_in_tx as usize,
+    })
+    .collect();
+
+    Ok(events)
+}
+
 /// Adds a withdrawal event to the DB.
 ///
 /// # Arguments
@@ -838,6 +870,26 @@ pub async fn inc_unsuccessful_finalization_attempts(
     Ok(())
 }
 
+/// Fetch decimals for a token.
+///
+/// # Arguments
+///
+/// * `pool` - `PgPool`
+/// * `token` - L2 token address.
+pub async fn token_decimals(pool: &PgPool, token: Address) -> Result<Option<u32>> {
+    let result = sqlx::query!(
+        "
+        SELECT decimals FROM tokens WHERE l2_token_address = $1
+        ",
+        token.as_bytes(),
+    )
+    .fetch_optional(pool)
+    .await?
+    .map(|r| r.decimals as u32);
+
+    Ok(result)
+}
+
 async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
         let deleted_ids = sqlx::query!(
@@ -942,8 +994,7 @@ async fn wipe_withdrawals(pool: &PgPool, delete_batch_size: usize) -> Result<()>
                   withdrawals
                 LIMIT
                   $1
-              )
-            RETURNING id
+              ) RETURNING id
             ",
             delete_batch_size as i64,
         )

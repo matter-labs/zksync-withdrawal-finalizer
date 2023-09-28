@@ -14,6 +14,18 @@ pub(crate) fn u256_to_big_decimal(value: U256) -> BigDecimal {
     ratio_to_big_decimal(&ratio, 80)
 }
 
+/// Converts `BigUint` value into the corresponding `U256` value.
+fn biguint_to_u256(value: BigUint) -> U256 {
+    let bytes = value.to_bytes_le();
+    U256::from_little_endian(&bytes)
+}
+
+/// Converts `BigDecimal` value into the corresponding `U256` value.
+pub(crate) fn bigdecimal_to_u256(value: BigDecimal) -> U256 {
+    let bigint = value.with_scale(0).into_bigint_and_exponent().0;
+    biguint_to_u256(bigint.to_biguint().unwrap())
+}
+
 fn ratio_to_big_decimal(num: &Ratio<BigUint>, precision: usize) -> BigDecimal {
     let bigint = round_precision_raw_no_div(num, precision)
         .to_bigint()

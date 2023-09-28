@@ -13,4 +13,5 @@ members = [
     "tx-sender",
     "vlog",
     "watcher",
+    "withdrawals-meterer"
 ]

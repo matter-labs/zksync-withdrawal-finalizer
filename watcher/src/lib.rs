@@ -11,6 +11,7 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{zksync_contract::L2ToL1Event, BlockEvent, WithdrawalEvent, ZksyncMiddleware};
+use withdrawals_meterer::WithdrawalsMeter;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -29,6 +30,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Watcher<M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
+    withdrawals_meterer: WithdrawalsMeter,
 }
 
 impl<M2> Watcher<M2>
@@ -38,9 +40,15 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
+        let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
+            pgpool.clone(),
+            "era_withdrawal_finalizer_watcher_meter",
+        );
+
         Self {
             l2_provider,
             pgpool,
+            withdrawals_meterer,
         }
     }
 
@@ -57,6 +65,7 @@ where
         let Watcher {
             l2_provider,
             pgpool,
+            withdrawals_meterer,
         } = self;
 
         // While reading the stream of withdrawal events asyncronously
@@ -79,8 +88,15 @@ where
             block_events,
             l2_provider,
         ));
-        let l2_loop_handler =
-            tokio::spawn(run_l2_events_loop(pgpool, withdrawal_events, from_l2_block));
+        let l2_loop_handler = tokio::spawn(async move {
+            run_l2_events_loop(
+                pgpool,
+                withdrawal_events,
+                from_l2_block,
+                withdrawals_meterer,
+            )
+            .await
+        });
 
         pin!(l1_loop_handler);
         pin!(l2_loop_handler);
@@ -272,7 +288,11 @@ where
     Ok(())
 }
 
-async fn process_withdrawals_in_block(pool: &PgPool, events: Vec<WithdrawalEvent>) -> Result<()> {
+async fn process_withdrawals_in_block(
+    pool: &PgPool,
+    events: Vec<WithdrawalEvent>,
+    withdrawals_meterer: &mut WithdrawalsMeter,
+) -> Result<()> {
     use itertools::Itertools;
     let group_by = events.into_iter().group_by(|event| event.tx_hash);
     let mut withdrawals_vec = vec![];
@@ -293,6 +313,13 @@ async fn process_withdrawals_in_block(pool: &PgPool, events: Vec<WithdrawalEvent
             event,
             index_in_tx: index,
         });
+    }
+
+    if let Err(e) = withdrawals_meterer
+        .meter_withdrawals(&stored_withdrawals)
+        .await
+    {
+        vlog::error!("Failed to meter requested withdrawals: {e}");
     }
 
     storage::add_withdrawals(pool, &stored_withdrawals).await?;
@@ -332,7 +359,12 @@ where
     Ok(())
 }
 
-async fn run_l2_events_loop<WE>(pool: PgPool, we: WE, from_l2_block: u64) -> Result<()>
+async fn run_l2_events_loop<WE>(
+    pool: PgPool,
+    we: WE,
+    from_l2_block: u64,
+    mut withdrawals_meterer: WithdrawalsMeter,
+) -> Result<()>
 where
     WE: Stream<Item = L2Event>,
 {
@@ -345,8 +377,12 @@ where
             L2Event::Withdrawal(event) => {
                 vlog::info!("received withdrawal event {event:?}");
                 if event.block_number > curr_l2_block_number {
-                    process_withdrawals_in_block(&pool, std::mem::take(&mut in_block_events))
-                        .await?;
+                    process_withdrawals_in_block(
+                        &pool,
+                        std::mem::take(&mut in_block_events),
+                        &mut withdrawals_meterer,
+                    )
+                    .await?;
                     curr_l2_block_number = event.block_number;
                 }
                 in_block_events.push(event);

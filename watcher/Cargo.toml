@@ -19,3 +19,4 @@ client = { path = "../client" }
 chain-events = { path = "../chain-events" }
 storage = { path = "../storage" }
 vlog = { path = "../vlog" }
+withdrawals-meterer = { path = "../withdrawals-meterer" }
