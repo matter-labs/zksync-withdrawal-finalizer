@@ -870,22 +870,31 @@ pub async fn inc_unsuccessful_finalization_attempts(
     Ok(())
 }
 
-/// Fetch decimals for a token.
+/// Fetch decimals and L1 address for a token.
 ///
 /// # Arguments
 ///
 /// * `pool` - `PgPool`
 /// * `token` - L2 token address.
-pub async fn token_decimals(pool: &PgPool, token: Address) -> Result<Option<u32>> {
+pub async fn token_decimals_and_l1_address(
+    pool: &PgPool,
+    token: Address,
+) -> Result<Option<(u32, Address)>> {
     let result = sqlx::query!(
         "
-        SELECT decimals FROM tokens WHERE l2_token_address = $1
+        SELECT
+            decimals,
+            l1_token_address
+        FROM
+            tokens
+        WHERE
+            l2_token_address = $1
         ",
         token.as_bytes(),
     )
     .fetch_optional(pool)
     .await?
-    .map(|r| r.decimals as u32);
+    .map(|r| (r.decimals as u32, Address::from_slice(&r.l1_token_address)));
 
     Ok(result)
 }

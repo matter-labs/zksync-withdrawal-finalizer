@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            decimals,\n            l1_token_address\n        FROM\n            tokens\n        WHERE\n            l2_token_address = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "decimals",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "l1_token_address",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "dd55ba3ba9d19346f07afb9a026edcf5e4eca8a8907113d93589522e114e5dab"
+}

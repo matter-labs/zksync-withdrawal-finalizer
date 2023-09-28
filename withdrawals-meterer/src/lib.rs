@@ -7,7 +7,7 @@
 
 use std::{collections::HashMap, str::FromStr};
 
-use client::ETH_TOKEN_ADDRESS;
+use client::{ETH_ADDRESS, ETH_TOKEN_ADDRESS};
 use ethers::types::Address;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
@@ -15,7 +15,8 @@ use storage::StoredWithdrawal;
 /// State of withdrawals volumes metering.
 pub struct WithdrawalsMeter {
     pool: PgPool,
-    token_decimals: HashMap<Address, u32>,
+    /// A mapping from L2 address to L1 address and decimals of token.
+    tokens: HashMap<Address, (u32, Address)>,
     component_name: &'static str,
 }
 
@@ -29,11 +30,11 @@ impl WithdrawalsMeter {
     ///    derived from it
     pub fn new(pool: PgPool, component_name: &'static str) -> Self {
         let mut token_decimals = HashMap::new();
-        token_decimals.insert(ETH_TOKEN_ADDRESS, 18_u32);
+        token_decimals.insert(ETH_ADDRESS, (18_u32, ETH_TOKEN_ADDRESS));
 
         Self {
             pool,
-            token_decimals,
+            tokens: token_decimals,
             component_name,
         }
     }
@@ -58,18 +59,19 @@ impl WithdrawalsMeter {
         withdrawals: &[StoredWithdrawal],
     ) -> Result<(), storage::Error> {
         for w in withdrawals {
-            let decimals = match self.token_decimals.get(&w.event.token) {
+            let (decimals, l1_token_address) = match self.tokens.get(&w.event.token) {
                 None => {
-                    let Some(decimals) = storage::token_decimals(&self.pool, w.event.token).await?
+                    let Some((decimals, address)) =
+                        storage::token_decimals_and_l1_address(&self.pool, w.event.token).await?
                     else {
                         vlog::error!("Received withdrawal from unknown token {:?}", w.event.token);
                         continue;
                     };
 
-                    self.token_decimals.insert(w.event.token, decimals);
-                    decimals
+                    self.tokens.insert(w.event.token, (decimals, address));
+                    (decimals, address)
                 }
-                Some(decimals) => *decimals,
+                Some(d) => *d,
             };
 
             let formatted = match ethers::utils::format_units(w.event.amount, decimals) {
@@ -91,7 +93,7 @@ impl WithdrawalsMeter {
             metrics::increment_gauge!(
                 format!("{}_withdrawals", self.component_name),
                 formatted_f64,
-                "token" => format!("{:?}", w.event.token)
+                "token" => format!("{:?}", l1_token_address)
             )
         }
 
