@@ -12,7 +12,7 @@ use ethers::types::Address;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 
-/// State of withdrawls volumes metering.
+/// State of withdrawals volumes metering.
 pub struct WithdrawalsMeter {
     pool: PgPool,
     token_decimals: HashMap<Address, u32>,
@@ -25,7 +25,7 @@ impl WithdrawalsMeter {
     /// # Arguments
     ///
     /// * `pool`: DB connection pool
-    /// * `metric_name: Name of the metric to meter to
+    /// * `metric_name`: Name of the metric to meter to
     pub fn new(pool: PgPool, metric_name: &'static str) -> Self {
         let mut token_decimals = HashMap::new();
         token_decimals.insert(ETH_TOKEN_ADDRESS, 18_u32);
