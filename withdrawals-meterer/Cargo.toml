@@ -8,9 +8,7 @@ edition = "2021"
 
 [dependencies]
 ethers = "2.0.10"
-lazy_static = "1.4.0"
 metrics = "0.21.1"
-tokio = "1.32.0"
 
 client = { path = "../client" }
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }

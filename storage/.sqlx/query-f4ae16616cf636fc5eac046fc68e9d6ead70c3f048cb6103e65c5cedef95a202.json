@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT * FROM\n            withdrawals\n        WHERE id in (SELECT * FROM unnest( $1 :: bigint[] ))\n        ",
+  "query": "\n        SELECT * FROM\n            withdrawals\n        WHERE id in (SELECT id FROM unnest( $1 :: bigint[] ))\n        ",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "bec6b9ad565f05d3587ce1db853e273f30a3e3ec884b0c1310aafbbf06a8f165"
+  "hash": "f4ae16616cf636fc5eac046fc68e9d6ead70c3f048cb6103e65c5cedef95a202"
 }
