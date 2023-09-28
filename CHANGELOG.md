@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.48](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.47...v0.1.48) (2023-09-28)
+
+
+### Features
+
+* collect withdrawal volumes metrics ([#200](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/200)) ([757e0fa](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/757e0fa19212ed852c973f9ff6fd5fba34913680))
+
+
+### Bug Fixes
+
+* **deps:** update rust crate thiserror to 1.0.49 ([#201](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/201)) ([91007c4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/91007c402494609a769e67eaf0060aab4fc34d1d))
+
 ## [0.1.47](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.46...v0.1.47) (2023-09-25)
 
 
