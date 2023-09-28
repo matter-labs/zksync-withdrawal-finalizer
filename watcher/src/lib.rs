@@ -42,7 +42,7 @@ where
     pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
-            "era_withdrawn_tokens_amounts_tracker",
+            "era_withdrawal_finalizer_watcher_meter",
         );
 
         Self {
@@ -316,7 +316,7 @@ async fn process_withdrawals_in_block(
     }
 
     if let Err(e) = withdrawals_meterer
-        .meter_finalized_withdrawals(&stored_withdrawals)
+        .meter_withdrawals(&stored_withdrawals)
         .await
     {
         vlog::error!("Failed to meter requested withdrawals: {e}");

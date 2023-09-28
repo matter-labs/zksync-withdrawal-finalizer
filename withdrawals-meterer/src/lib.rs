@@ -16,7 +16,7 @@ use storage::StoredWithdrawal;
 pub struct WithdrawalsMeter {
     pool: PgPool,
     token_decimals: HashMap<Address, u32>,
-    metric_name: &'static str,
+    component_name: &'static str,
 }
 
 impl WithdrawalsMeter {
@@ -25,26 +25,25 @@ impl WithdrawalsMeter {
     /// # Arguments
     ///
     /// * `pool`: DB connection pool
-    /// * `metric_name`: Name of the metric to meter to
-    pub fn new(pool: PgPool, metric_name: &'static str) -> Self {
+    /// * `component_name`: Name of the component that does metering, metric names will be
+    ///    derived from it
+    pub fn new(pool: PgPool, component_name: &'static str) -> Self {
         let mut token_decimals = HashMap::new();
         token_decimals.insert(ETH_TOKEN_ADDRESS, 18_u32);
 
         Self {
             pool,
             token_decimals,
-            metric_name,
+            component_name,
         }
     }
+
     /// Given a set of withdrawal ids meter all of them to a metric
     /// with a given name.
-    pub async fn meter_finalized_withdrawals_storage(
-        &mut self,
-        ids: &[i64],
-    ) -> Result<(), storage::Error> {
+    pub async fn meter_withdrawals_storage(&mut self, ids: &[i64]) -> Result<(), storage::Error> {
         let withdrawals = storage::get_withdrawals(&self.pool, ids).await?;
 
-        self.meter_finalized_withdrawals(&withdrawals).await?;
+        self.meter_withdrawals(&withdrawals).await?;
 
         Ok(())
     }
@@ -54,7 +53,7 @@ impl WithdrawalsMeter {
     ///
     /// This function returns only storage error, all formatting, etc
     /// errors will be just logged.
-    pub async fn meter_finalized_withdrawals(
+    pub async fn meter_withdrawals(
         &mut self,
         withdrawals: &[StoredWithdrawal],
     ) -> Result<(), storage::Error> {
@@ -90,7 +89,7 @@ impl WithdrawalsMeter {
             };
 
             metrics::increment_gauge!(
-                self.metric_name,
+                format!("{}_withdrawals", self.component_name),
                 formatted_f64,
                 "token" => format!("{:?}", w.event.token)
             )

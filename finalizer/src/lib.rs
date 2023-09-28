@@ -86,7 +86,7 @@ where
     ) -> Self {
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
-            "era_withdrawal_finalizer_withdrawn_tokens",
+            "era_withdrawal_finalizer_meter",
         );
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
@@ -216,7 +216,7 @@ where
 
                 if let Err(e) = self
                     .withdrawals_meterer
-                    .meter_finalized_withdrawals_storage(&ids)
+                    .meter_withdrawals_storage(&ids)
                     .await
                 {
                     vlog::error!("Failed to meter the withdrawals: {e}");
