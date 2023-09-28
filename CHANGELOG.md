@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.49](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.48...v0.1.49) (2023-09-28)
+
+
+### Bug Fixes
+
+* should meter with l1 token names ([#203](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/203)) ([5578d24](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5578d24c09b300c21966ab43acc679236d3bfb14))
+
 ## [0.1.48](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.47...v0.1.48) (2023-09-28)
 
 
