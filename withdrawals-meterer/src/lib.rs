@@ -69,6 +69,12 @@ impl WithdrawalsMeter {
                     };
 
                     self.tokens.insert(w.event.token, (decimals, address));
+
+                    metrics::increment_gauge!(
+                        format!("{}_token_decimals_stored", self.component_name),
+                        1.0
+                    );
+
                     (decimals, address)
                 }
                 Some(d) => *d,
