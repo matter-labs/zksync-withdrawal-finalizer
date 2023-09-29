@@ -255,7 +255,7 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
         "
         SELECT * FROM
             withdrawals
-        WHERE id in (SELECT id FROM unnest( $1 :: bigint[] ))
+        WHERE id in (SELECT * FROM unnest( $1 :: bigint[] ))
         ",
         ids
     )
