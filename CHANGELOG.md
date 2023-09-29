@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.52](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.51...v0.1.52) (2023-09-29)
+
+
+### Features
+
+* Adds logging to investigate hangs ([#211](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/211)) ([7bd5c57](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7bd5c57afa8112f21b3f883ab84c0cabbe9d3888))
+
+
+### Bug Fixes
+
+* correct address of l2 ethereum token take 2 ([#209](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/209)) ([fcc4d32](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/fcc4d329b96a8ee0b4a8196d85ec033e57bb8382))
+
 ## [0.1.51](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.50...v0.1.51) (2023-09-29)
 
 
