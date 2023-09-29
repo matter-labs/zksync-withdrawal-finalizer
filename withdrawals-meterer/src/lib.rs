@@ -30,7 +30,10 @@ impl WithdrawalsMeter {
     ///    derived from it
     pub fn new(pool: PgPool, component_name: &'static str) -> Self {
         let mut token_decimals = HashMap::new();
+
         token_decimals.insert(ETH_TOKEN_ADDRESS, (18_u32, ETH_TOKEN_ADDRESS));
+
+        metrics::increment_gauge!(format!("{component_name}_token_decimals_stored"), 1.0);
 
         Self {
             pool,
