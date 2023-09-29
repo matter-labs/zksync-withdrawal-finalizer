@@ -7,7 +7,7 @@
 
 use std::{collections::HashMap, str::FromStr};
 
-use client::{ETH_ADDRESS, ETH_TOKEN_ADDRESS};
+use client::ETH_TOKEN_ADDRESS;
 use ethers::types::Address;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
@@ -30,7 +30,7 @@ impl WithdrawalsMeter {
     ///    derived from it
     pub fn new(pool: PgPool, component_name: &'static str) -> Self {
         let mut token_decimals = HashMap::new();
-        token_decimals.insert(ETH_ADDRESS, (18_u32, ETH_TOKEN_ADDRESS));
+        token_decimals.insert(ETH_TOKEN_ADDRESS, (18_u32, ETH_TOKEN_ADDRESS));
 
         Self {
             pool,
