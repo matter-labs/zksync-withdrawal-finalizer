@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.53](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.52...v0.1.53) (2023-09-29)
+
+
+### Bug Fixes
+
+* fix get_withdrawals query ([#212](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/212)) ([c3c8bee](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c3c8bee9d8ea2974205ca0ab2791398d0f58894d))
+* Revert "feat: Adds logging to investigate hangs" ([#213](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/213)) ([14ffa1a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/14ffa1a14cfcf15284dd128f0b2bfbb3c15c4c3b))
+
 ## [0.1.52](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.51...v0.1.52) (2023-09-29)
 
 
