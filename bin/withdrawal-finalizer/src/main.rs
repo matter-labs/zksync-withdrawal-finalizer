@@ -298,7 +298,5 @@ async fn main() -> Result<()> {
         }
     }
 
-    vlog::info!("Shutting down fianalizer");
-
     Ok(())
 }

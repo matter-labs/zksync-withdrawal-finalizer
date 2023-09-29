@@ -45,15 +45,9 @@ impl WithdrawalsMeter {
     /// Given a set of withdrawal ids meter all of them to a metric
     /// with a given name.
     pub async fn meter_withdrawals_storage(&mut self, ids: &[i64]) -> Result<(), storage::Error> {
-        vlog::info!("meter_withdrawals_storage start");
-
         let withdrawals = storage::get_withdrawals(&self.pool, ids).await?;
 
-        vlog::info!("meter_withdrawals_storage continued");
-
         self.meter_withdrawals(&withdrawals).await?;
-
-        vlog::info!("meter_withdrawals_storage end");
 
         Ok(())
     }
