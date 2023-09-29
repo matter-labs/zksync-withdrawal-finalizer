@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.51](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.50...v0.1.51) (2023-09-29)
+
+
+### Bug Fixes
+
+* correct l2 eth token address ([#207](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/207)) ([7fbf36c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7fbf36c015ee04d5f0adda8ce3bcabdd3608e4f2))
+
 ## [0.1.50](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.49...v0.1.50) (2023-09-29)
 
 
