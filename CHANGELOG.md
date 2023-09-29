@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.50](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.49...v0.1.50) (2023-09-29)
+
+
+### Bug Fixes
+
+* collect metric of meterer hashmap ([#205](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/205)) ([ec12c13](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ec12c135432d8654b04b7e040c32c593ca2a26ee))
+
 ## [0.1.49](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.48...v0.1.49) (2023-09-28)
 
 
