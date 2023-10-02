@@ -275,8 +275,10 @@ where
             )
             .await
             else {
-                return Ok(());
+                vlog::error!("Failed to retreive transaction {:?}", log.transaction_hash);
+                return Err(Error::NoTransaction);
             };
+
             let tx = tx.unwrap_or_else(|| {
                 panic!("mined transaction exists {:?}; qed", log.transaction_hash)
             });
@@ -320,6 +322,11 @@ where
                 .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksExecution(event) => {
+            vlog::info!(
+                "Received a block execution event {event:?} {:?}",
+                log.transaction_hash
+            );
+
             metrics::increment_counter!("watcher.chain_events.block_execution_events");
             sender
                 .send(BlockEvent::BlockExecution {
