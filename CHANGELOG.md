@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.54](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.53...v0.1.54) (2023-10-02)
+
+
+### Bug Fixes
+
+* adds logging to block execution events ([#217](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/217)) ([0b528aa](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0b528aa91910283066ee127a0a156961410b4767))
+* increase timeouts on transaction querying on L1 ([#215](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/215)) ([a3760d5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a3760d57e3456f9cfd9239c879cdbe33d45f851d))
+* on restarts do not throw away buffered withdrawal events ([#219](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/219)) ([0460a9a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0460a9aca915fdb92660e44ebb6b071882fe0815))
+
 ## [0.1.53](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.52...v0.1.53) (2023-09-29)
 
 
