@@ -22,8 +22,9 @@ use ethers_log_decode::EthLogDecode;
 
 use crate::{Error, Result, RECONNECT_BACKOFF};
 
-const PENDING_TX_RETRY: usize = 5;
-const PENDING_TX_RETRY_BACKOFF: Duration = Duration::from_secs(3);
+// Total timecap for tx querying retry 10 minutes
+const PENDING_TX_RETRY: usize = 12 * 10;
+const PENDING_TX_RETRY_BACKOFF: Duration = Duration::from_secs(5);
 
 #[derive(EthLogDecode)]
 enum L1Events {
