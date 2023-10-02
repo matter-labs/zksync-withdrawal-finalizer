@@ -394,10 +394,21 @@ where
             L2Event::RestartedFromBlock(_block_number) => {
                 // The event producer has been restarted at a given
                 // block height. It is going to re-send all events
-                // from that block number up. To avoid duplications
-                // already received events have to be removed from
-                // the accumulator.
-                in_block_events.clear()
+                // from that block number up. However the already received
+                // events need to be processed because they may never be sent again.
+                //
+                // Consider the situation where events at following block already sit in the
+                // accumulator:
+                // `[1042]`.
+                //
+                // The producer is restarted from block `1045`, and as such event at `1042`
+                // will never be re-sent.
+                process_withdrawals_in_block(
+                    &pool,
+                    std::mem::take(&mut in_block_events),
+                    &mut withdrawals_meterer,
+                )
+                .await?;
             }
         }
     }
