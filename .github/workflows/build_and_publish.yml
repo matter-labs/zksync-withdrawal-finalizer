@@ -8,7 +8,7 @@ on:
 jobs:
   push_to_registry:
     name: Build and push docker image
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
 
     steps:
       - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # v4

@@ -11,7 +11,7 @@ env:
 
 jobs:
   cargo_deny:
-    runs-on: [self-hosted, ci-runner]
+    runs-on: [matterlabs-ci-runner]
     strategy:
       matrix:
         checks:
