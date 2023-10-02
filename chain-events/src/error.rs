@@ -13,6 +13,9 @@ pub enum Error {
 
     #[error("Channel closing")]
     ChannelClosing,
+
+    #[error("Failed to retreive transaction")]
+    NoTransaction,
 }
 
 impl<E: Debug + Display> From<LogQueryError<E>> for Error {
