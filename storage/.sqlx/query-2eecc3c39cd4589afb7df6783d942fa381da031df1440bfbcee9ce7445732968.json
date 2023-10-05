@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id\n        FROM\n            withdrawals\n        WHERE\n            l2_block_number >= $1\n        AND\n            l2_block_number < $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2eecc3c39cd4589afb7df6783d942fa381da031df1440bfbcee9ce7445732968"
+}

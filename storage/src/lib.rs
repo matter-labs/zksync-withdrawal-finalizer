@@ -899,6 +899,77 @@ pub async fn token_decimals_and_l1_address(
     Ok(result)
 }
 
+/// Returns current max executed l2 miniblock number
+pub async fn max_finalized_l2_miniblock_since_block(
+    pool: &PgPool,
+    since_block: u64,
+) -> Result<Option<u64>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            MAX(withdrawals.l2_block_number)
+        FROM
+            withdrawals
+        LEFT JOIN
+            finalization_data
+        ON
+            withdrawals.id = finalization_data.withdrawal_id
+        WHERE
+            finalization_tx IS NOT NULL
+        AND withdrawals.l2_block_number > $1;
+
+        ",
+        since_block as i64,
+    )
+    .fetch_one(pool)
+    .await?
+    .max;
+
+    Ok(res.map(|m| m as u64))
+}
+
+/// Returns current max l2 miniblock number
+pub async fn max_l2_miniblock(pool: &PgPool) -> Result<Option<u64>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            MAX(l2_block_number)
+        FROM
+            l2_blocks
+        "
+    )
+    .fetch_one(pool)
+    .await?
+    .max;
+
+    Ok(res.map(|m| m as u64))
+}
+
+/// Returns ids of withdrawals in the given l2 miniblock interval
+pub async fn withdrawal_ids(pool: &PgPool, from: u64, to: u64) -> Result<Vec<i64>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            id
+        FROM
+            withdrawals
+        WHERE
+            l2_block_number >= $1
+        AND
+            l2_block_number < $2
+        ",
+        from as i64,
+        to as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| r.id)
+    .collect();
+
+    Ok(res)
+}
+
 async fn wipe_finalization_data(pool: &PgPool, delete_batch_size: usize) -> Result<()> {
     loop {
         let deleted_ids = sqlx::query!(
