@@ -10,6 +10,7 @@ mod error;
 use std::sync::Arc;
 use std::{num::NonZeroUsize, time::Instant};
 
+use chrono::{Datelike, LocalResult, TimeZone, Utc};
 pub use error::{Error, Result};
 
 use async_trait::async_trait;
@@ -552,6 +553,29 @@ where
 
         Ok(is_finalized)
     }
+}
+
+/// Get the first block mined today by UTC time
+///
+/// # Arguments
+/// * `at_date_time`: Look for the block at this date-time
+/// * `start_from_block`: Will perform search starting from this block,
+///    if `None` is specified then searches from block 1.
+pub async fn get_first_block_today<M: Middleware>(
+    start_from_block: Option<U64>,
+    middleware: M,
+) -> Result<Option<U64>> {
+    let now = Utc::now();
+
+    let todays_midnight = match Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0) {
+        LocalResult::None => {
+            // vlog::error!("could not compute `with_ymd_and_hms` from todays date");
+            return Err(Error::TimeConversion);
+        }
+        LocalResult::Single(s) | LocalResult::Ambiguous(s, _) => s,
+    };
+
+    get_block_number_by_timestamp(todays_midnight, start_from_block, middleware).await
 }
 
 /// Get the block number by timestamp

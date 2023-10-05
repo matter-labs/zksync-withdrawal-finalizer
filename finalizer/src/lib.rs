@@ -11,7 +11,7 @@ use accumulator::WithdrawalsAccumulator;
 use ethers::{
     abi::Address,
     providers::{Middleware, MiddlewareError},
-    types::{H256, U256},
+    types::{H256, U256, U64},
 };
 use futures::TryFutureExt;
 use sqlx::PgPool;
@@ -74,7 +74,7 @@ where
     /// [`SignerMiddleware`]: https://docs.rs/ethers/latest/ethers/middleware/struct.SignerMiddleware.html
     /// [`Middleware`]: https://docs.rs/ethers/latest/ethers/providers/trait.Middleware.html
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub async fn new(
         pgpool: PgPool,
         one_withdrawal_gas_limit: U256,
         batch_finalization_gas_limit: U256,
@@ -83,15 +83,24 @@ where
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
         account_address: Address,
-    ) -> Self {
+        first_block_today: U64,
+    ) -> Result<Self> {
+        let max_finalized_today =
+            storage::max_finalized_l2_miniblock_since_block(&pgpool, first_block_today.as_u64())
+                .await?
+                .unwrap_or(first_block_today.as_u64());
+
+        // we need to tell the meter to meter only finalized withdrawls
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
             "era_withdrawal_finalizer_meter",
-        );
+            Some((first_block_today, max_finalized_today.into())),
+        )
+        .await;
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
-        Self {
+        Ok(Self {
             pgpool,
             one_withdrawal_gas_limit,
             batch_finalization_gas_limit,
@@ -105,7 +114,7 @@ where
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
             withdrawals_meterer,
-        }
+        })
     }
 
     /// [`Finalizer`] main loop.

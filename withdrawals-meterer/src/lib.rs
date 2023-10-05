@@ -9,7 +9,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use chrono::{Datelike, TimeZone, Utc};
 use client::{ETH_ADDRESS, ETH_TOKEN_ADDRESS};
-use ethers::types::Address;
+use ethers::types::{Address, U64};
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 use tokio::sync::RwLock;
@@ -67,7 +67,11 @@ impl WithdrawalsMeter {
     /// * `pool`: DB connection pool
     /// * `component_name`: Name of the component that does metering, metric names will be
     ///    derived from it
-    pub fn new(pool: PgPool, component_name: &'static str) -> Self {
+    pub async fn new(
+        pool: PgPool,
+        component_name: &'static str,
+        historic_interval: Option<(U64, U64)>,
+    ) -> Self {
         let mut token_decimals = HashMap::new();
 
         token_decimals.insert(ETH_TOKEN_ADDRESS, (18_u32, ETH_ADDRESS));
@@ -78,10 +82,32 @@ impl WithdrawalsMeter {
 
         tokio::spawn(reset_metrics_at_midnight(tokens.clone(), component_name));
 
-        Self {
+        let mut res = Self {
             pool,
             tokens,
             component_name,
+        };
+
+        res.meter_historic_interval(historic_interval).await;
+
+        res
+    }
+
+    async fn meter_historic_interval(&mut self, historic_interval: Option<(U64, U64)>) {
+        const HISTORIC_QUERYING_STEP: u64 = 1000;
+
+        let Some((from, to)) = historic_interval else {
+            return;
+        };
+        let mut from = from.as_u64();
+        let to = to.as_u64();
+
+        while from < to {
+            vlog::info!("querying historic withdrawal volumes from {from} to {to}");
+            let ids = storage::withdrawal_ids(&self.pool, from, to).await.unwrap();
+
+            self.meter_withdrawals_storage(&ids).await.unwrap();
+            from += HISTORIC_QUERYING_STEP;
         }
     }
 

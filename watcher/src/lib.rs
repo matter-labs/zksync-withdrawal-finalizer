@@ -4,7 +4,10 @@ use std::{
 };
 
 use chain_events::L2Event;
-use ethers::providers::{JsonRpcClient, Middleware};
+use ethers::{
+    providers::{JsonRpcClient, Middleware},
+    types::U64,
+};
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
@@ -39,17 +42,23 @@ where
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
+    pub async fn new(l2_provider: Arc<M2>, pgpool: PgPool, first_block_today: U64) -> Result<Self> {
+        let max_l2_miniblock = storage::max_l2_miniblock(&pgpool)
+            .await?
+            .unwrap_or(first_block_today.as_u64());
+
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
             "era_withdrawal_finalizer_watcher_meter",
-        );
+            Some((first_block_today, max_l2_miniblock.into())),
+        )
+        .await;
 
-        Self {
+        Ok(Self {
             l2_provider,
             pgpool,
             withdrawals_meterer,
-        }
+        })
     }
 
     pub async fn run<BE, WE>(

@@ -53,6 +53,9 @@ pub enum Error {
 
     #[error("Block has no number, parent block hash is {0:?}")]
     BlockHasNoNumber(H256),
+
+    #[error("Time Conversion error in chrono")]
+    TimeConversion,
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {
