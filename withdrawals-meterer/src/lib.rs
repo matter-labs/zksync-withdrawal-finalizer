@@ -5,19 +5,58 @@
 
 //! A utility crate that meters withdrawals amounts.
 
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
+use chrono::{Datelike, TimeZone, Utc};
 use client::{ETH_ADDRESS, ETH_TOKEN_ADDRESS};
 use ethers::types::Address;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
+use tokio::sync::RwLock;
 
 /// State of withdrawals volumes metering.
 pub struct WithdrawalsMeter {
     pool: PgPool,
+
     /// A mapping from L2 address to L1 address and decimals of token.
-    tokens: HashMap<Address, (u32, Address)>,
+    tokens: Arc<RwLock<HashMap<Address, (u32, Address)>>>,
     component_name: &'static str,
+}
+
+async fn reset_metrics_at_midnight(
+    tokens: Arc<RwLock<HashMap<Address, (u32, Address)>>>,
+    component_name: &'static str,
+) {
+    loop {
+        let date = Utc::now();
+
+        let next_midnight =
+            match Utc.with_ymd_and_hms(date.year(), date.month(), date.day() + 1, 0, 0, 0) {
+                chrono::LocalResult::None => {
+                    vlog::error!("Failed to calculate next midnight");
+                    continue;
+                }
+                chrono::LocalResult::Single(s) | chrono::LocalResult::Ambiguous(s, _) => s,
+            };
+
+        let duration_to_sleep = next_midnight.signed_duration_since(date).to_std().expect(
+            "by calculating just the next day we never overflow i64::MAX milliseconds; qed",
+        );
+
+        tokio::time::sleep(duration_to_sleep).await;
+
+        vlog::info!("zeroing metrics for {component_name}");
+
+        let read_guard = tokens.read().await;
+
+        for v in read_guard.values() {
+            metrics::increment_gauge!(
+                format!("{}_withdrawals", component_name),
+                0_f64,
+                "token" => format!("{:?}", v.1)
+            )
+        }
+    }
 }
 
 impl WithdrawalsMeter {
@@ -35,9 +74,13 @@ impl WithdrawalsMeter {
 
         metrics::increment_gauge!(format!("{component_name}_token_decimals_stored"), 1.0);
 
+        let tokens = Arc::new(RwLock::new(token_decimals));
+
+        tokio::spawn(reset_metrics_at_midnight(tokens.clone(), component_name));
+
         Self {
             pool,
-            tokens: token_decimals,
+            tokens,
             component_name,
         }
     }
@@ -62,7 +105,11 @@ impl WithdrawalsMeter {
         withdrawals: &[StoredWithdrawal],
     ) -> Result<(), storage::Error> {
         for w in withdrawals {
-            let (decimals, l1_token_address) = match self.tokens.get(&w.event.token) {
+            let guard = self.tokens.read().await;
+            let value = guard.get(&w.event.token).cloned();
+            drop(guard);
+
+            let (decimals, l1_token_address) = match value {
                 None => {
                     let Some((decimals, address)) =
                         storage::token_decimals_and_l1_address(&self.pool, w.event.token).await?
@@ -71,7 +118,9 @@ impl WithdrawalsMeter {
                         continue;
                     };
 
-                    self.tokens.insert(w.event.token, (decimals, address));
+                    let mut guard = self.tokens.write().await;
+                    guard.insert(w.event.token, (decimals, address));
+                    drop(guard);
 
                     metrics::increment_gauge!(
                         format!("{}_token_decimals_stored", self.component_name),
@@ -80,7 +129,7 @@ impl WithdrawalsMeter {
 
                     (decimals, address)
                 }
-                Some(d) => *d,
+                Some(d) => d,
             };
 
             let formatted = match ethers::utils::format_units(w.event.amount, decimals) {
