@@ -557,7 +557,7 @@ where
 /// Get the block number by timestamp
 ///
 /// # Arguments
-/// * `at_date_time`: Look for the block at this datetime
+/// * `at_date_time`: Look for the block at this date-time
 /// * `start_from_block`: Will perform search starting from this block,
 ///    if `None` is specified then searches from block 1.
 /// * `middleware`: The client to perform requests to RPC with.
