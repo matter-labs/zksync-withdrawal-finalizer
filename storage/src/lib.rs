@@ -899,7 +899,7 @@ pub async fn token_decimals_and_l1_address(
     Ok(result)
 }
 
-/// Returns current max executed l2 miniblock number
+/// Returns current max executed L2 miniblock number
 pub async fn max_finalized_l2_miniblock_since_block(
     pool: &PgPool,
     since_block: u64,
@@ -928,7 +928,7 @@ pub async fn max_finalized_l2_miniblock_since_block(
     Ok(res.map(|m| m as u64))
 }
 
-/// Returns current max l2 miniblock number
+/// Returns current max L2 miniblock number
 pub async fn max_l2_miniblock(pool: &PgPool) -> Result<Option<u64>> {
     let res = sqlx::query!(
         "
@@ -945,7 +945,7 @@ pub async fn max_l2_miniblock(pool: &PgPool) -> Result<Option<u64>> {
     Ok(res.map(|m| m as u64))
 }
 
-/// Returns ids of withdrawals in the given l2 miniblock interval
+/// Returns ids of withdrawals in the given L2 miniblock interval
 pub async fn withdrawal_ids(pool: &PgPool, from: u64, to: u64) -> Result<Vec<i64>> {
     let res = sqlx::query!(
         "
