@@ -1,6 +1,9 @@
 use ethers::{
-    abi::EncodePackedError, contract::ContractError, prelude::Middleware, providers::ProviderError,
-    types::H256,
+    abi::EncodePackedError,
+    contract::ContractError,
+    prelude::Middleware,
+    providers::ProviderError,
+    types::{TimeError, H256},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -17,6 +20,9 @@ pub enum Error {
 
     #[error(transparent)]
     EncodePackedError(#[from] EncodePackedError),
+
+    #[error(transparent)]
+    TimeError(#[from] TimeError),
 
     #[error("Contract error {0}")]
     ContractError(String),
@@ -44,6 +50,9 @@ pub enum Error {
 
     #[error("Message not RLP bytes encoded: {0}")]
     MessageNotRlpBytes(String),
+
+    #[error("Block has no number, parent block hash is {0:?}")]
+    BlockHasNoNumber(H256),
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {

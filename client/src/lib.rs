@@ -14,6 +14,7 @@ pub use error::{Error, Result};
 
 use async_trait::async_trait;
 use auto_impl::auto_impl;
+use ethers::types::BlockNumber;
 use ethers::{
     abi::{AbiDecode, AbiEncode, ParamType, RawLog, Token},
     contract::{EthCall, EthEvent, EthLogDecode},
@@ -551,6 +552,70 @@ where
 
         Ok(is_finalized)
     }
+}
+
+/// Get the block number by timestamp
+///
+/// # Arguments
+/// * `at_date_time`: Look for the block at this datetime
+/// * `start_from_block`: Will perform search starting from this block,
+///    if `None` is specified then searches from block 1.
+/// * `middleware`: The client to perform requests to RPC with.
+pub async fn get_block_number_by_timestamp<M: Middleware>(
+    at_date: chrono::DateTime<chrono::offset::Utc>,
+    start_from_block: Option<U64>,
+    middleware: M,
+) -> Result<Option<U64>> {
+    let start_from_block = start_from_block.unwrap_or(1_u64.into());
+
+    let right_block = match middleware
+        .get_block(BlockNumber::Latest)
+        .await
+        .map_err(|e| Error::Middleware(format!("{e}")))?
+    {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let mut right = right_block
+        .number
+        .ok_or(Error::BlockHasNoNumber(right_block.parent_hash))?;
+
+    let mut left = start_from_block;
+
+    if at_date > right_block.time()? {
+        return Ok(None);
+    }
+
+    let mut middle = left + (right - left) / 2;
+
+    while left < right {
+        middle = left + (right - left) / 2;
+
+        let middle_block = middleware
+            .get_block(BlockNumber::Number(middle))
+            .await
+            .map_err(|e| Error::Middleware(format!("{e}")))?
+            .ok_or(Error::BlockHasNoNumber(right_block.parent_hash))?;
+
+        let middle_block_timestamp = middle_block.time()?;
+
+        let signed_duration_since_requested_timestamp =
+            middle_block_timestamp.signed_duration_since(at_date);
+
+        let num_milliseconds = signed_duration_since_requested_timestamp.num_milliseconds();
+
+        // look within the 500ms margin to the right of the given date.
+        if (0..500).contains(&num_milliseconds) {
+            return Ok(Some(middle));
+        } else if num_milliseconds.is_positive() {
+            right = middle;
+        } else {
+            left = middle;
+        }
+    }
+
+    Ok(Some(middle))
 }
 
 fn get_l1_bridge_burn_message_keccak(
