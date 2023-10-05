@@ -50,9 +50,11 @@ where
         let max_l2_miniblock = storage::max_l2_miniblock(&pgpool).await?;
 
         let historic_interval = match (first_block_today, max_l2_miniblock) {
-            (None, None) | (None, Some(_)) | (Some(_), None) => None,
             (Some(from), Some(to)) => Some((from, to.into())),
+            _ => None,
         };
+
+        vlog::info!("historic interval {historic_interval:?}");
 
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),

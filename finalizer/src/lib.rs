@@ -94,9 +94,11 @@ where
         };
 
         let historic_interval = match (first_block_today, max_finalized_today) {
-            (None, None) | (None, Some(_)) | (Some(_), None) => None,
             (Some(from), Some(to)) => Some((from, to.into())),
+            _ => None,
         };
+
+        vlog::info!("historic interval {historic_interval:?}");
 
         // we need to tell the meter to meter only finalized withdrawls
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(

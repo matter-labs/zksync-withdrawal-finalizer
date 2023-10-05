@@ -14,6 +14,8 @@ use sqlx::PgPool;
 use storage::StoredWithdrawal;
 use tokio::sync::RwLock;
 
+const HISTORIC_QUERYING_STEP: u64 = 1000;
+
 /// State of withdrawals volumes metering.
 pub struct WithdrawalsMeter {
     pool: PgPool,
@@ -94,8 +96,6 @@ impl WithdrawalsMeter {
     }
 
     async fn meter_historic_interval(&mut self, historic_interval: Option<(U64, U64)>) {
-        const HISTORIC_QUERYING_STEP: u64 = 1000;
-
         let Some((from, to)) = historic_interval else {
             return;
         };
