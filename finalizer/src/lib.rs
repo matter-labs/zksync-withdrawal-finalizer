@@ -83,18 +83,26 @@ where
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
         account_address: Address,
-        first_block_today: U64,
+        first_block_today: Option<U64>,
     ) -> Result<Self> {
-        let max_finalized_today =
-            storage::max_finalized_l2_miniblock_since_block(&pgpool, first_block_today.as_u64())
-                .await?
-                .unwrap_or(first_block_today.as_u64());
+        let max_finalized_today = match first_block_today {
+            Some(first_block_today) => {
+                storage::max_finalized_l2_miniblock_since_block(&pgpool, first_block_today.as_u64())
+                    .await?
+            }
+            None => None,
+        };
+
+        let historic_interval = match (first_block_today, max_finalized_today) {
+            (None, None) | (None, Some(_)) | (Some(_), None) => None,
+            (Some(from), Some(to)) => Some((from, to.into())),
+        };
 
         // we need to tell the meter to meter only finalized withdrawls
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
             "era_withdrawal_finalizer_meter",
-            Some((first_block_today, max_finalized_today.into())),
+            historic_interval,
         )
         .await;
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)

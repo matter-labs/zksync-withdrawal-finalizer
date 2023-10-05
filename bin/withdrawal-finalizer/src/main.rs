@@ -219,9 +219,7 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let first_block_today = client::get_first_block_today(None, &client_l2)
-        .await?
-        .unwrap();
+    let first_block_today = client::get_first_block_today(None, &client_l2).await?;
 
     let watcher = Watcher::new(client_l2.clone(), pgpool.clone(), first_block_today).await?;
 
@@ -271,7 +269,7 @@ async fn main() -> Result<()> {
         config.one_withdrawal_gas_limit,
         config.batch_finalization_gas_limit,
     );
-    vlog::info!("first L2 miniblock mined today is {first_block_today}");
+    vlog::info!("first L2 miniblock mined today is {first_block_today:?}");
 
     let finalizer = finalizer::Finalizer::new(
         pgpool,

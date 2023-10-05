@@ -42,15 +42,22 @@ where
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(l2_provider: Arc<M2>, pgpool: PgPool, first_block_today: U64) -> Result<Self> {
-        let max_l2_miniblock = storage::max_l2_miniblock(&pgpool)
-            .await?
-            .unwrap_or(first_block_today.as_u64());
+    pub async fn new(
+        l2_provider: Arc<M2>,
+        pgpool: PgPool,
+        first_block_today: Option<U64>,
+    ) -> Result<Self> {
+        let max_l2_miniblock = storage::max_l2_miniblock(&pgpool).await?;
+
+        let historic_interval = match (first_block_today, max_l2_miniblock) {
+            (None, None) | (None, Some(_)) | (Some(_), None) => None,
+            (Some(from), Some(to)) => Some((from, to.into())),
+        };
 
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
             "era_withdrawal_finalizer_watcher_meter",
-            Some((first_block_today, max_l2_miniblock.into())),
+            historic_interval,
         )
         .await;
 
