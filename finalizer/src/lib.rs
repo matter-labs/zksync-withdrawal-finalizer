@@ -85,12 +85,12 @@ where
         account_address: Address,
         first_block_today: Option<U64>,
     ) -> Result<Self> {
-        let max_finalized_today = match first_block_today {
-            Some(first_block_today) => {
+        let mut max_finalized_today = None;
+
+        if let Some(first_block_today) = first_block_today {
+            max_finalized_today =
                 storage::max_finalized_l2_miniblock_since_block(&pgpool, first_block_today.as_u64())
                     .await?
-            }
-            None => None,
         };
 
         let historic_interval = match (first_block_today, max_finalized_today) {
@@ -107,6 +107,7 @@ where
             historic_interval,
         )
         .await;
+
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 

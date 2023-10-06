@@ -10,17 +10,18 @@ mod error;
 use std::sync::Arc;
 use std::{num::NonZeroUsize, time::Instant};
 
-use chrono::{Datelike, LocalResult, TimeZone, Utc};
 pub use error::{Error, Result};
 
 use async_trait::async_trait;
 use auto_impl::auto_impl;
-use ethers::types::BlockNumber;
+use chrono::{Datelike, LocalResult, TimeZone, Utc};
 use ethers::{
     abi::{AbiDecode, AbiEncode, ParamType, RawLog, Token},
     contract::{EthCall, EthEvent, EthLogDecode},
     providers::{JsonRpcClient, Middleware, Provider},
-    types::{transaction::eip2718::TypedTransaction, Address, Bytes, H160, H256, U256, U64},
+    types::{
+        transaction::eip2718::TypedTransaction, Address, BlockNumber, Bytes, H160, H256, U256, U64,
+    },
 };
 
 use ethers_log_decode::EthLogDecode;
@@ -557,6 +558,9 @@ where
 
 /// Get the first block mined today by UTC time
 ///
+/// This performs a binary search on a given blockrange, so expect logarithmic
+/// number of calls to RPC.
+///
 /// # Arguments
 /// * `at_date_time`: Look for the block at this date-time
 /// * `start_from_block`: Will perform search starting from this block,
@@ -569,7 +573,6 @@ pub async fn get_first_block_today<M: Middleware>(
 
     let todays_midnight = match Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0) {
         LocalResult::None => {
-            // vlog::error!("could not compute `with_ymd_and_hms` from todays date");
             return Err(Error::TimeConversion);
         }
         LocalResult::Single(s) | LocalResult::Ambiguous(s, _) => s,
@@ -579,6 +582,9 @@ pub async fn get_first_block_today<M: Middleware>(
 }
 
 /// Get the block number by timestamp
+///
+/// This performs a binary search on a given blockrange, so expect logarithmic
+/// number of calls to RPC.
 ///
 /// # Arguments
 /// * `at_date_time`: Look for the block at this date-time
@@ -592,13 +598,12 @@ pub async fn get_block_number_by_timestamp<M: Middleware>(
 ) -> Result<Option<U64>> {
     let start_from_block = start_from_block.unwrap_or(1_u64.into());
 
-    let right_block = match middleware
+    let Some(right_block) = middleware
         .get_block(BlockNumber::Latest)
         .await
         .map_err(|e| Error::Middleware(format!("{e}")))?
-    {
-        Some(r) => r,
-        None => return Ok(None),
+    else {
+        return Ok(None);
     };
 
     let mut right = right_block
