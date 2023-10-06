@@ -1,4 +1,4 @@
-FROM rust:1.72 AS builder
+FROM rust:1.73 AS builder
 
 WORKDIR /app
 
