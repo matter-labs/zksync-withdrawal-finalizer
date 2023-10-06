@@ -103,8 +103,11 @@ impl WithdrawalsMeter {
         let to = to.as_u64();
 
         while from < to {
-            vlog::info!("querying historic withdrawal volumes from {from} to {to}");
-            let ids = storage::withdrawal_ids(&self.pool, from, to).await.unwrap();
+            let step = from + std::cmp::min(to, HISTORIC_QUERYING_STEP);
+            vlog::info!("querying historic withdrawal volumes from {from} to {step}");
+            let ids = storage::withdrawal_ids(&self.pool, from, step)
+                .await
+                .unwrap();
 
             self.meter_withdrawals_storage(&ids).await.unwrap();
             from += HISTORIC_QUERYING_STEP;
