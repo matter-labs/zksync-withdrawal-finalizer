@@ -10,7 +10,7 @@ edition = "2021"
 color-eyre = "0.6.2"
 eyre = "0.6.8"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
-tokio = { version = "1.32.0", features = ["full"] }
+tokio = { version = "1.33.0", features = ["full"] }
 
 storage = { path = "../../storage" }
 dotenvy = "0.15.7"
