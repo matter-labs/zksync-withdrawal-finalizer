@@ -31,6 +31,33 @@ use crate::error::{Error, Result};
 mod accumulator;
 mod error;
 
+/// A configuration of a blacklist or whitelist policy for finalizing tokens
+pub enum TokensRestrictions {
+    /// Only finalize the whitelisted tokens
+    WhiteList(Vec<Address>),
+
+    /// Finalize all tokens except for this blacklist
+    BlackList(Vec<Address>),
+}
+
+impl TokensRestrictions {
+    /// Create new token restrictions set.
+    pub fn new(
+        token_whitelist: Option<Vec<Address>>,
+        token_blacklist: Option<Vec<Address>>,
+    ) -> Option<Self> {
+        if let Some(whitelist) = token_whitelist {
+            return Some(Self::WhiteList(whitelist.to_vec()));
+        }
+
+        if let Some(blacklist) = token_blacklist {
+            return Some(Self::BlackList(blacklist.to_vec()));
+        }
+
+        None
+    }
+}
+
 /// A limit to cap a transaction fee (in ether) for safety reasons.
 const TX_FEE_LIMIT: f64 = 0.8;
 
@@ -56,6 +83,7 @@ pub struct Finalizer<M1, M2> {
     tx_retry_timeout: Duration,
     account_address: Address,
     withdrawals_meterer: WithdrawalsMeter,
+    token_restrictions: Option<TokensRestrictions>,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -83,6 +111,7 @@ where
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
         account_address: Address,
+        token_restrictions: Option<TokensRestrictions>,
     ) -> Self {
         let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
             pgpool.clone(),
@@ -105,6 +134,7 @@ where
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
             withdrawals_meterer,
+            token_restrictions,
         }
     }
 
@@ -288,8 +318,28 @@ where
     async fn loop_iteration(&mut self) -> Result<()> {
         vlog::debug!("begin iteration of the finalizer loop");
 
-        let try_finalize_these =
-            storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit).await?;
+        let try_finalize_these = match &self.token_restrictions {
+            None => {
+                storage::withdrawals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
+                    .await?
+            }
+            Some(TokensRestrictions::WhiteList(w)) => {
+                storage::withdrawals_to_finalize_with_whitelist(
+                    &self.pgpool,
+                    self.query_db_pagination_limit,
+                    w,
+                )
+                .await?
+            }
+            Some(TokensRestrictions::BlackList(b)) => {
+                storage::withdrawals_to_finalize_with_blacklist(
+                    &self.pgpool,
+                    self.query_db_pagination_limit,
+                    b,
+                )
+                .await?
+            }
+        };
 
         vlog::debug!("trying to finalize these {try_finalize_these:?}");
 

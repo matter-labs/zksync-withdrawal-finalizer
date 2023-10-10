@@ -27,3 +27,4 @@ finalizer = { path = "../../finalizer" }
 watcher = { path = "../../watcher" }
 metrics-exporter-prometheus = "0.12.1"
 metrics = "0.21.1"
+serde_json = "1.0.107"

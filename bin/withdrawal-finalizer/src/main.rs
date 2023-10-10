@@ -277,6 +277,10 @@ async fn main() -> Result<()> {
         l1_bridge,
         config.tx_retry_timeout,
         finalizer_account_address,
+        finalizer::TokensRestrictions::new(
+            config.token_whitelist.map(|t| t.0),
+            config.token_blacklist.map(|t| t.0),
+        ),
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 

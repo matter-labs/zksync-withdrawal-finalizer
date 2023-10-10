@@ -32,6 +32,11 @@
         "ordinal": 5,
         "name": "id",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "l2_block_timestamp",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -45,7 +50,8 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "bec6b9ad565f05d3587ce1db853e273f30a3e3ec884b0c1310aafbbf06a8f165"
