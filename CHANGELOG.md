@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.55](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.54...v0.1.55) (2023-10-13)
+
+
+### Bug Fixes
+
+* backoff 1 minute after unsuccessful finalization attempts ([#231](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/231)) ([3fb7e3c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/3fb7e3cef948a5411cc43cca5c290a5fea03c4d5))
+* backoff 15 seconds after unsuccessful finalization attempts ([3fb7e3c](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/3fb7e3cef948a5411cc43cca5c290a5fea03c4d5))
+* **deps:** update rust crate lru to 0.12.0 ([#221](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/221)) ([49762a3](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/49762a3a88a19d8dec3196ebce6f6adc704459ea))
+* **deps:** update rust crate proc-macro2 to 1.0.68 ([#225](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/225)) ([b8d92f4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/b8d92f405cf548be604700a019f7f2b1f307a2ec))
+* **deps:** update rust crate proc-macro2 to 1.0.69 ([#227](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/227)) ([e7c4581](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/e7c45810ace461b378a53912b36a8d732ad0e405))
+* **deps:** update rust crate serde to 1.0.189 ([#230](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/230)) ([ea07a58](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ea07a58647e1f474c77e3524d3201678686226db))
+* **deps:** update rust crate syn to 2.0.38 ([#224](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/224)) ([cc814e6](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/cc814e6aa16c24a0e3a6c4166d377266dc8c37e6))
+* **deps:** update rust crate tokio to 1.33.0 ([#228](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/228)) ([81c3925](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/81c3925537636bff7191ae94b962180a012ff0c4))
+* if failed to fetch withdrawal parameters because withdrawal is broken mark it as so ([#232](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/232)) ([5f41bb4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5f41bb467b48c91a343aefcf516b69c548aae42f))
+
 ## [0.1.54](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.53...v0.1.54) (2023-10-02)
 
 
