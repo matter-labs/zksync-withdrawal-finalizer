@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n          w.tx_hash,\n          w.event_index_in_tx,\n          withdrawal_id,\n          finalization_data.l2_block_number,\n          l1_batch_number,\n          l2_message_index,\n          l2_tx_number_in_block,\n          message,\n          sender,\n          proof\n        FROM\n          finalization_data\n          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id\n        WHERE\n          finalization_tx IS NULL\n          AND failed_finalization_attempts < 3\n          AND finalization_data.l2_block_number <= COALESCE(\n            (\n              SELECT\n                MAX(l2_block_number)\n              FROM\n                l2_blocks\n              WHERE\n                execute_l1_block_number IS NOT NULL\n            ),\n            1\n          )\n        ORDER BY\n          finalization_data.l2_block_number\n        LIMIT\n          $1\n        ",
+  "query": "\n        SELECT\n          w.tx_hash,\n          w.event_index_in_tx,\n          withdrawal_id,\n          finalization_data.l2_block_number,\n          l1_batch_number,\n          l2_message_index,\n          l2_tx_number_in_block,\n          message,\n          sender,\n          proof\n        FROM\n          finalization_data\n          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id\n        WHERE\n          finalization_tx IS NULL\n          AND failed_finalization_attempts < 3\n          AND finalization_data.l2_block_number <= COALESCE(\n            (\n              SELECT\n                MAX(l2_block_number)\n              FROM\n                l2_blocks\n              WHERE\n                execute_l1_block_number IS NOT NULL\n            ),\n            1\n          )\n          AND (\n            last_finalization_attempt IS NULL\n          OR\n            last_finalization_attempt < NOW() - INTERVAL '1 minutes'\n          )\n        ORDER BY\n          finalization_data.l2_block_number\n        LIMIT\n          $1\n        ",
   "describe": {
     "columns": [
       {
@@ -72,5 +72,5 @@
       false
     ]
   },
-  "hash": "fceb9c1b2af1a60725ee1ffd2824431ed581508f3f93df9c28afa441a3ab1404"
+  "hash": "1429bfeafe86ef0ce1449e07709bcce578fe6c917592a00654294c881dcc609a"
 }

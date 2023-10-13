@@ -749,6 +749,11 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
             ),
             1
           )
+          AND (
+            last_finalization_attempt IS NULL
+          OR
+            last_finalization_attempt < NOW() - INTERVAL '1 minutes'
+          )
         ORDER BY
           finalization_data.l2_block_number
         LIMIT
@@ -843,6 +848,7 @@ pub async fn inc_unsuccessful_finalization_attempts(
         UPDATE
           finalization_data
         SET
+          last_finalization_attempt = NOW(),
           failed_finalization_attempts = failed_finalization_attempts + 1
         FROM
           (
