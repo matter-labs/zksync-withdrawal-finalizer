@@ -694,6 +694,7 @@ pub async fn get_withdrawals_with_no_data(
             ),
             1
           )
+          AND finalizable = TRUE
         ORDER BY
           l2_block_number
         LIMIT
@@ -715,6 +716,30 @@ pub async fn get_withdrawals_with_no_data(
     .collect();
 
     Ok(withdrawals)
+}
+
+/// Set a withdrawals as unfinalizable since we have failed to request parameters
+pub async fn set_withdrawal_unfinalizable(
+    pool: &PgPool,
+    tx_hash: H256,
+    event_index_in_tx: usize,
+) -> Result<()> {
+    sqlx::query!(
+        "
+            UPDATE withdrawals
+            SET finalizable = false 
+            WHERE
+              tx_hash = $1
+              AND
+              event_index_in_tx = $2
+        ",
+        tx_hash.as_bytes(),
+        event_index_in_tx as i32,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 /// Get the earliest withdrawals never attempted to be finalized before

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE withdrawals\n            SET finalizable = false \n            WHERE\n              tx_hash = $1\n              AND\n              event_index_in_tx = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c8e8dbb5b21bc5726ff4d029ab00f76d602010948c9025964eb62d2f8921a48"
+}
