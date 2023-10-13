@@ -455,6 +455,7 @@ fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error
 
 // Request finalization parameters for a set of withdrawals in parallel.
 async fn request_finalize_params<M2>(
+    pgpool: &PgPool,
     middleware: M2,
     hash_and_indices: &[(H256, u16, u64)],
 ) -> Vec<WithdrawalParams>
@@ -486,6 +487,11 @@ where
                 metrics::increment_counter!(
                     "finalizer.params_fetcher.failed_to_fetch_withdrawal_params"
                 );
+                if let Error::Client(client::Error::WithdrawalLogNotFound(index, tx_hash)) = e {
+                    storage::set_withdrawal_unfinalizable(pgpool, tx_hash, index)
+                        .await
+                        .ok();
+                }
                 vlog::error!(
                     "failed to fetch withdrawal parameters: {e} {:?}",
                     hash_and_indices[i]
@@ -543,7 +549,7 @@ where
         .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16, p.id))
         .collect();
 
-    let params = request_finalize_params(&middleware, &hash_and_index_and_id).await;
+    let params = request_finalize_params(pool, &middleware, &hash_and_index_and_id).await;
 
     let already_finalized: Vec<_> = get_finalized_withdrawals(&params, zksync_contract, l1_bridge)
         .await?
