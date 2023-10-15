@@ -12,7 +12,7 @@ publish = false # This is an utility crate, not to be used by libraries.
 
 [dependencies]
 chrono = { version = "0.4.31", default-features = false, features = ["serde", "clock"] }
-tracing = { version = "0.1.37", features = ["log"] }
+tracing = { version = "0.1.39", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "time", "json"] }
 sentry = { version = "0", default-features = false, features = ["reqwest", "rustls", "backtrace", "contexts", "panic", "anyhow"] }
 serde_json = "1.0"
