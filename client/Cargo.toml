@@ -11,7 +11,7 @@ ethers = "2.0.10"
 thiserror = "1.0.49"
 serde = "1.0.189"
 chrono = { version = "0.4.31", default-features = false, features = ["serde"] }
-async-trait = "0.1.73"
+async-trait = "0.1.74"
 metrics = "0.21.1"
 auto_impl = "1.1.0"
 
