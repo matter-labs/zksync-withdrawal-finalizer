@@ -412,8 +412,8 @@ dependencies = [
  "futures",
  "thiserror",
  "tokio",
+ "tracing",
  "vise",
- "vlog",
 ]
 
 [[package]]
@@ -1366,9 +1366,9 @@ dependencies = [
  "storage",
  "thiserror",
  "tokio",
+ "tracing",
  "tx-sender",
  "vise",
- "vlog",
  "withdrawals-meterer",
 ]
 
@@ -4410,8 +4410,8 @@ dependencies = [
  "ethers",
  "pretty_assertions",
  "tokio",
+ "tracing",
  "vise",
- "vlog",
 ]
 
 [[package]]
@@ -4694,8 +4694,8 @@ dependencies = [
  "storage",
  "thiserror",
  "tokio",
+ "tracing",
  "vise",
- "vlog",
  "withdrawals-meterer",
 ]
 
@@ -4903,6 +4903,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "tracing",
  "url",
  "vlog",
  "watcher",
@@ -4916,8 +4917,8 @@ dependencies = [
  "ethers",
  "sqlx",
  "storage",
+ "tracing",
  "vise",
- "vlog",
 ]
 
 [[package]]

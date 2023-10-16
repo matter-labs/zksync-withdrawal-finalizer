@@ -14,8 +14,7 @@ ethers = { version = "2.0.10", features = ["ws"] }
 futures = "0.3.28"
 thiserror = "1.0.49"
 tokio = { version = "1.33.0", features = ["time"] }
+tracing = { workspace = true }
 vise = { workspace = true }
 
-
-vlog = { path = "../vlog" }
 ethers-log-decode = { path = "../ethers-log-decode" }

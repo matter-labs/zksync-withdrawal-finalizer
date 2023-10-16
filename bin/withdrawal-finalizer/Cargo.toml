@@ -18,6 +18,7 @@ envconfig = "0.10.0"
 tokio-util = "0.7.9"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 dotenvy = "0.15.7"
+tracing = { workspace = true }
 
 client = { path = "../../client" }
 storage = { path = "../../storage" }

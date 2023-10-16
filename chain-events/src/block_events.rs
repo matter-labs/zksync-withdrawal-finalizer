@@ -63,7 +63,7 @@ impl BlockEvents {
                 Some(p)
             }
             Err(e) => {
-                vlog::warn!("Block events stream reconnect attempt failed: {e}");
+                tracing::warn!("Block events stream reconnect attempt failed: {e}");
                 CHAIN_EVENTS_METRICS.l1_reconnects_on_error.inc();
                 None
             }
@@ -107,7 +107,7 @@ impl BlockEvents {
             .await
             {
                 Err(e) => {
-                    vlog::warn!("Block events worker failed with {e}");
+                    tracing::warn!("Block events worker failed with {e}");
                 }
                 Ok(block) => from_block = block,
             }
@@ -153,7 +153,7 @@ impl BlockEvents {
             .number
             .expect("last block always has a number; qed");
 
-        vlog::info!(
+        tracing::info!(
             "Filtering logs from {} to {}",
             from_block
                 .into()
@@ -193,7 +193,7 @@ impl BlockEvents {
         while let Some(log) = logs.next().await {
             let log = match log {
                 Err(e) => {
-                    vlog::warn!("L1 block events stream ended with {e}");
+                    tracing::warn!("L1 block events stream ended with {e}");
                     break;
                 }
                 Ok(log) => log,
@@ -217,7 +217,7 @@ impl BlockEvents {
             }
         }
 
-        vlog::info!("all event streams have terminated, exiting...");
+        tracing::info!("all event streams have terminated, exiting...");
 
         Ok(last_seen_block)
     }
@@ -272,7 +272,7 @@ where
             )
             .await
             else {
-                vlog::error!("Failed to retreive transaction {:?}", log.transaction_hash);
+                tracing::error!("Failed to retreive transaction {:?}", log.transaction_hash);
                 return Err(Error::NoTransaction);
             };
 
@@ -319,7 +319,7 @@ where
                 .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksExecution(event) => {
-            vlog::info!(
+            tracing::info!(
                 "Received a block execution event {event:?} {:?}",
                 log.transaction_hash
             );

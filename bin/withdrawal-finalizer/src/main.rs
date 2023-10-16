@@ -66,14 +66,14 @@ where
         (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
         (b1, b2) => {
             if b1.is_none() {
-                vlog::info!(concat!(
+                tracing::info!(concat!(
                     "information about l2 to l1 events is missing, ",
                     "starting from L1 block corresponding to L2 block 1"
                 ));
             }
 
             if b2.is_none() {
-                vlog::info!(concat!(
+                tracing::info!(concat!(
                     "information about last block seen is missing, ",
                     "starting from L1 block corresponding to L2 block 1"
                 ));
@@ -149,14 +149,14 @@ async fn main() -> Result<()> {
     let sentry_guard = vlog::init();
 
     if sentry_guard.is_some() {
-        vlog::info!(
+        tracing::info!(
             "Starting Sentry url: {}, l1_network: {}, l2_network {}",
             std::env::var("MISC_SENTRY_URL").unwrap(),
             std::env::var("CHAIN_ETH_NETWORK").unwrap(),
             std::env::var("CHAIN_ETH_ZKSYNC_NETWORK").unwrap(),
         );
     } else {
-        vlog::info!("No sentry url configured");
+        tracing::info!("No sentry url configured");
     }
 
     let prometheus_exporter_handle = run_prometheus_exporter()?;
@@ -191,7 +191,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    vlog::info!("Starting from L2 block number {from_l2_block}");
+    tracing::info!("Starting from L2 block number {from_l2_block}");
 
     let (we_tx, we_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
@@ -205,7 +205,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    vlog::info!("Starting from L1 block number {from_l1_block}");
+    tracing::info!("Starting from L1 block number {from_l1_block}");
 
     let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
@@ -262,7 +262,7 @@ async fn main() -> Result<()> {
     let batch_finalization_gas_limit = U256::from_dec_str(&config.batch_finalization_gas_limit)?;
     let one_withdrawal_gas_limit = U256::from_dec_str(&config.one_withdrawal_gas_limit)?;
 
-    vlog::info!(
+    tracing::info!(
         "finalization gas limits one: {}, batch: {}",
         config.one_withdrawal_gas_limit,
         config.batch_finalization_gas_limit,
@@ -282,19 +282,19 @@ async fn main() -> Result<()> {
 
     tokio::select! {
         r = block_events_handle => {
-            vlog::error!("Block Events stream ended with {r:?}");
+            tracing::error!("Block Events stream ended with {r:?}");
         }
         r = withdrawal_events_handle => {
-            vlog::error!("Withdrawals Events stream ended with {r:?}");
+            tracing::error!("Withdrawals Events stream ended with {r:?}");
         }
         r = watcher_handle => {
-            vlog::error!("Finalizer main loop ended with {r:?}");
+            tracing::error!("Finalizer main loop ended with {r:?}");
         }
         r = prometheus_exporter_handle => {
-            vlog::error!("Prometheus exporter ended with {r:?}");
+            tracing::error!("Prometheus exporter ended with {r:?}");
         }
         r = finalizer_handle => {
-            vlog::error!("Finalizer ended with {r:?}");
+            tracing::error!("Finalizer ended with {r:?}");
         }
     }
 

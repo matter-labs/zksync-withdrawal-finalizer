@@ -25,112 +25,6 @@ pub use sentry as __sentry;
 pub use tracing as __tracing;
 pub use tracing::{debug, info, log, trace};
 
-#[macro_export]
-macro_rules! warn {
-    ($fmt:expr) => {{
-        $crate::__tracing::warn!(
-            file=file!(),
-            line=line!(),
-            column=column!(),
-            $fmt,
-        );
-        // $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-        //     fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-        //     message: Some(format!($fmt)),
-        //     level: $crate::__sentry::Level::Warning,
-        //     ..Default::default()
-        // });
-    }};
-
-    ($fmt:expr, $($args:tt)*) => {
-        {
-            $crate::__tracing::warn!(
-                file=file!(),
-                line=line!(),
-                column=column!(),
-                $fmt,
-                $($args)*
-            );
-            // $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-            //     fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-            //     message: Some(format!($fmt, $($args)*)),
-            //     level: $crate::__sentry::Level::Warning,
-            //     ..Default::default()
-            // });
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! panic {
-    ($fmt:expr) => {{
-        $crate::__tracing::error!(
-            file=file!(),
-            line=line!(),
-            column=column!(),
-            $fmt,
-        );
-        $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-            fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-            message: Some(format!($fmt)),
-            level: $crate::__sentry::Level::Fatal,
-            ..Default::default()
-        });
-    }};
-    ($fmt:expr, $($args:tt)*) => {
-        {
-            $crate::__tracing::error!(
-                file=file!(),
-                line=line!(),
-                column=column!(),
-                $fmt,
-                $($args)*
-            );
-            $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-                fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-                message: Some(format!($fmt, $($args)*)),
-                level: $crate::__sentry::Level::Fatal,
-                ..Default::default()
-            });
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! error {
-    ($fmt:expr) => {{
-        $crate::__tracing::error!(
-            file=file!(),
-            line=line!(),
-            column=column!(),
-            $fmt,
-        );
-        $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-            fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-            message: Some(format!($fmt)),
-            level: $crate::__sentry::Level::Error,
-            ..Default::default()
-        });
-    }};
-    ($fmt:expr, $($args:tt)*) => {
-        {
-            $crate::__tracing::error!(
-                file=file!(),
-                line=line!(),
-                column=column!(),
-                $fmt,
-                $($args)*
-            );
-            $crate::__sentry::capture_event($crate::__sentry::protocol::Event {
-                fingerprint: ::std::borrow::Cow::Borrowed(&[::std::borrow::Cow::Borrowed($fmt)]),
-                message: Some(format!($fmt, $($args)*)),
-                level: $crate::__sentry::Level::Error,
-                ..Default::default()
-            });
-        }
-    };
-}
-
 fn get_sentry_url() -> Option<Dsn> {
     if let Ok(sentry_url) = std::env::var("MISC_SENTRY_URL") {
         if let Ok(sentry_url) = Dsn::from_str(sentry_url.as_str()) {
@@ -164,7 +58,13 @@ pub fn init() -> Option<ClientInitGuard> {
             install_pretty_panic_hook();
 
             tracing_subscriber::registry()
-                .with(fmt::Layer::default().with_timer(timer).json())
+                .with(
+                    fmt::Layer::default()
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_timer(timer)
+                        .json(),
+                )
                 .with(tracing_subscriber::EnvFilter::from_default_env())
                 .init();
         }
@@ -186,7 +86,7 @@ pub fn init() -> Option<ClientInitGuard> {
     })
 }
 
-/// Format panics like vlog::error
+/// Format panics like tracing::error
 fn install_pretty_panic_hook() {
     // This hook does not use the previous one set because it leads to 2 logs:
     // the first is the default panic log and the second is from this code. To avoid this situation,

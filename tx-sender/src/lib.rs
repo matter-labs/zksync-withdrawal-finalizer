@@ -122,7 +122,7 @@ where
                 return Ok(res);
             }
             Err(_e) => {
-                vlog::info!("waiting for mined transaction {tx_hash:?} timed out",);
+                tracing::info!("waiting for mined transaction {tx_hash:?} timed out",);
                 TX_SENDER_METRICS.timedout_transactions.inc();
             }
         }
