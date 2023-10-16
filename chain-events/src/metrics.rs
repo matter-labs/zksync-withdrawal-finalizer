@@ -12,13 +12,13 @@ pub(super) struct ChainEventsMetrics {
     /// Number of new tokens added
     pub new_token_added: Counter,
 
-    /// Successful reconnect attempts to RPC api
+    /// Successful reconnect attempts to RPC API
     pub successful_l2_reconnects: Counter,
 
-    /// Reconnects on error to RPC api
+    /// Reconnects on error to RPC API
     pub reconnects_on_error: Counter,
 
-    /// Pagination on querying events on l2
+    /// Pagination on querying events on L2
     pub query_pagination: Gauge,
 
     /// Number of L2 logs received

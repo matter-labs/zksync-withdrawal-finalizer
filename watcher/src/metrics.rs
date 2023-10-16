@@ -15,7 +15,7 @@ pub(super) struct WatcherMetrics {
     /// Block number of last seen block execute event.
     pub l2_last_executed_block: Gauge,
 
-    /// Last seen l2 block number.
+    /// Last seen L2 block number.
     pub l2_last_seen_block: Gauge,
 }
 
