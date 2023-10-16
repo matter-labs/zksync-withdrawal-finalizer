@@ -20,7 +20,7 @@ use client::{
 };
 use ethers_log_decode::EthLogDecode;
 
-use crate::{Error, Result, RECONNECT_BACKOFF};
+use crate::{metrics::CHAIN_EVENTS_METRICS, Error, Result, RECONNECT_BACKOFF};
 
 // Total timecap for tx querying retry 10 minutes
 const PENDING_TX_RETRY: usize = 12 * 10;
@@ -59,16 +59,12 @@ impl BlockEvents {
     async fn connect(&self) -> Option<Provider<Ws>> {
         match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
             Ok(p) => {
-                metrics::increment_counter!(
-                    "watcher.chain_events.block_events.successful_reconnects"
-                );
+                CHAIN_EVENTS_METRICS.successful_l1_reconnects.inc();
                 Some(p)
             }
             Err(e) => {
                 tracing::warn!("Block events stream reconnect attempt failed: {e}");
-                metrics::increment_counter!(
-                    "watcher.chain_events.block_events.reconnects_on_error"
-                );
+                CHAIN_EVENTS_METRICS.l1_reconnects_on_error.inc();
                 None
             }
         }
@@ -303,7 +299,7 @@ where
                 .await
                 .map_err(|_| Error::ChannelClosing)?;
 
-            metrics::increment_counter!("watcher.chain_events.block_commit_events");
+            CHAIN_EVENTS_METRICS.block_commit_events.inc();
             sender
                 .send(BlockEvent::BlockCommit {
                     block_number,
@@ -313,7 +309,7 @@ where
                 .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksVerification(event) => {
-            metrics::increment_counter!("watcher.chain_events.block_verification_events");
+            CHAIN_EVENTS_METRICS.block_verification_events.inc();
             sender
                 .send(BlockEvent::BlocksVerification {
                     block_number,
@@ -328,7 +324,7 @@ where
                 log.transaction_hash
             );
 
-            metrics::increment_counter!("watcher.chain_events.block_execution_events");
+            CHAIN_EVENTS_METRICS.block_execution_events.inc();
             sender
                 .send(BlockEvent::BlockExecution {
                     block_number,

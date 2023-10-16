@@ -18,3 +18,4 @@ members = [
 
 [workspace.dependencies]
 tracing = "0.1"
+vise = { git = "https://github.com/matter-labs/vise.git" }

@@ -8,9 +8,9 @@ edition = "2021"
 
 [dependencies]
 ethers = "2.0.10"
-metrics = "0.21.1"
 tokio = { version = "1.33.0", features = ["time"] }
 tracing = { workspace = true }
+vise = { workspace = true }
 
 [dev-dependencies]
 tokio = { version = "1.33.0", features = ["rt", "rt-multi-thread", "macros"] }

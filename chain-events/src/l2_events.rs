@@ -19,7 +19,10 @@ use ethers::{
     types::{BlockNumber, Filter, Log},
 };
 
-use crate::{rpc_query_too_large, Error, L2Event, L2TokenInitEvent, Result, RECONNECT_BACKOFF};
+use crate::{
+    metrics::CHAIN_EVENTS_METRICS, rpc_query_too_large, Error, L2Event, L2TokenInitEvent, Result,
+    RECONNECT_BACKOFF,
+};
 use ethers_log_decode::EthLogDecode;
 
 struct NewTokenAdded;
@@ -71,16 +74,12 @@ impl L2EventsListener {
     async fn connect(&self) -> Option<Provider<Ws>> {
         match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
             Ok(p) => {
-                metrics::increment_counter!(
-                    "watcher.chain_events.withdrawal_events.successful_reconnects"
-                );
+                CHAIN_EVENTS_METRICS.successful_l2_reconnects.inc();
                 Some(p)
             }
             Err(e) => {
                 tracing::warn!("Withdrawal events stream reconnect attempt failed: {e}");
-                metrics::increment_counter!(
-                    "watcher.chain_events.withdrawal_events.reconnects_on_error"
-                );
+                CHAIN_EVENTS_METRICS.reconnects_on_error.inc();
                 None
             }
         }
@@ -236,10 +235,7 @@ impl L2EventsListener {
             };
 
             let middleware = Arc::new(provider_l1);
-            metrics::gauge!(
-                "watcher.chain_events.l2_events.query_pagination",
-                pagination as f64
-            );
+            CHAIN_EVENTS_METRICS.query_pagination.set(pagination as i64);
 
             match self
                 .run(
@@ -396,7 +392,7 @@ impl L2EventsListener {
                 Ok(log) => log,
             };
             let raw_log: RawLog = log.clone().into();
-            metrics::increment_counter!("watcher.chain_events.l2_logs_received");
+            CHAIN_EVENTS_METRICS.l2_logs_received.inc();
             successful_logs += 1;
 
             if should_attempt_pagination_increase(pagination_step, successful_logs) {
@@ -413,7 +409,7 @@ impl L2EventsListener {
                         continue;
                     };
                 }
-                metrics::increment_counter!("watcher.chain_events.l2_logs_decoded");
+                CHAIN_EVENTS_METRICS.l2_logs_decoded.inc();
 
                 match self
                     .process_l2_event(&log, &l2_event, &mut sender, &middleware)
@@ -453,7 +449,7 @@ impl L2EventsListener {
             match l2_event {
                 L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
                 | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
-                    metrics::increment_counter!("watcher.chain_events.withdrawal_events");
+                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
 
                     let we = WithdrawalEvent {
                         tx_hash,
@@ -487,9 +483,7 @@ impl L2EventsListener {
                         self.bridge_initialize_event(bridge_init_log)?
                     {
                         if self.tokens.insert(address) {
-                            metrics::increment_counter!(
-                                "watcher.chain_events.new_token_added_events"
-                            );
+                            CHAIN_EVENTS_METRICS.new_token_added.inc();
 
                             let event = l2_event.into();
                             tracing::info!("sending new token event {event:?}");

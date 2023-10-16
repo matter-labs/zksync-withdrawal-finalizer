@@ -24,12 +24,16 @@ use client::{
     l1bridge::codegen::IL1Bridge, withdrawal_finalizer::codegen::WithdrawalFinalizer,
     zksync_contract::codegen::IZkSync, WithdrawalParams, ZksyncMiddleware,
 };
-use withdrawals_meterer::WithdrawalsMeter;
+use withdrawals_meterer::{MeteringComponent, WithdrawalsMeter};
 
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    metrics::FINALIZER_METRICS,
+};
 
 mod accumulator;
 mod error;
+mod metrics;
 
 /// A limit to cap a transaction fee (in ether) for safety reasons.
 const TX_FEE_LIMIT: f64 = 0.8;
@@ -84,10 +88,8 @@ where
         tx_retry_timeout: usize,
         account_address: Address,
     ) -> Self {
-        let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
-            pgpool.clone(),
-            "era_withdrawal_finalizer_meter",
-        );
+        let withdrawals_meterer =
+            WithdrawalsMeter::new(pgpool.clone(), MeteringComponent::FinalizedWithdrawals);
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
@@ -209,10 +211,9 @@ where
                 )
                 .await?;
 
-                metrics::gauge!(
-                    "finalizer.highest_finalized_batch_number",
-                    highest_batch_number.as_u64() as f64,
-                );
+                FINALIZER_METRICS
+                    .highest_finalized_batch_number
+                    .set(highest_batch_number.as_u64() as i64);
 
                 if let Err(e) = self
                     .withdrawals_meterer
@@ -239,10 +240,9 @@ where
                         .await?;
                 } else {
                     tracing::error!("failed to send finalization withdrawal tx: {e}");
-                    metrics::counter!(
-                        "finalizer.finalization_events.failed_to_finalize_low_gas",
-                        withdrawals.len() as u64
-                    );
+                    FINALIZER_METRICS
+                        .failed_to_finalize_low_gas
+                        .inc_by(withdrawals.len() as u64);
 
                     tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                 }
@@ -312,10 +312,9 @@ where
 
                 let predicted_to_fail = self.predict_fails(accumulator.withdrawals()).await?;
 
-                metrics::counter!(
-                    "finalizer.predicted_to_fail_withdrawals",
-                    predicted_to_fail.len() as u64
-                );
+                FINALIZER_METRICS
+                    .predicted_to_fail_withdrawals
+                    .inc_by(predicted_to_fail.len() as u64);
 
                 tracing::debug!("predicted to fail: {predicted_to_fail:?}");
 
@@ -484,9 +483,7 @@ where
         match result {
             Ok(r) => ok_results.push(r),
             Err(e) => {
-                metrics::increment_counter!(
-                    "finalizer.params_fetcher.failed_to_fetch_withdrawal_params"
-                );
+                FINALIZER_METRICS.failed_to_fetch_withdrawal_params.inc();
                 if let Error::Client(client::Error::WithdrawalLogNotFound(index, tx_hash)) = e {
                     storage::set_withdrawal_unfinalizable(pgpool, tx_hash, index)
                         .await
