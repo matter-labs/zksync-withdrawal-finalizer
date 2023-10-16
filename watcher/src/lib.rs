@@ -235,7 +235,9 @@ where
                     block_number,
                 }))
             } else {
-                tracing::warn!("One of the verified ranges not found: {range_begin:?}, {range_end:?}");
+                tracing::warn!(
+                    "One of the verified ranges not found: {range_begin:?}, {range_end:?}"
+                );
                 Ok(None)
             }
         }

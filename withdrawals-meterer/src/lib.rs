@@ -67,7 +67,10 @@ impl WithdrawalsMeter {
                     let Some((decimals, address)) =
                         storage::token_decimals_and_l1_address(&self.pool, w.event.token).await?
                     else {
-                        tracing::error!("Received withdrawal from unknown token {:?}", w.event.token);
+                        tracing::error!(
+                            "Received withdrawal from unknown token {:?}",
+                            w.event.token
+                        );
                         continue;
                     };
 
