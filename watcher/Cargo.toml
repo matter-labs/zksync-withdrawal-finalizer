@@ -10,10 +10,11 @@ edition = "2021"
 ethers = "2.0.10"
 itertools = "0.11.0"
 futures = "0.3.28"
-metrics = "0.21.1"
 thiserror = "1.0.49"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { version = "1.33.0", features = ["time"] }
+
+vise = { workspace = true }
 
 client = { path = "../client" }
 chain-events = { path = "../chain-events" }

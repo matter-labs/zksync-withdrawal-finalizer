@@ -410,9 +410,9 @@ dependencies = [
  "ethers",
  "ethers-log-decode",
  "futures",
- "metrics",
  "thiserror",
  "tokio",
+ "vise",
  "vlog",
 ]
 
@@ -451,11 +451,11 @@ dependencies = [
  "hex",
  "lazy_static",
  "lru",
- "metrics",
  "pretty_assertions",
  "serde",
  "thiserror",
  "tokio",
+ "vise",
 ]
 
 [[package]]
@@ -838,6 +838,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
 
 [[package]]
+name = "dtoa"
+version = "1.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcbb2bf8e87535c23f7a8a321e364ce21462d0ff10cb6407820e8e96dfff6653"
+
+[[package]]
 name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -883,6 +889,15 @@ dependencies = [
  "sec1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "elsa"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "714f766f3556b44e7e4776ad133fcc3445a489517c25c704ace411bb14790194"
+dependencies = [
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -1347,12 +1362,12 @@ dependencies = [
  "client",
  "ethers",
  "futures",
- "metrics",
  "sqlx",
  "storage",
  "thiserror",
  "tokio",
  "tx-sender",
+ "vise",
  "vlog",
  "withdrawals-meterer",
 ]
@@ -2078,6 +2093,26 @@ dependencies = [
  "cc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "linkme"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91ed2ee9464ff9707af8e9ad834cffa4802f072caad90639c583dd3c62e6e608"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba125974b109d512fccbc6c0244e7580143e460895dfd6ea7f8bbb692fd94396"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
 ]
 
 [[package]]
@@ -2825,6 +2860,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "prometheus-client"
+version = "0.21.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c99afa9a01501019ac3a14d71d9f94050346f55ca471ce90c799a15c58f61e2"
+dependencies = [
+ "dtoa",
+ "itoa",
+ "parking_lot",
+ "prometheus-client-derive-encode",
+]
+
+[[package]]
+name = "prometheus-client-derive-encode"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "440f724eba9f6996b75d63681b0a92b06947f1457076d503a4d2e2c8f56442b8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
 ]
 
 [[package]]
@@ -3873,6 +3931,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "stable_deref_trait"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3886,10 +3950,10 @@ dependencies = [
  "chain-events",
  "client",
  "ethers",
- "metrics",
  "num",
  "sqlx",
  "thiserror",
+ "vise",
 ]
 
 [[package]]
@@ -4344,9 +4408,9 @@ name = "tx-sender"
 version = "0.1.11"
 dependencies = [
  "ethers",
- "metrics",
  "pretty_assertions",
  "tokio",
+ "vise",
  "vlog",
 ]
 
@@ -4494,6 +4558,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
+name = "vise"
+version = "0.1.0"
+source = "git+https://github.com/matter-labs/vise.git#dd05139b76ab0843443ab3ff730174942c825dae"
+dependencies = [
+ "elsa",
+ "linkme",
+ "once_cell",
+ "prometheus-client",
+ "vise-macros",
+]
+
+[[package]]
+name = "vise-macros"
+version = "0.1.0"
+source = "git+https://github.com/matter-labs/vise.git#dd05139b76ab0843443ab3ff730174942c825dae"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
+]
+
+[[package]]
 name = "vlog"
 version = "1.0.0"
 dependencies = [
@@ -4604,11 +4690,11 @@ dependencies = [
  "ethers",
  "futures",
  "itertools 0.11.0",
- "metrics",
  "sqlx",
  "storage",
  "thiserror",
  "tokio",
+ "vise",
  "vlog",
  "withdrawals-meterer",
 ]
@@ -4828,9 +4914,9 @@ version = "0.1.11"
 dependencies = [
  "client",
  "ethers",
- "metrics",
  "sqlx",
  "storage",
+ "vise",
  "vlog",
 ]
 
