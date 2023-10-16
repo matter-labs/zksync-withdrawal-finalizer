@@ -15,7 +15,7 @@ pub(super) struct FinalizerMetrics {
     /// Number of withdrawals predicted to fail by the smart contract.
     pub predicted_to_fail_withdrawals: Counter,
 
-    /// Number of withdrawals failed to fetch withdrawal params for.
+    /// Number of withdrawals failed to fetch withdrawal parameters for.
     pub failed_to_fetch_withdrawal_params: Counter,
 }
 
