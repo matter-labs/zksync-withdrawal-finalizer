@@ -15,6 +15,10 @@ use ethers::{
     },
 };
 
+use crate::metrics::TX_SENDER_METRICS;
+
+mod metrics;
+
 const RETRY_BUMP_FEES_PERCENT: u8 = 15;
 
 /// Bump prices of a `TypedTransaction` depending on its type.
@@ -119,7 +123,7 @@ where
             }
             Err(_e) => {
                 vlog::info!("waiting for mined transaction {tx_hash:?} timed out",);
-                metrics::increment_counter!("finalizer.tx_sender.timedout_transactions");
+                TX_SENDER_METRICS.timedout_transactions.inc();
             }
         }
     }

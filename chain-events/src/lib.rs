@@ -8,6 +8,7 @@
 mod block_events;
 mod error;
 mod l2_events;
+mod metrics;
 
 use std::time::Duration;
 

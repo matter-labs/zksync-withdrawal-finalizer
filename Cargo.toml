@@ -15,3 +15,6 @@ members = [
     "watcher",
     "withdrawals-meterer"
 ]
+
+[workspace.dependencies]
+vise = { git = "https://github.com/matter-labs/vise.git" }

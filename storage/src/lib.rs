@@ -5,8 +5,6 @@
 
 //! Finalizer watcher.storage.operations.
 
-use std::time::Instant;
-
 use ethers::types::{Address, H160, H256};
 use sqlx::{PgConnection, PgPool};
 
@@ -14,11 +12,14 @@ use chain_events::L2TokenInitEvent;
 use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, WithdrawalParams};
 
 mod error;
+mod metrics;
 mod utils;
 
 use utils::u256_to_big_decimal;
 
 pub use error::{Error, Result};
+
+use crate::metrics::STORAGE_METRICS;
 
 /// A convenience struct that couples together [`WithdrawalEvent`]
 /// with index in tx and boolean `is_finalized` value
@@ -39,8 +40,10 @@ pub async fn committed_new_batch(
     l1_block_number: u64,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
+
+    let latency = STORAGE_METRICS.call[&"committed_new_batch"].start();
+
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
-    let started_at = Instant::now();
 
     sqlx::query!(
         "
@@ -66,10 +69,7 @@ pub async fn committed_new_batch(
 
     tx.commit().await?;
 
-    metrics::histogram!(
-        "watcher.storage.transactions.commited_new_batch",
-        started_at.elapsed()
-    );
+    latency.observe();
 
     Ok(())
 }
@@ -79,7 +79,7 @@ pub async fn withdrawal_committed_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"withdrawal_committed_in_block"].start();
 
     let res = sqlx::query!(
         "
@@ -97,7 +97,7 @@ pub async fn withdrawal_committed_in_block(
     .await?
     .and_then(|r| r.commit_l1_block_number);
 
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_committed_in_block");
+    latency.observe();
 
     Ok(res)
 }
@@ -107,7 +107,7 @@ pub async fn withdrawal_verified_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"withdrawal_verified_in_block"].start();
 
     let res = sqlx::query!(
         "
@@ -125,7 +125,7 @@ pub async fn withdrawal_verified_in_block(
     .await?
     .and_then(|r| r.verify_l1_block_number);
 
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_verified_in_block");
+    latency.observe();
 
     Ok(res)
 }
@@ -135,8 +135,7 @@ pub async fn withdrawal_executed_in_block(
     conn: &mut PgConnection,
     tx_hash: H256,
 ) -> Result<Option<i64>> {
-    let started_at = Instant::now();
-
+    let latency = STORAGE_METRICS.call[&"withdrawal_executed_in_block"].start();
     let res = sqlx::query!(
         "
         SELECT
@@ -153,7 +152,7 @@ pub async fn withdrawal_executed_in_block(
     .await?
     .and_then(|r| r.execute_l1_block_number);
 
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "withdrawal_executed_in_block");
+    latency.observe();
 
     Ok(res)
 }
@@ -167,8 +166,7 @@ pub async fn verified_new_batch(
     let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
 
-    let started_at = Instant::now();
-
+    let latency = STORAGE_METRICS.call[&"verified_new_batch"].start();
     sqlx::query!(
         "
         INSERT INTO
@@ -192,11 +190,7 @@ pub async fn verified_new_batch(
     .await?;
 
     tx.commit().await?;
-
-    metrics::histogram!(
-        "watcher.storage.transactions.verified_new_batch",
-        started_at.elapsed()
-    );
+    latency.observe();
 
     Ok(())
 }
@@ -210,7 +204,7 @@ pub async fn executed_new_batch(
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"executed_new_batch"].start();
 
     sqlx::query!(
         "
@@ -235,11 +229,7 @@ pub async fn executed_new_batch(
     .await?;
 
     tx.commit().await?;
-
-    metrics::histogram!(
-        "watcher.storage.transactions.executed_new_batch",
-        started_at.elapsed(),
-    );
+    latency.observe();
 
     Ok(())
 }
@@ -251,6 +241,8 @@ pub async fn executed_new_batch(
 /// * `conn`: Connection to the Postgres DB
 /// * `ids`: ID fields of the withdrawals to be returned.
 pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWithdrawal>> {
+    let latency = STORAGE_METRICS.call[&"get_withdrawals"].start();
+
     let events = sqlx::query!(
         "
         SELECT * FROM
@@ -272,6 +264,8 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
         index_in_tx: r.event_index_in_tx as usize,
     })
     .collect();
+
+    latency.observe();
 
     Ok(events)
 }
@@ -297,7 +291,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         indices_in_tx.push(sw.index_in_tx as i32);
     });
 
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"add_withdrawals"].start();
 
     sqlx::query!(
         "
@@ -342,17 +336,14 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
     .execute(pool)
     .await?;
 
-    metrics::histogram!(
-        "watcher.storage.transactions.add_withdrawals",
-        started_at.elapsed()
-    );
+    latency.observe();
 
     Ok(())
 }
 
 /// Get the block number of the last L2 withdrawal the DB has record of.
 pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"last_l2_block_seen"].start();
 
     let res = sqlx::query!(
         "
@@ -367,14 +358,14 @@ pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "last_l2_block_seen");
+    latency.observe();
 
     Ok(res)
 }
 
 /// Get the block number of the last L1 block seen.
 pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"last_l1_block_seen"].start();
 
     let res = sqlx::query!(
         "
@@ -389,14 +380,14 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
     .max
     .map(|max| max as u64);
 
-    metrics::histogram!("watcher.storage.request", started_at.elapsed(), "method" => "last_l1_block_seen");
+    latency.observe();
 
     Ok(res)
 }
 
 /// Get the last block seen for the `l2_to_l1_events` set
 pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"last_l2_to_l1_events_block_seen"].start();
 
     let res = sqlx::query!(
         "
@@ -411,11 +402,7 @@ pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<
     .max
     .map(|max| max as u64);
 
-    metrics::histogram!(
-        "watcher.storage.request",
-        started_at.elapsed(),
-        "method" => "last_l2_to_l1_events_block_seen",
-    );
+    latency.observe();
 
     Ok(res)
 }
@@ -443,7 +430,7 @@ pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()
         tx_numbers_in_block.push(e.tx_number_in_block as i32);
     });
 
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"l2_to_l1_events"].start();
 
     sqlx::query!(
         "
@@ -494,15 +481,14 @@ pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()
     .execute(pool)
     .await?;
 
-    metrics::histogram!(
-        "watcher.storage.transactions.add_l2_to_l1_event",
-        started_at.elapsed()
-    );
+    latency.observe();
+
     Ok(())
 }
 
 /// Get addresses of known tokens on L2 and the last seen block.
 pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
+    let latency = STORAGE_METRICS.call[&"get_tokens"].start();
     let last_l2_block_seen = sqlx::query!(
         "
         SELECT
@@ -530,11 +516,14 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     .map(|r| H160::from_slice(&r.l2_token_address))
     .collect();
 
+    latency.observe();
     Ok((tokens, last_l2_block_seen as u64))
 }
 
 /// Insert a token initialization event into the DB.
 pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
+    let latency = STORAGE_METRICS.call[&"add_token"].start();
+
     sqlx::query!(
         "
         INSERT INTO
@@ -560,6 +549,8 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     )
     .execute(pool)
     .await?;
+
+    latency.observe();
 
     Ok(())
 }
@@ -594,7 +585,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
         proof.push(bincode::serialize(&d.proof).unwrap());
     });
 
-    let started_at = Instant::now();
+    let latency = STORAGE_METRICS.call[&"add_withdrawals_data"].start();
 
     sqlx::query!(
         "
@@ -651,10 +642,7 @@ pub async fn add_withdrawals_data(pool: &PgPool, wd: &[WithdrawalParams]) -> Res
     .execute(pool)
     .await?;
 
-    metrics::histogram!(
-        "watcher.storage.transactions.add_withdrawal_data",
-        started_at.elapsed(),
-    );
+    latency.observe();
 
     Ok(())
 }
@@ -664,6 +652,8 @@ pub async fn get_withdrawals_with_no_data(
     pool: &PgPool,
     limit_by: u64,
 ) -> Result<Vec<WithdrawalWithBlock>> {
+    let latency = STORAGE_METRICS.call[&"get_withdrawals_no_data"].start();
+
     let withdrawals = sqlx::query!(
         "
         SELECT
@@ -715,6 +705,8 @@ pub async fn get_withdrawals_with_no_data(
     })
     .collect();
 
+    latency.observe();
+
     Ok(withdrawals)
 }
 
@@ -724,6 +716,8 @@ pub async fn set_withdrawal_unfinalizable(
     tx_hash: H256,
     event_index_in_tx: usize,
 ) -> Result<()> {
+    let latency = STORAGE_METRICS.call[&"set_withdrawal_unfinalizable"].start();
+
     sqlx::query!(
         "
             UPDATE withdrawals
@@ -739,11 +733,15 @@ pub async fn set_withdrawal_unfinalizable(
     .execute(pool)
     .await?;
 
+    latency.observe();
+
     Ok(())
 }
 
 /// Get the earliest withdrawals never attempted to be finalized before
 pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalParams>> {
+    let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
+
     let data = sqlx::query!(
         "
         SELECT
@@ -804,6 +802,8 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     })
     .collect();
 
+    latency.observe();
+
     Ok(data)
 }
 
@@ -820,6 +820,8 @@ pub async fn finalization_data_set_finalized_in_tx(
         tx_hashes.push(w.tx_hash.0.to_vec());
         event_index_in_tx.push(w.event_index_in_tx as i32);
     });
+
+    let latency = STORAGE_METRICS.call[&"finalization_data_set_finalized_in_tx"].start();
 
     sqlx::query!(
         "
@@ -851,6 +853,8 @@ pub async fn finalization_data_set_finalized_in_tx(
     .execute(pool)
     .await?;
 
+    latency.observe();
+
     Ok(())
 }
 
@@ -867,6 +871,8 @@ pub async fn inc_unsuccessful_finalization_attempts(
         tx_hashes.push(w.tx_hash.0.to_vec());
         event_index_in_tx.push(w.event_index_in_tx as i32);
     });
+
+    let latency = STORAGE_METRICS.call[&"inc_unsuccessful_finalization_attempts"].start();
 
     sqlx::query!(
         "
@@ -898,6 +904,8 @@ pub async fn inc_unsuccessful_finalization_attempts(
     .execute(pool)
     .await?;
 
+    latency.observe();
+
     Ok(())
 }
 
@@ -911,6 +919,8 @@ pub async fn token_decimals_and_l1_address(
     pool: &PgPool,
     token: Address,
 ) -> Result<Option<(u32, Address)>> {
+    let latency = STORAGE_METRICS.call[&"token_decimals_and_l1_address"].start();
+
     let result = sqlx::query!(
         "
         SELECT
@@ -927,6 +937,7 @@ pub async fn token_decimals_and_l1_address(
     .await?
     .map(|r| (r.decimals as u32, Address::from_slice(&r.l1_token_address)));
 
+    latency.observe();
     Ok(result)
 }
 
