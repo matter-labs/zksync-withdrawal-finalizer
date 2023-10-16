@@ -6,22 +6,17 @@ homepage = "https://zksync.io/"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-sqlx = { version = "0.7", features = [
+sqlx = { workspace = true, features = [
     "bigdecimal",
     "postgres",
     "runtime-tokio-rustls",
     "macros"
 ] }
-num = "0.4.1"
-
+num = { workspace = true }
 vise = { workspace = true }
-
-client = { path = "../client" }
-chain-events = { path = "../chain-events" }
-ethers = "2.0.10"
-thiserror = "1.0.49"
-bincode = "1.3.3"
-
+client = { workspace = true }
+chain-events = { workspace = true }
+ethers = { workspace = true } 
+thiserror = { workspace = true }
+bincode = { workspace = true }

@@ -7,10 +7,9 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.10"
+ethers = { workspace = true }
 tracing = { workspace = true }
 vise = { workspace = true }
-
-client = { path = "../client" }
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
-storage = { path = "../storage" }
+client = { workspace = true }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
+storage = { workspace = true }
