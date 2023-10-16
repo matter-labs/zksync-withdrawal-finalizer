@@ -7,24 +7,24 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-color-eyre = "0.6.2"
-ethers = { version = "2.0.10", default-features = false, features = ["ws", "rustls"] }
-serde = "1.0.189"
-tokio = { version = "1.33.0", features = ["full"] }
-url = { version = "2.4.1", features = ["serde"] }
-eyre = "0.6.8"
-tokio-stream = "0.1.14"
-envconfig = "0.10.0"
-tokio-util = "0.7.9"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
-dotenvy = "0.15.7"
+color-eyre = { workspace = true }
+ethers = { workspace = true, default-features = false, features = ["ws", "rustls"] }
+serde = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+url = { workspace = true, features = ["serde"] }
+eyre = { workspace = true }
+tokio-stream = { workspace = true }
+envconfig = { workspace = true }
+tokio-util = { workspace = true }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
+dotenvy = { workspace = true }
 tracing = { workspace = true }
 
-client = { path = "../../client" }
-storage = { path = "../../storage" }
-chain-events = { path = "../../chain-events" }
-vlog = { path = "../../vlog" }
-finalizer = { path = "../../finalizer" }
-watcher = { path = "../../watcher" }
-metrics-exporter-prometheus = "0.12.1"
-metrics = "0.21.1"
+client = { workspace = true }
+storage = { workspace = true }
+chain-events = { workspace = true }
+vlog = {  workspace = true }
+finalizer = { workspace = true }
+watcher = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics =  { workspace = true }

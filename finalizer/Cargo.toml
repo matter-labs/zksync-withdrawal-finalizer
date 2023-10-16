@@ -7,15 +7,15 @@ license = "MIT OR Apache-2.0"
 edition = "2021"
 
 [dependencies]
-ethers = "2.0.10"
-futures = "0.3.28"
-thiserror = "1.0.49"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
-tokio = { version = "1.33.0", features = ["time"] }
+ethers = { workspace = true }
+futures = { workspace = true }
+thiserror = { workspace = true }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
+tokio = { workspace = true }
 tracing = { workspace = true }
 vise = { workspace = true }
 
-client = { path = "../client" }
-storage = { path = "../storage" }
-tx-sender = { path = "../tx-sender" }
-withdrawals-meterer = { path = "../withdrawals-meterer" }
+client = { workspace = true }
+storage = { workspace = true }
+tx-sender = { workspace = true }
+withdrawals-meterer = { workspace = true }
