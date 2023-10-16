@@ -15,3 +15,6 @@ members = [
     "watcher",
     "withdrawals-meterer"
 ]
+
+[workspace.dependencies]
+tracing = "0.1"

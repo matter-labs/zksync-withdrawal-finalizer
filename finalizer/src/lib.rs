@@ -126,10 +126,10 @@ where
 
         tokio::select! {
             m = params_fetcher_handle => {
-                vlog::error!("migrator ended with {m:?}");
+                tracing::error!("migrator ended with {m:?}");
             }
             f = finalizer_handle => {
-                vlog::error!("finalizer ended with {f:?}");
+                tracing::error!("finalizer ended with {f:?}");
             }
         }
 
@@ -150,7 +150,7 @@ where
             .finalize_withdrawals(w)
             .call()
             .await?;
-        vlog::info!("predicted results for withdrawals: {results:?}");
+        tracing::info!("predicted results for withdrawals: {results:?}");
 
         Ok(results
             .into_iter()
@@ -163,7 +163,7 @@ where
             return Ok(());
         };
 
-        vlog::info!(
+        tracing::info!(
             "finalizing batch {:?}",
             withdrawals.iter().map(|w| w.id).collect::<Vec<_>>()
         );
@@ -197,7 +197,7 @@ where
 
         match tx {
             Ok(Some(tx)) => {
-                vlog::info!(
+                tracing::info!(
                     "withdrawal transaction {:?} successfully mined",
                     tx.transaction_hash
                 );
@@ -219,26 +219,26 @@ where
                     .meter_withdrawals_storage(&ids)
                     .await
                 {
-                    vlog::error!("Failed to meter the withdrawals: {e}");
+                    tracing::error!("Failed to meter the withdrawals: {e}");
                 }
             }
             // TODO: why would a pending tx resolve to `None`?
             Ok(None) => {
-                vlog::warn!("sent transaction resolved with none result",);
+                tracing::warn!("sent transaction resolved with none result",);
             }
             Err(e) => {
-                vlog::error!(
+                tracing::error!(
                     "waiting for transaction status withdrawals failed with an error {:?}",
                     e
                 );
 
                 if let Some(provider_error) = e.as_provider_error() {
-                    vlog::error!("failed to send finalization transaction: {provider_error}");
+                    tracing::error!("failed to send finalization transaction: {provider_error}");
                 } else if !is_gas_required_exceeds_allowance::<S>(&e) {
                     storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals)
                         .await?;
                 } else {
-                    vlog::error!("failed to send finalization withdrawal tx: {e}");
+                    tracing::error!("failed to send finalization withdrawal tx: {e}");
                     metrics::counter!(
                         "finalizer.finalization_events.failed_to_finalize_low_gas",
                         withdrawals.len() as u64
@@ -279,19 +279,19 @@ where
     {
         loop {
             if let Err(e) = self.loop_iteration().await {
-                vlog::error!("iteration of finalizer loop has ended with {e}");
+                tracing::error!("iteration of finalizer loop has ended with {e}");
                 tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
             }
         }
     }
 
     async fn loop_iteration(&mut self) -> Result<()> {
-        vlog::debug!("begin iteration of the finalizer loop");
+        tracing::debug!("begin iteration of the finalizer loop");
 
         let try_finalize_these =
             storage::withdrwals_to_finalize(&self.pgpool, self.query_db_pagination_limit).await?;
 
-        vlog::debug!("trying to finalize these {try_finalize_these:?}");
+        tracing::debug!("trying to finalize these {try_finalize_these:?}");
 
         if try_finalize_these.is_empty() {
             tokio::time::sleep(self.no_new_withdrawals_backoff).await;
@@ -305,7 +305,7 @@ where
             accumulator.add_withdrawal(t);
 
             if accumulator.ready_to_finalize() || iter.peek().is_none() {
-                vlog::info!(
+                tracing::info!(
                     "predicting results for withdrawals: {:?}",
                     accumulator.withdrawals().map(|w| w.id).collect::<Vec<_>>()
                 );
@@ -317,7 +317,7 @@ where
                     predicted_to_fail.len() as u64
                 );
 
-                vlog::debug!("predicted to fail: {predicted_to_fail:?}");
+                tracing::debug!("predicted to fail: {predicted_to_fail:?}");
 
                 if !predicted_to_fail.is_empty() {
                     let mut removed = accumulator.remove_unsuccessful(&predicted_to_fail);
@@ -344,12 +344,12 @@ where
     // * erc20 has denied a tx for some internal reasons.
     async fn process_unsuccessful(&mut self) -> Result<()> {
         if self.unsuccessful.is_empty() {
-            vlog::debug!("no unsuccessful withdrawals");
+            tracing::debug!("no unsuccessful withdrawals");
             return Ok(());
         }
 
         let predicted = std::mem::take(&mut self.unsuccessful);
-        vlog::debug!("requesting finalization status of withdrawals");
+        tracing::debug!("requesting finalization status of withdrawals");
         let are_finalized =
             get_finalized_withdrawals(&predicted, &self.zksync_contract, &self.l1_bridge).await?;
 
@@ -366,7 +366,7 @@ where
             }
         }
 
-        vlog::debug!(
+        tracing::debug!(
             "setting unsuccessful finalization attempts to {} withdrawals",
             unsuccessful.len()
         );
@@ -375,7 +375,7 @@ where
         // predicted to fail.
         storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &unsuccessful).await?;
 
-        vlog::debug!(
+        tracing::debug!(
             "setting already finalized status to {} withdrawals",
             already_finalized.len()
         );
@@ -492,7 +492,7 @@ where
                         .await
                         .ok();
                 }
-                vlog::error!(
+                tracing::error!(
                     "failed to fetch withdrawal parameters: {e} {:?}",
                     hash_and_indices[i]
                 );
@@ -519,7 +519,7 @@ async fn params_fetcher_loop<M1, M2>(
         if let Err(e) =
             params_fetcher_loop_iteration(&pool, &middleware, &zksync_contract, &l1_bridge).await
         {
-            vlog::error!("params fetcher iteration ended with {e}");
+            tracing::error!("params fetcher iteration ended with {e}");
             tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
         }
     }
@@ -542,7 +542,7 @@ where
         return Ok(());
     }
 
-    vlog::debug!("newly committed withdrawals {newly_executed_withdrawals:?}");
+    tracing::debug!("newly committed withdrawals {newly_executed_withdrawals:?}");
 
     let hash_and_index_and_id: Vec<_> = newly_executed_withdrawals
         .iter()

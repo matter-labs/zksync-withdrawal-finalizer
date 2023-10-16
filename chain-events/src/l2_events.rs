@@ -77,7 +77,7 @@ impl L2EventsListener {
                 Some(p)
             }
             Err(e) => {
-                vlog::warn!("Withdrawal events stream reconnect attempt failed: {e}");
+                tracing::warn!("Withdrawal events stream reconnect attempt failed: {e}");
                 metrics::increment_counter!(
                     "watcher.chain_events.withdrawal_events.reconnects_on_error"
                 );
@@ -102,7 +102,7 @@ impl L2EventsListener {
     {
         let from_block: BlockNumber = from_block.into();
         let to_block: BlockNumber = to_block.into();
-        vlog::debug!("querying past token events {from_block:?} - {to_block:?}");
+        tracing::debug!("querying past token events {from_block:?} - {to_block:?}");
 
         // Query all deployment events emitted by Deployer and with address of l2_erc20_bridge_addr
         // as a topic1. This narrows down the query to basically only the needed results so
@@ -141,7 +141,7 @@ impl L2EventsListener {
                 if self.tokens.insert(address) {
                     let event = l2_event.into();
 
-                    vlog::info!("sending token event {event:?}");
+                    tracing::info!("sending token event {event:?}");
                     sender
                         .send(event)
                         .await
@@ -260,7 +260,7 @@ impl L2EventsListener {
                             let pagination_old = pagination;
                             if pagination > 2 {
                                 pagination /= 2;
-                                vlog::debug!(
+                                tracing::debug!(
                                     "Decreasing pagination from {pagination_old} to {pagination}",
                                 );
                             }
@@ -269,7 +269,7 @@ impl L2EventsListener {
                             let pagination_old = pagination;
                             if pagination + PAGINATION_INCREASE_STEP < PAGINATION_STEP {
                                 pagination += PAGINATION_INCREASE_STEP;
-                                vlog::debug!(
+                                tracing::debug!(
                                     "Increasing pagination from {pagination_old} to {pagination}",
                                 );
                             }
@@ -278,7 +278,7 @@ impl L2EventsListener {
                     }
                 }
                 Err(e) => {
-                    vlog::warn!("Withdrawal events worker failed with {e}");
+                    tracing::warn!("Withdrawal events worker failed with {e}");
                 }
             }
 
@@ -340,8 +340,8 @@ impl L2EventsListener {
             WithdrawalFilter::signature(),
         ];
 
-        vlog::debug!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
-        vlog::debug!("from_block {from_block:?}");
+        tracing::debug!("last_seen_l2_token_block {last_seen_l2_token_block:?}");
+        tracing::debug!("from_block {from_block:?}");
 
         let latest_block = middleware
             .get_block(BlockNumber::Latest)
@@ -386,7 +386,7 @@ impl L2EventsListener {
         while let Some(log) = logs.next().await {
             let log = match log {
                 Err(e) => {
-                    vlog::info!("L2 withdrawal events stream ended with {e:?}");
+                    tracing::info!("L2 withdrawal events stream ended with {e:?}");
                     if rpc_query_too_large(&e) {
                         return Ok((last_seen_block, RunResult::PaginationTooLarge));
                     }
@@ -423,7 +423,7 @@ impl L2EventsListener {
                         break;
                     }
                     Err(e) => {
-                        vlog::warn!("Stopping event loop with an error {e}");
+                        tracing::warn!("Stopping event loop with an error {e}");
                         break;
                     }
                     _ => (),
@@ -431,7 +431,7 @@ impl L2EventsListener {
             }
         }
 
-        vlog::info!("withdrawal streams being closed");
+        tracing::info!("withdrawal streams being closed");
 
         Ok((last_seen_block, RunResult::OtherError))
     }
@@ -462,7 +462,7 @@ impl L2EventsListener {
                         amount: *amount,
                     };
                     let event = we.into();
-                    vlog::info!("sending withdrawal event {event:?}");
+                    tracing::info!("sending withdrawal event {event:?}");
                     sender
                         .send(event)
                         .await
@@ -492,12 +492,12 @@ impl L2EventsListener {
                             );
 
                             let event = l2_event.into();
-                            vlog::info!("sending new token event {event:?}");
+                            tracing::info!("sending new token event {event:?}");
                             sender
                                 .send(event)
                                 .await
                                 .map_err(|_| Error::ChannelClosing)?;
-                            vlog::info!("Restarting on the token added event {address}");
+                            tracing::info!("Restarting on the token added event {address}");
                             return Ok(Some(NewTokenAdded));
                         }
                     }

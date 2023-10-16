@@ -67,7 +67,7 @@ impl WithdrawalsMeter {
                     let Some((decimals, address)) =
                         storage::token_decimals_and_l1_address(&self.pool, w.event.token).await?
                     else {
-                        vlog::error!("Received withdrawal from unknown token {:?}", w.event.token);
+                        tracing::error!("Received withdrawal from unknown token {:?}", w.event.token);
                         continue;
                     };
 
@@ -86,7 +86,7 @@ impl WithdrawalsMeter {
             let formatted = match ethers::utils::format_units(w.event.amount, decimals) {
                 Ok(f) => f,
                 Err(e) => {
-                    vlog::error!("failed to format units: {e}");
+                    tracing::error!("failed to format units: {e}");
                     continue;
                 }
             };
@@ -94,7 +94,7 @@ impl WithdrawalsMeter {
             let formatted_f64 = match f64::from_str(&formatted) {
                 Ok(f) => f,
                 Err(e) => {
-                    vlog::error!("failed to format units: {e}");
+                    tracing::error!("failed to format units: {e}");
                     continue;
                 }
             };

@@ -9,8 +9,8 @@ edition = "2021"
 [dependencies]
 ethers = "2.0.10"
 metrics = "0.21.1"
+tracing = { workspace = true }
 
 client = { path = "../client" }
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"] }
 storage = { path = "../storage" }
-vlog = { path = "../vlog" }
