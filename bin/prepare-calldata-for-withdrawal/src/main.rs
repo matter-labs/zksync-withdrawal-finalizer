@@ -41,5 +41,5 @@ async fn main() {
 
     let encoded = finalize_withdrawal_call.encode();
 
-    println!("hex payload is\n{}", hex::encode(&encoded));
+    println!("hex payload is\n{}", hex::encode(encoded));
 }
