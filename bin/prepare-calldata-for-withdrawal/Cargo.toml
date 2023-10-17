@@ -1,0 +1,17 @@
+[package]
+name = "prepare-calldata-for-withdrawal"
+version = "0.1.11"
+authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
+homepage = "https://zksync.io/"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+[dependencies]
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
+tokio = { workspace = true, features = ["full"] }
+client = { workspace = true }
+storage = { workspace = true }
+bincode = { workspace = true }
+hex = { workspace = true }
+ethers = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
