@@ -13,9 +13,9 @@ message: "predicted results for withdrawals: [Result { l_2_block_number: 271910,
 What you want to do is take the same calldata and trace it on `tenderly` to figure
 out what is going on.
 
-This utility allows you to connect to your database and by providing the withdrawal
-id in question it constructs hax-encoded calldata for you as such (note that you need to
-set the relevant gas limit for this withdrawal yourself):
+This utility allows you to connect to your prod database that contains this withdrawal 
+and by providing the withdrawal id in question it constructs hax-encoded
+calldata for you as such (note that you need to set the relevant gas limit for this withdrawal yourself):
 
 ```
 cargo run -- -d $DATABASE_URL -w 2069871 -g 300000 
