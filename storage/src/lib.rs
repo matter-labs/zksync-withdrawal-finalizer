@@ -9,7 +9,10 @@ use ethers::types::{Address, H160, H256};
 use sqlx::{PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
-use client::{zksync_contract::L2ToL1Event, WithdrawalEvent, WithdrawalKey, WithdrawalParams};
+use client::{
+    is_eth, withdrawal_finalizer::codegen::RequestFinalizeWithdrawal, zksync_contract::L2ToL1Event,
+    WithdrawalEvent, WithdrawalKey, WithdrawalParams,
+};
 
 mod error;
 mod metrics;
@@ -805,6 +808,45 @@ pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<
     latency.observe();
 
     Ok(data)
+}
+
+/// Fetch finalization parameters for some withdrawal
+pub async fn get_finalize_withdrawal_params(
+    pool: &PgPool,
+    id: u64,
+    gas: u64,
+) -> Result<Option<RequestFinalizeWithdrawal>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            finalization_data.l2_block_number,
+            l1_batch_number,
+            l2_message_index,
+            l2_tx_number_in_block,
+            message,
+            proof,
+            withdrawals.token
+        FROM
+            finalization_data
+        JOIN withdrawals ON withdrawals.id = finalization_data.withdrawal_id
+        WHERE
+            withdrawal_id = $1
+        ",
+        id as i64
+    )
+    .fetch_optional(pool)
+    .await?
+    .map(|r| RequestFinalizeWithdrawal {
+        l_2_block_number: r.l1_batch_number.into(),
+        l_2_message_index: r.l2_message_index.into(),
+        l_2_tx_number_in_block: r.l2_tx_number_in_block as u16,
+        message: r.message.into(),
+        merkle_proof: bincode::deserialize(&r.proof).unwrap(),
+        is_eth: is_eth(Address::from_slice(&r.token)),
+        gas: gas.into(),
+    });
+
+    Ok(res)
 }
 
 /// Set status of a set of withdrawals in `finalization_data` to finalized
