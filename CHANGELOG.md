@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.57](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.56...v0.1.57) (2023-10-20)
+
+
+### Bug Fixes
+
+* use vise metrics exporter ([#241](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/241)) ([a31a246](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a31a24622fc0bba7107d7e6150ad20a6ee90e683))
+
 ## [0.1.56](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.55...v0.1.56) (2023-10-20)
 
 
