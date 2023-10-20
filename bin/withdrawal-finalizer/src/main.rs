@@ -20,32 +20,26 @@ use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 use chain_events::{BlockEvents, L2EventsListener};
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use tokio::task::JoinHandle;
+use tokio::sync::watch;
+use vise_exporter::MetricsExporter;
 use watcher::Watcher;
 
+use crate::metrics::MAIN_FINALIZER_METRICS;
+
 mod config;
+mod metrics;
 
 const CHANNEL_CAPACITY: usize = 1024 * 16;
 
-fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
-    let builder = {
-        let addr = ([0, 0, 0, 0], 3312);
-        PrometheusBuilder::new().with_http_listener(addr)
-    };
+fn run_vise_exporter() -> Result<watch::Sender<()>> {
+    let (shutdown_sender, mut shutdown_receiver) = watch::channel(());
+    let exporter = MetricsExporter::default().with_graceful_shutdown(async move {
+        shutdown_receiver.changed().await.ok();
+    });
+    let bind_address = "0.0.0.0:3312".parse().unwrap();
+    tokio::spawn(exporter.start(bind_address));
 
-    let (recorder, exporter) = builder.build()?;
-
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set the metrics recorder");
-
-    Ok(tokio::spawn(async move {
-        tokio::pin!(exporter);
-        loop {
-            tokio::select! {
-                _ = &mut exporter => {}
-            }
-        }
-    }))
+    Ok(shutdown_sender)
 }
 
 async fn start_from_l1_block<M1, M2>(
@@ -159,7 +153,7 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
-    let prometheus_exporter_handle = run_prometheus_exporter()?;
+    let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
     // `ethers-rs`. In the logic of reconnections have to happen as long
@@ -240,8 +234,12 @@ async fn main() -> Result<()> {
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
             interval.tick().await;
-            metrics::gauge!("watcher.l1_channel.capacity", blocks_tx.capacity() as f64);
-            metrics::gauge!("watcher.l2_channel.capacity", we_tx.capacity() as f64)
+            MAIN_FINALIZER_METRICS
+                .watcher_l1_channel_capacity
+                .set(blocks_tx.capacity() as i64);
+            MAIN_FINALIZER_METRICS
+                .watcher_l2_channel_capacity
+                .set(we_tx.capacity() as i64);
         }
     });
 
@@ -290,13 +288,12 @@ async fn main() -> Result<()> {
         r = watcher_handle => {
             tracing::error!("Finalizer main loop ended with {r:?}");
         }
-        r = prometheus_exporter_handle => {
-            tracing::error!("Prometheus exporter ended with {r:?}");
-        }
         r = finalizer_handle => {
             tracing::error!("Finalizer ended with {r:?}");
         }
     }
+
+    stop_vise_exporter.send_replace(());
 
     Ok(())
 }
