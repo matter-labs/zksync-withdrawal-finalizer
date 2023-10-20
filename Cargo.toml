@@ -35,9 +35,7 @@ serde_json = "1.0"
 color-eyre = "0.6.2"
 eyre = "0.6.8"
 dotenvy = "0.15.7"
-metrics = "0.21"
 envconfig = "0.10.0"
-metrics-exporter-prometheus = "0.12"
 proc-macro2 = "1.0.69"
 bincode = "1.3.3"
 futures = "0.3.28"
@@ -49,6 +47,7 @@ pretty_assertions = "1"
 sqlx = "0.7"
 chrono = { version = "0.4.31", default-features = false }
 vise = { git = "https://github.com/matter-labs/vise.git" }
+vise-exporter = { git = "https://github.com/matter-labs/vise.git" }
 client = { path = "./client" }
 chain-events = { path = "./chain-events" }
 storage = { path = "./storage" }

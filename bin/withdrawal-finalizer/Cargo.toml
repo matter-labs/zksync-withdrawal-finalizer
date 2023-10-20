@@ -19,6 +19,8 @@ tokio-util = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
 dotenvy = { workspace = true }
 tracing = { workspace = true }
+vise-exporter = { workspace = true }
+vise = { workspace = true }
 
 client = { workspace = true }
 storage = { workspace = true }
@@ -26,5 +28,3 @@ chain-events = { workspace = true }
 vlog = {  workspace = true }
 finalizer = { workspace = true }
 watcher = { workspace = true }
-metrics-exporter-prometheus = { workspace = true }
-metrics =  { workspace = true }
