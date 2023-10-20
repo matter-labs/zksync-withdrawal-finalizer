@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.56](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.55...v0.1.56) (2023-10-20)
+
+
+### Features
+
+* use tracing macros instead of vlog ([#237](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/237)) ([db2763d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/db2763d4934f4585eff63acde723850c20e567f5))
+* use vise as metrics solution ([#236](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/236)) ([768fdf3](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/768fdf374328b2752d8c188559c03b5b27d6d5f3))
+
+
+### Bug Fixes
+
+* **deps:** update rust crate async-trait to 0.1.74 ([#234](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/234)) ([bb2c655](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/bb2c655b24a9e92308a9f111a4ed49513d138ddb))
+* **deps:** update rust crate tracing to 0.1.39 ([#233](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/233)) ([02e9621](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/02e96214752846a43a881ebe4fdf25c5c090e233))
+
 ## [0.1.55](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.54...v0.1.55) (2023-10-13)
 
 
