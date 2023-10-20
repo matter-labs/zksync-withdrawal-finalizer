@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.59](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.58...v0.1.59) (2023-10-20)
+
+
+### Bug Fixes
+
+* correctly track last executed and seen blocks in metrics ([#245](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/245)) ([729d8cb](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/729d8cb8936fc1cfe0ee183f1bf7ed1ca1312735))
+
 ## [0.1.58](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.57...v0.1.58) (2023-10-20)
 
 
