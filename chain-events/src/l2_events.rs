@@ -359,6 +359,8 @@ impl L2EventsListener {
 
         let tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
 
+        tracing::info!("Listeing to events from tokens {tokens:?}");
+
         let past_filter = Filter::new()
             .from_block(from_block)
             .to_block(latest_block)
