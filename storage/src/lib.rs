@@ -723,7 +723,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
     limit_by: u64,
     token_blacklist: &[Address],
 ) -> Result<Vec<WithdrawalParams>> {
-    let whitelist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
+    let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
 
     let data = sqlx::query!(
         "
@@ -764,7 +764,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
           $1
         ",
         limit_by as i64,
-        &whitelist,
+        &blacklist,
     )
     .fetch_all(pool)
     .await?
