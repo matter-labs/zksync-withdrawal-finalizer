@@ -1,0 +1,1 @@
+ALTER TABLE withdrawals ADD finalizable BOOLEAN NOT NULL DEFAULT TRUE;

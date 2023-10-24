@@ -20,7 +20,7 @@ use client::{
 };
 use ethers_log_decode::EthLogDecode;
 
-use crate::{Error, Result, RECONNECT_BACKOFF};
+use crate::{metrics::CHAIN_EVENTS_METRICS, Error, Result, RECONNECT_BACKOFF};
 
 // Total timecap for tx querying retry 10 minutes
 const PENDING_TX_RETRY: usize = 12 * 10;
@@ -59,16 +59,12 @@ impl BlockEvents {
     async fn connect(&self) -> Option<Provider<Ws>> {
         match Provider::<Ws>::connect_with_reconnects(&self.url, 0).await {
             Ok(p) => {
-                metrics::increment_counter!(
-                    "watcher.chain_events.block_events.successful_reconnects"
-                );
+                CHAIN_EVENTS_METRICS.successful_l1_reconnects.inc();
                 Some(p)
             }
             Err(e) => {
-                vlog::warn!("Block events stream reconnect attempt failed: {e}");
-                metrics::increment_counter!(
-                    "watcher.chain_events.block_events.reconnects_on_error"
-                );
+                tracing::warn!("Block events stream reconnect attempt failed: {e}");
+                CHAIN_EVENTS_METRICS.l1_reconnects_on_error.inc();
                 None
             }
         }
@@ -111,7 +107,7 @@ impl BlockEvents {
             .await
             {
                 Err(e) => {
-                    vlog::warn!("Block events worker failed with {e}");
+                    tracing::warn!("Block events worker failed with {e}");
                 }
                 Ok(block) => from_block = block,
             }
@@ -157,7 +153,7 @@ impl BlockEvents {
             .number
             .expect("last block always has a number; qed");
 
-        vlog::info!(
+        tracing::info!(
             "Filtering logs from {} to {}",
             from_block
                 .into()
@@ -197,7 +193,7 @@ impl BlockEvents {
         while let Some(log) = logs.next().await {
             let log = match log {
                 Err(e) => {
-                    vlog::warn!("L1 block events stream ended with {e}");
+                    tracing::warn!("L1 block events stream ended with {e}");
                     break;
                 }
                 Ok(log) => log,
@@ -221,7 +217,7 @@ impl BlockEvents {
             }
         }
 
-        vlog::info!("all event streams have terminated, exiting...");
+        tracing::info!("all event streams have terminated, exiting...");
 
         Ok(last_seen_block)
     }
@@ -276,7 +272,7 @@ where
             )
             .await
             else {
-                vlog::error!("Failed to retreive transaction {:?}", log.transaction_hash);
+                tracing::error!("Failed to retreive transaction {:?}", log.transaction_hash);
                 return Err(Error::NoTransaction);
             };
 
@@ -303,7 +299,7 @@ where
                 .await
                 .map_err(|_| Error::ChannelClosing)?;
 
-            metrics::increment_counter!("watcher.chain_events.block_commit_events");
+            CHAIN_EVENTS_METRICS.block_commit_events.inc();
             sender
                 .send(BlockEvent::BlockCommit {
                     block_number,
@@ -313,7 +309,7 @@ where
                 .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksVerification(event) => {
-            metrics::increment_counter!("watcher.chain_events.block_verification_events");
+            CHAIN_EVENTS_METRICS.block_verification_events.inc();
             sender
                 .send(BlockEvent::BlocksVerification {
                     block_number,
@@ -323,12 +319,12 @@ where
                 .map_err(|_| Error::ChannelClosing)?;
         }
         L1Events::BlocksExecution(event) => {
-            vlog::info!(
+            tracing::info!(
                 "Received a block execution event {event:?} {:?}",
                 log.transaction_hash
             );
 
-            metrics::increment_counter!("watcher.chain_events.block_execution_events");
+            CHAIN_EVENTS_METRICS.block_execution_events.inc();
             sender
                 .send(BlockEvent::BlockExecution {
                     block_number,

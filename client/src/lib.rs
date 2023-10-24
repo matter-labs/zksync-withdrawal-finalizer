@@ -6,9 +6,10 @@
 //! Interactions with zkSync on-chain contracts.
 
 mod error;
+mod metrics;
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::{num::NonZeroUsize, time::Instant};
 
 pub use error::{Error, Result};
 
@@ -40,6 +41,7 @@ pub use zksync_contract::BlockEvent;
 pub use zksync_types::WithdrawalEvent;
 
 use crate::l2bridge::codegen::WithdrawalInitiatedFilter;
+use crate::metrics::CLIENT_METRICS;
 
 /// Eth token address
 pub const ETH_TOKEN_ADDRESS: Address = H160([
@@ -251,12 +253,12 @@ pub trait ZksyncMiddleware: Middleware {
 #[async_trait]
 impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
     async fn get_block_details(&self, block_number: u32) -> Result<Option<BlockDetails>> {
-        let start = Instant::now();
+        let latency = CLIENT_METRICS.call[&"get_block_details"].start();
         let res = self
             .request::<[u32; 1], Option<BlockDetails>>("zks_getBlockDetails", [block_number])
             .await?;
 
-        metrics::histogram!("watcher.zks_client.get_block_details", start.elapsed());
+        latency.observe();
 
         Ok(res)
     }
@@ -266,7 +268,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         tx_hash: H256,
         l2_to_l1_index: Option<u64>,
     ) -> Result<Option<L2ToL1LogProof>> {
-        let start = Instant::now();
+        let latency = CLIENT_METRICS.call[&"get_l2_to_l1_log_proof"].start();
         let params = match l2_to_l1_index {
             Some(idx) => vec![
                 ethers::utils::serialize(&tx_hash),
@@ -276,46 +278,40 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         };
         let res = self.request("zks_getL2ToL1LogProof", params).await?;
 
-        metrics::histogram!("watcher.zks_client.get_log_proof", start.elapsed());
+        latency.observe();
 
         Ok(res)
     }
 
     async fn get_l1_batch_block_range(&self, batch_number: u32) -> Result<Option<(U64, U64)>> {
-        let start = Instant::now();
+        let latency = CLIENT_METRICS.call[&"get_l1_batch_block_range"].start();
         let res = self
             .request::<[u32; 1], Option<(U64, U64)>>("zks_getL1BatchBlockRange", [batch_number])
             .await?;
 
-        metrics::histogram!(
-            "watcher.zks_client.get_l1_batch_block_range",
-            start.elapsed()
-        );
+        latency.observe();
 
         Ok(res)
     }
 
     async fn get_confirmed_tokens(&self, from: u32, limit: u8) -> Result<Vec<Token>> {
-        let start = Instant::now();
+        let latency = CLIENT_METRICS.call[&"get_confirmed_tokens"].start();
         let res = self
             .request::<[u32; 2], Vec<Token>>("zks_getConfirmedTokens", [from, limit as u32])
             .await?;
 
-        metrics::histogram!("watcher.zks_client.get_confirmed_tokens", start.elapsed());
+        latency.observe();
 
         Ok(res)
     }
 
     async fn zks_get_transaction_receipt(&self, tx_hash: H256) -> Result<ZksyncTransactionReceipt> {
-        let start = Instant::now();
+        let latency = CLIENT_METRICS.call[&"get_transaction_receipt"].start();
         let res = self
             .request::<[H256; 1], ZksyncTransactionReceipt>("eth_getTransactionReceipt", [tx_hash])
             .await?;
 
-        metrics::histogram!(
-            "watcher.zks_client.get_transaction_receipt",
-            start.elapsed()
-        );
+        latency.observe();
 
         Ok(res)
     }
@@ -325,6 +321,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         withdrawal_hash: H256,
         index: usize,
     ) -> Result<Option<WithdrawalParams>> {
+        let latency = CLIENT_METRICS.call[&"get_finalize_withdrawal_params"].start();
+
         let receipt = self.zks_get_transaction_receipt(withdrawal_hash).await?;
 
         let withdrawal_log = receipt
@@ -429,6 +427,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .map(|hash| hash.to_fixed_bytes())
             .collect();
 
+        latency.observe();
+
         Ok(Some(WithdrawalParams {
             tx_hash: withdrawal_hash,
             event_index_in_tx: index as u32,
@@ -451,6 +451,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         tx_hash: H256,
         index: usize,
     ) -> Result<Option<(ZKSLog, Option<U64>)>> {
+        let latency = CLIENT_METRICS.call[&"get_withdrawal_log"].start();
+
         let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
         let log = receipt
             .logs
@@ -460,6 +462,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
                     && entry.topics[0] == L1MessageSentFilter::signature()
             })
             .nth(index);
+
+        latency.observe();
 
         let log = match log {
             Some(log) => log,
@@ -474,6 +478,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         tx_hash: H256,
         index: usize,
     ) -> Result<Option<(L2ToL1Log, Option<U64>)>> {
+        let latency = CLIENT_METRICS.call[&"get_withdrawal_l2_to_l1_log"].start();
+
         let receipt = self.zks_get_transaction_receipt(tx_hash).await?;
 
         let log = receipt
@@ -481,6 +487,8 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .into_iter()
             .filter(|entry| entry.sender == L1_MESSENGER_ADDRESS)
             .nth(index);
+
+        latency.observe();
 
         let log = match log {
             Some(log) => log,

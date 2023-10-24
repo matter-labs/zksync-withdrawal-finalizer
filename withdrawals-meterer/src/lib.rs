@@ -12,12 +12,17 @@ use ethers::types::Address;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 
+use crate::metrics::WM_METRICS;
+
+mod metrics;
+pub use metrics::MeteringComponent;
+
 /// State of withdrawals volumes metering.
 pub struct WithdrawalsMeter {
     pool: PgPool,
     /// A mapping from L2 address to L1 address and decimals of token.
     tokens: HashMap<Address, (u32, Address)>,
-    component_name: &'static str,
+    metering_component: MeteringComponent,
 }
 
 impl WithdrawalsMeter {
@@ -28,17 +33,17 @@ impl WithdrawalsMeter {
     /// * `pool`: DB connection pool
     /// * `component_name`: Name of the component that does metering, metric names will be
     ///    derived from it
-    pub fn new(pool: PgPool, component_name: &'static str) -> Self {
+    pub fn new(pool: PgPool, metering_component: MeteringComponent) -> Self {
         let mut token_decimals = HashMap::new();
 
         token_decimals.insert(ETH_TOKEN_ADDRESS, (18_u32, ETH_ADDRESS));
 
-        metrics::increment_gauge!(format!("{component_name}_token_decimals_stored"), 1.0);
+        WM_METRICS.token_decimals_stored[&metering_component].inc_by(1);
 
         Self {
             pool,
             tokens: token_decimals,
-            component_name,
+            metering_component,
         }
     }
 
@@ -67,16 +72,16 @@ impl WithdrawalsMeter {
                     let Some((decimals, address)) =
                         storage::token_decimals_and_l1_address(&self.pool, w.event.token).await?
                     else {
-                        vlog::error!("Received withdrawal from unknown token {:?}", w.event.token);
+                        tracing::error!(
+                            "Received withdrawal from unknown token {:?}",
+                            w.event.token
+                        );
                         continue;
                     };
 
                     self.tokens.insert(w.event.token, (decimals, address));
 
-                    metrics::increment_gauge!(
-                        format!("{}_token_decimals_stored", self.component_name),
-                        1.0
-                    );
+                    WM_METRICS.token_decimals_stored[&self.metering_component].inc_by(1);
 
                     (decimals, address)
                 }
@@ -86,7 +91,7 @@ impl WithdrawalsMeter {
             let formatted = match ethers::utils::format_units(w.event.amount, decimals) {
                 Ok(f) => f,
                 Err(e) => {
-                    vlog::error!("failed to format units: {e}");
+                    tracing::error!("failed to format units: {e}");
                     continue;
                 }
             };
@@ -94,16 +99,13 @@ impl WithdrawalsMeter {
             let formatted_f64 = match f64::from_str(&formatted) {
                 Ok(f) => f,
                 Err(e) => {
-                    vlog::error!("failed to format units: {e}");
+                    tracing::error!("failed to format units: {e}");
                     continue;
                 }
             };
 
-            metrics::increment_gauge!(
-                format!("{}_withdrawals", self.component_name),
-                formatted_f64,
-                "token" => format!("{:?}", l1_token_address)
-            )
+            WM_METRICS.withdrawals[&(self.metering_component, format!("{:?}", l1_token_address))]
+                .inc_by(formatted_f64);
         }
 
         Ok(())

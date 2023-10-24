@@ -20,32 +20,26 @@ use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 use chain_events::{BlockEvents, L2EventsListener};
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use tokio::task::JoinHandle;
+use tokio::sync::watch;
+use vise_exporter::MetricsExporter;
 use watcher::Watcher;
 
+use crate::metrics::MAIN_FINALIZER_METRICS;
+
 mod config;
+mod metrics;
 
 const CHANNEL_CAPACITY: usize = 1024 * 16;
 
-fn run_prometheus_exporter() -> Result<JoinHandle<()>> {
-    let builder = {
-        let addr = ([0, 0, 0, 0], 3312);
-        PrometheusBuilder::new().with_http_listener(addr)
-    };
+fn run_vise_exporter() -> Result<watch::Sender<()>> {
+    let (shutdown_sender, mut shutdown_receiver) = watch::channel(());
+    let exporter = MetricsExporter::default().with_graceful_shutdown(async move {
+        shutdown_receiver.changed().await.ok();
+    });
+    let bind_address = "0.0.0.0:3312".parse().unwrap();
+    tokio::spawn(exporter.start(bind_address));
 
-    let (recorder, exporter) = builder.build()?;
-
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("failed to set the metrics recorder");
-
-    Ok(tokio::spawn(async move {
-        tokio::pin!(exporter);
-        loop {
-            tokio::select! {
-                _ = &mut exporter => {}
-            }
-        }
-    }))
+    Ok(shutdown_sender)
 }
 
 async fn start_from_l1_block<M1, M2>(
@@ -66,14 +60,14 @@ where
         (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
         (b1, b2) => {
             if b1.is_none() {
-                vlog::info!(concat!(
+                tracing::info!(concat!(
                     "information about l2 to l1 events is missing, ",
                     "starting from L1 block corresponding to L2 block 1"
                 ));
             }
 
             if b2.is_none() {
-                vlog::info!(concat!(
+                tracing::info!(concat!(
                     "information about last block seen is missing, ",
                     "starting from L1 block corresponding to L2 block 1"
                 ));
@@ -149,17 +143,17 @@ async fn main() -> Result<()> {
     let sentry_guard = vlog::init();
 
     if sentry_guard.is_some() {
-        vlog::info!(
+        tracing::info!(
             "Starting Sentry url: {}, l1_network: {}, l2_network {}",
             std::env::var("MISC_SENTRY_URL").unwrap(),
             std::env::var("CHAIN_ETH_NETWORK").unwrap(),
             std::env::var("CHAIN_ETH_ZKSYNC_NETWORK").unwrap(),
         );
     } else {
-        vlog::info!("No sentry url configured");
+        tracing::info!("No sentry url configured");
     }
 
-    let prometheus_exporter_handle = run_prometheus_exporter()?;
+    let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
     // `ethers-rs`. In the logic of reconnections have to happen as long
@@ -191,7 +185,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    vlog::info!("Starting from L2 block number {from_l2_block}");
+    tracing::info!("Starting from L2 block number {from_l2_block}");
 
     let (we_tx, we_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
@@ -205,7 +199,7 @@ async fn main() -> Result<()> {
     )
     .await?;
 
-    vlog::info!("Starting from L1 block number {from_l1_block}");
+    tracing::info!("Starting from L1 block number {from_l1_block}");
 
     let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
@@ -240,8 +234,12 @@ async fn main() -> Result<()> {
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
             interval.tick().await;
-            metrics::gauge!("watcher.l1_channel.capacity", blocks_tx.capacity() as f64);
-            metrics::gauge!("watcher.l2_channel.capacity", we_tx.capacity() as f64)
+            MAIN_FINALIZER_METRICS
+                .watcher_l1_channel_capacity
+                .set(blocks_tx.capacity() as i64);
+            MAIN_FINALIZER_METRICS
+                .watcher_l2_channel_capacity
+                .set(we_tx.capacity() as i64);
         }
     });
 
@@ -262,7 +260,7 @@ async fn main() -> Result<()> {
     let batch_finalization_gas_limit = U256::from_dec_str(&config.batch_finalization_gas_limit)?;
     let one_withdrawal_gas_limit = U256::from_dec_str(&config.one_withdrawal_gas_limit)?;
 
-    vlog::info!(
+    tracing::info!(
         "finalization gas limits one: {}, batch: {}",
         config.one_withdrawal_gas_limit,
         config.batch_finalization_gas_limit,
@@ -286,21 +284,20 @@ async fn main() -> Result<()> {
 
     tokio::select! {
         r = block_events_handle => {
-            vlog::error!("Block Events stream ended with {r:?}");
+            tracing::error!("Block Events stream ended with {r:?}");
         }
         r = withdrawal_events_handle => {
-            vlog::error!("Withdrawals Events stream ended with {r:?}");
+            tracing::error!("Withdrawals Events stream ended with {r:?}");
         }
         r = watcher_handle => {
-            vlog::error!("Finalizer main loop ended with {r:?}");
-        }
-        r = prometheus_exporter_handle => {
-            vlog::error!("Prometheus exporter ended with {r:?}");
+            tracing::error!("Finalizer main loop ended with {r:?}");
         }
         r = finalizer_handle => {
-            vlog::error!("Finalizer ended with {r:?}");
+            tracing::error!("Finalizer ended with {r:?}");
         }
     }
+
+    stop_vise_exporter.send_replace(());
 
     Ok(())
 }

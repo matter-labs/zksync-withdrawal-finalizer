@@ -11,7 +11,11 @@ use storage::StoredWithdrawal;
 use tokio::pin;
 
 use client::{zksync_contract::L2ToL1Event, BlockEvent, WithdrawalEvent, ZksyncMiddleware};
-use withdrawals_meterer::WithdrawalsMeter;
+use withdrawals_meterer::{MeteringComponent, WithdrawalsMeter};
+
+use crate::metrics::WATCHER_METRICS;
+
+mod metrics;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -40,10 +44,8 @@ where
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
-        let withdrawals_meterer = withdrawals_meterer::WithdrawalsMeter::new(
-            pgpool.clone(),
-            "era_withdrawal_finalizer_watcher_meter",
-        );
+        let withdrawals_meterer =
+            WithdrawalsMeter::new(pgpool.clone(), MeteringComponent::RequestedWithdrawals);
 
         Self {
             l2_provider,
@@ -102,11 +104,11 @@ where
         pin!(l2_loop_handler);
         tokio::select! {
             l1 = l1_loop_handler => {
-                vlog::error!("watcher l1 loop ended with {l1:?}");
+                tracing::error!("watcher l1 loop ended with {l1:?}");
                 l1.unwrap()?;
             }
             l2 = l2_loop_handler => {
-                vlog::error!("watcher l2 loop ended with {l2:?}");
+                tracing::error!("watcher l2 loop ended with {l2:?}");
                 l2.unwrap()?;
             }
         }
@@ -152,7 +154,7 @@ impl BlockRangesParams {
             } => {
                 storage::committed_new_batch(pool, range_begin, range_end, block_number).await?;
 
-                vlog::info!(
+                tracing::info!(
                     "Changed withdrawals status to committed for range {range_begin}-{range_end}"
                 );
             }
@@ -162,7 +164,7 @@ impl BlockRangesParams {
                 block_number,
             } => {
                 storage::verified_new_batch(pool, range_begin, range_end, block_number).await?;
-                vlog::info!(
+                tracing::info!(
                     "Changed withdrawals status to verified for range {range_begin}-{range_end}"
                 );
             }
@@ -173,7 +175,7 @@ impl BlockRangesParams {
             } => {
                 storage::executed_new_batch(pool, range_begin, range_end, block_number).await?;
 
-                vlog::info!(
+                tracing::info!(
                     "Changed withdrawals status to executed for range {range_begin}-{range_end}"
                 );
             }
@@ -201,7 +203,9 @@ where
                 .get_l1_batch_block_range(event.block_number.as_u64() as u32)
                 .await?
             {
-                metrics::gauge!("watcher.l2_last_committed_block", range_end.as_u64() as f64);
+                WATCHER_METRICS
+                    .l2_last_committed_block
+                    .set(range_end.as_u64() as i64);
                 Ok(Some(BlockRangesParams::Commit {
                     range_begin: range_begin.as_u64(),
                     range_end: range_end.as_u64(),
@@ -228,14 +232,16 @@ where
                 .map(|range| range.1.as_u64());
 
             if let (Some(range_begin), Some(range_end)) = (range_begin, range_end) {
-                metrics::gauge!("watcher.l2_last_verified_block", range_end as f64);
+                WATCHER_METRICS.l2_last_verified_block.set(range_end as i64);
                 Ok(Some(BlockRangesParams::Verify {
                     range_begin,
                     range_end,
                     block_number,
                 }))
             } else {
-                vlog::warn!("One of the verified ranges not found: {range_begin:?}, {range_end:?}");
+                tracing::warn!(
+                    "One of the verified ranges not found: {range_begin:?}, {range_end:?}"
+                );
                 Ok(None)
             }
         }
@@ -247,7 +253,9 @@ where
                 .get_l1_batch_block_range(event.block_number.as_u64() as u32)
                 .await?
             {
-                metrics::gauge!("watcher.l2_last_executed_block", range_end.as_u64() as f64);
+                WATCHER_METRICS
+                    .l2_last_executed_block
+                    .set(range_end.as_u64() as i64);
                 Ok(Some(BlockRangesParams::Execute {
                     range_begin: range_begin.as_u64(),
                     range_end: range_end.as_u64(),
@@ -299,8 +307,10 @@ async fn process_withdrawals_in_block(
 
     for (_tx_hash, group) in group_by.into_iter() {
         for (index, event) in group.into_iter().enumerate() {
-            metrics::gauge!("watcher.l2_last_seen_block", event.block_number as f64);
-            vlog::info!("withdrawal {event:?} index in transaction is {index}");
+            WATCHER_METRICS
+                .l2_last_seen_block
+                .set(event.block_number as i64);
+            tracing::info!("withdrawal {event:?} index in transaction is {index}");
 
             withdrawals_vec.push((event, index));
         }
@@ -319,7 +329,7 @@ async fn process_withdrawals_in_block(
         .meter_withdrawals(&stored_withdrawals)
         .await
     {
-        vlog::error!("Failed to meter requested withdrawals: {e}");
+        tracing::error!("Failed to meter requested withdrawals: {e}");
     }
 
     storage::add_withdrawals(pool, &stored_withdrawals).await?;
@@ -339,11 +349,11 @@ where
     let batch_size = 1024;
 
     while let Some(event) = be.next().await {
-        vlog::debug!("block event {event}");
+        tracing::debug!("block event {event}");
         block_event_batch.push(event);
 
         if block_event_batch.len() >= batch_size || batch_begin.elapsed() > batch_backoff {
-            vlog::debug!("processing batch of l1 events {}", block_event_batch.len());
+            tracing::debug!("processing batch of l1 events {}", block_event_batch.len());
 
             process_block_events(
                 &pool,
@@ -375,7 +385,7 @@ where
     while let Some(event) = we.next().await {
         match event {
             L2Event::Withdrawal(event) => {
-                vlog::info!("received withdrawal event {event:?}");
+                tracing::info!("received withdrawal event {event:?}");
                 if event.block_number > curr_l2_block_number {
                     process_withdrawals_in_block(
                         &pool,
@@ -388,7 +398,7 @@ where
                 in_block_events.push(event);
             }
             L2Event::L2TokenInitEvent(event) => {
-                vlog::debug!("l2 token init event {event:?}");
+                tracing::debug!("l2 token init event {event:?}");
                 storage::add_token(&pool, &event).await?;
             }
             L2Event::RestartedFromBlock(_block_number) => {
