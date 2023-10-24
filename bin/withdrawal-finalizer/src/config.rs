@@ -1,7 +1,21 @@
+use std::str::FromStr;
+
 use envconfig::Envconfig;
 use ethers::types::Address;
 use serde::Deserialize;
 use url::Url;
+
+#[derive(Deserialize, Debug)]
+pub struct TokenList(pub Vec<Address>);
+
+impl FromStr for TokenList {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let res = serde_json::from_str(s)?;
+        Ok(TokenList(res))
+    }
+}
 
 /// Withdrawal finalizer configuration.
 ///
@@ -62,4 +76,10 @@ pub struct Config {
 
     #[envconfig(from = "TX_RETRY_TIMEOUT_SECS")]
     pub tx_retry_timeout: usize,
+
+    #[envconfig(from = "TOKEN_WHITELIST")]
+    pub token_whitelist: Option<TokenList>,
+
+    #[envconfig(from = "TOKEN_BLACKLIST")]
+    pub token_blacklist: Option<TokenList>,
 }
