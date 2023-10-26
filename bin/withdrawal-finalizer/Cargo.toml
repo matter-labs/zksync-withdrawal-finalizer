@@ -10,7 +10,6 @@ edition = "2021"
 color-eyre = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["ws", "rustls"] }
 serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 url = { workspace = true, features = ["serde"] }
 eyre = { workspace = true }
@@ -29,3 +28,4 @@ chain-events = { workspace = true }
 vlog = {  workspace = true }
 finalizer = { workspace = true }
 watcher = { workspace = true }
+
