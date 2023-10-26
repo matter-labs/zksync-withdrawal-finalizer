@@ -5,7 +5,7 @@
 
 //! Finalization logic implementation.
 
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, str::FromStr, time::Duration};
 
 use accumulator::WithdrawalsAccumulator;
 use ethers::{
@@ -14,6 +14,7 @@ use ethers::{
     types::{H256, U256},
 };
 use futures::TryFutureExt;
+use serde::Deserialize;
 use sqlx::PgPool;
 
 use client::{
@@ -35,33 +36,6 @@ mod accumulator;
 mod error;
 mod metrics;
 
-/// A configuration of a blacklist or whitelist policy for finalizing tokens
-pub enum TokensRestrictions {
-    /// Only finalize the whitelisted tokens
-    WhiteList(Vec<Address>),
-
-    /// Finalize all tokens except for this blacklist
-    BlackList(Vec<Address>),
-}
-
-impl TokensRestrictions {
-    /// Create new token restrictions set.
-    pub fn new(
-        token_whitelist: Option<Vec<Address>>,
-        token_blacklist: Option<Vec<Address>>,
-    ) -> Option<Self> {
-        if let Some(whitelist) = token_whitelist {
-            return Some(Self::WhiteList(whitelist.to_vec()));
-        }
-
-        if let Some(blacklist) = token_blacklist {
-            return Some(Self::BlackList(blacklist.to_vec()));
-        }
-
-        None
-    }
-}
-
 /// A limit to cap a transaction fee (in ether) for safety reasons.
 const TX_FEE_LIMIT: f64 = 0.8;
 
@@ -70,6 +44,34 @@ const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 
 /// Backoff period if one of the loop iterations has failed.
 const LOOP_ITERATION_ERROR_BACKOFF: Duration = Duration::from_secs(5);
+
+/// An `enum` that defines a set of tokens that Finalizer finalizes.
+#[derive(Deserialize, Debug, Eq, PartialEq)]
+pub enum TokenList {
+    /// Finalize all known tokens
+    All,
+    /// Finalize nothing
+    None,
+    /// Finalize everything but these tokens, this is a blacklist.
+    BlackList(Vec<Address>),
+    /// Finalize nothing but these tokens, this is a whitelist.
+    WhiteList(Vec<Address>),
+}
+
+impl Default for TokenList {
+    fn default() -> Self {
+        Self::WhiteList(vec![client::ETH_TOKEN_ADDRESS])
+    }
+}
+
+impl FromStr for TokenList {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let res = serde_json::from_str(s)?;
+        Ok(res)
+    }
+}
 
 /// Finalizer.
 pub struct Finalizer<M1, M2> {
@@ -87,7 +89,7 @@ pub struct Finalizer<M1, M2> {
     tx_retry_timeout: Duration,
     account_address: Address,
     withdrawals_meterer: WithdrawalsMeter,
-    token_restrictions: Option<TokensRestrictions>,
+    token_list: TokenList,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -115,7 +117,7 @@ where
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
         account_address: Address,
-        token_restrictions: Option<TokensRestrictions>,
+        token_list: TokenList,
     ) -> Self {
         let withdrawals_meterer =
             WithdrawalsMeter::new(pgpool.clone(), MeteringComponent::FinalizedWithdrawals);
@@ -136,7 +138,7 @@ where
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
             withdrawals_meterer,
-            token_restrictions,
+            token_list,
         }
     }
 
@@ -318,12 +320,12 @@ where
     async fn loop_iteration(&mut self) -> Result<()> {
         tracing::debug!("begin iteration of the finalizer loop");
 
-        let try_finalize_these = match &self.token_restrictions {
-            None => {
+        let try_finalize_these = match &self.token_list {
+            TokenList::All => {
                 storage::withdrawals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
                     .await?
             }
-            Some(TokensRestrictions::WhiteList(w)) => {
+            TokenList::WhiteList(w) => {
                 storage::withdrawals_to_finalize_with_whitelist(
                     &self.pgpool,
                     self.query_db_pagination_limit,
@@ -331,7 +333,7 @@ where
                 )
                 .await?
             }
-            Some(TokensRestrictions::BlackList(b)) => {
+            TokenList::BlackList(b) => {
                 storage::withdrawals_to_finalize_with_blacklist(
                     &self.pgpool,
                     self.query_db_pagination_limit,
@@ -339,6 +341,7 @@ where
                 )
                 .await?
             }
+            TokenList::None => return Ok(()),
         };
 
         tracing::debug!("trying to finalize these {try_finalize_these:?}");
@@ -607,4 +610,50 @@ where
     storage::finalization_data_set_finalized_in_tx(pool, &already_finalized, H256::zero()).await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TokenList;
+    use ethers::abi::Address;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn tokens_list_de() {
+        let all = "\"All\"";
+
+        let none = "\"None\"";
+
+        let all: TokenList = serde_json::from_str(all).unwrap();
+        assert_eq!(all, TokenList::All);
+
+        let none: TokenList = serde_json::from_str(none).unwrap();
+        assert_eq!(none, TokenList::None);
+
+        let black = r#"
+            {
+                "BlackList":[
+                    "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"
+                ]
+            }
+        "#;
+
+        let usdc_addr: Address = "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"
+            .parse()
+            .unwrap();
+
+        let blocked_usdc: TokenList = serde_json::from_str(black).unwrap();
+        assert_eq!(blocked_usdc, TokenList::BlackList(vec![usdc_addr]));
+
+        let white = r#"
+            {
+                "WhiteList":[
+                    "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"
+                ]
+            }
+        "#;
+
+        let allowed_usdc: TokenList = serde_json::from_str(white).unwrap();
+        assert_eq!(allowed_usdc, TokenList::WhiteList(vec![usdc_addr]));
+    }
 }

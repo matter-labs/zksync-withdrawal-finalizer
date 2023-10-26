@@ -51,12 +51,25 @@ Deployment is done by deploying a dockerized image of the service.
 | `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalizastion of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
 | `TX_RETRY_TIMEOUT_SECS` | Number of seconds to wait for a potentially stuck finalization transaction before readjusting its fees |
+| `TOKENS_TO_FINALIZE` | Configures the sets of tokens this instance of finalizer will finalize. It may be configured as a whitelist, a blacklist, a wildcard or completely disable any finalization. For more info see below. |
 
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 
 ** more about zkSync contracts can be found [here](https://github.com/matter-labs/era-contracts/blob/main/docs/Overview.md)
 
+## Configuring Tokens to finalize.
 
+It may be handy to limit a set of tokens the Finalizer is finalizing. This
+configuration may be specified by setting a rule in the `TOKENS_TO_FINALIZE` value.
+If this enviromnent variable is not set then by default Finalizer will only finalize
+ETH token (`0x000...0800a`).
+
+You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
+
+1. `TOKENS_TO_FINALIZE = '"All"'` - Finalize everything
+1. `TOKENS_TO_FINALIZE = '"None"'` - Finalize nothing
+1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize only these tokens
+1. `TOKENS_TO_FINALIZE = '{ "BlackList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize all tokens but these
 
 ## License
 
