@@ -68,7 +68,7 @@ You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
 
 1. `TOKENS_TO_FINALIZE = '"All"'` - Finalize everything
 1. `TOKENS_TO_FINALIZE = '"None"'` - Finalize nothing
-1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize ony these tokens
+1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize only these tokens
 1. `TOKENS_TO_FINALIZE = '{ "BlackList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize all tokens but these
 
 ## License
