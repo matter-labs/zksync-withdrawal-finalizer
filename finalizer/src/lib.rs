@@ -45,14 +45,14 @@ const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 /// Backoff period if one of the loop iterations has failed.
 const LOOP_ITERATION_ERROR_BACKOFF: Duration = Duration::from_secs(5);
 
-/// An enum that defines a set of tokens that Finalizer finalizes.
+/// An `enum` that defines a set of tokens that Finalizer finalizes.
 #[derive(Deserialize, Debug, Eq, PartialEq)]
 pub enum TokenList {
     /// Finalize all known tokens
     All,
-    /// Finalize nonthing
+    /// Finalize nothing
     None,
-    /// Fainalize everything but these tokens, this is a blacklist.
+    /// Finalize everything but these tokens, this is a blacklist.
     BlackList(Vec<Address>),
     /// Finalize nothing but these tokens, this is a whitelist.
     WhiteList(Vec<Address>),
