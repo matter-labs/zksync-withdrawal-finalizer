@@ -1,3 +1,15 @@
 {
-  ".": "0.1.59"
+  "bin/withdrawal-finalizer": "0.1.59",
+  "bin/delete-db-content-migration": "0.1.59",
+  "bin/delete-finalization-data-migration": "0.1.59",
+  "bin/prepare-calldata-for-withdrawal": "0.1.59",
+  "chain-events": "0.1.59",
+  "client": "0.1.59",
+  "ethers-log-decode": "0.1.59",
+  "finalizer": "0.1.59",
+  "storage": "0.1.59",
+  "tx-sender": "0.1.59",
+  "watcher": "0.1.59",
+  "withdrawals-meterer": "0.1.59",
+  "vlog": "0.1.0"
 }
