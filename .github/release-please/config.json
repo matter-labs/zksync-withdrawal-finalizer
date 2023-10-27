@@ -19,6 +19,6 @@
         "tx-sender": {},
         "vlog": {},
         "watcher": {},
-        "withdrawals-meterer": {},
+        "withdrawals-meterer": {}
     }
 }
