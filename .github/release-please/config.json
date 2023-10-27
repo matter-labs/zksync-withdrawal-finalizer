@@ -7,6 +7,6 @@
     "bump-patch-for-minor-pre-major": true,
     "last-release-sha": "6883ba6efd565ea389e4e1b677d702032ffb0f41",
     "packages": {
-        ".": {}
+      "bin/withdrawal-finalizer": {}
     }
 }
