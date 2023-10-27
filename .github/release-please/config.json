@@ -5,7 +5,7 @@
     "release-type": "rust",
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
-    "last-release-sha": "4064f79d4b01ceadbae2a4c6b4cb19aa840a868d",
+    "last-release-sha": "6883ba6efd565ea389e4e1b677d702032ffb0f41",
     "packages": {
         "bin/delete-db-content-migration": {},
         "bin/delete-finalization-data-migration": {},
