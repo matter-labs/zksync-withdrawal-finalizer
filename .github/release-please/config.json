@@ -4,7 +4,6 @@
     ],
     "changelog-path": "CHANGELOG.md",
     "release-type": "rust",
-    "relaese-as": "0.2.0",
     "last-release-sha": "6883ba6efd565ea389e4e1b677d702032ffb0f41",
     "packages": {
        "bin/delete-db-content-migration": {},
