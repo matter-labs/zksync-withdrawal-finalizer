@@ -1,15 +1,15 @@
 {
-  "bin/withdrawal-finalizer": "0.1.59",
-  "bin/delete-db-content-migration": "0.1.59",
-  "bin/delete-finalization-data-migration": "0.1.59",
-  "bin/prepare-calldata-for-withdrawal": "0.1.59",
+  "bin/withdrawal-finalizer": "0.2.0",
+  "bin/delete-db-content-migration": "0.1.60",
+  "bin/delete-finalization-data-migration": "0.1.60",
+  "bin/prepare-calldata-for-withdrawal": "0.1.60",
   "chain-events": "0.1.59",
   "client": "0.1.59",
   "ethers-log-decode": "0.1.59",
-  "finalizer": "0.1.59",
-  "storage": "0.1.59",
+  "finalizer": "0.2.0",
+  "storage": "0.2.0",
   "tx-sender": "0.1.59",
-  "watcher": "0.1.59",
-  "withdrawals-meterer": "0.1.59",
+  "watcher": "0.1.60",
+  "withdrawals-meterer": "0.1.60",
   "vlog": "1.0.0"
 }
