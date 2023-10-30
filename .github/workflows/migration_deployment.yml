@@ -16,7 +16,7 @@ jobs:
   deployment:
     name: Perform migration
     environment: production
-    runs-on: ["self-hosted", "matterlabs-deployer-32-128-mainnet2"]
+    runs-on: ["matterlabs-deployer-32-128-mainnet2"]
     timeout-minutes: 1800
     container:
       image: matterlabs/zk-environment:latest2.0
