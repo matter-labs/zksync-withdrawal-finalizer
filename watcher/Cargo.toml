@@ -11,7 +11,7 @@ itertools = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["macros", "time"] }
 tracing = { workspace = true }
 vise = { workspace = true }
 ethers = { workspace = true }
