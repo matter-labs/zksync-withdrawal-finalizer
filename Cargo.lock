@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "delete-db-content-migration"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "color-eyre",
  "dotenvy",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "delete-finalization-data-migration"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "color-eyre",
  "dotenvy",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "finalizer"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "client",
  "ethers",
@@ -2810,7 +2810,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "prepare-calldata-for-withdrawal"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "bincode",
  "clap",
@@ -3950,7 +3950,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "storage"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "bincode",
  "chain-events",
@@ -4714,7 +4714,7 @@ checksum = "ca6ad05a4870b2bf5fe995117d3728437bd27d7cd5f06f13c17443ef369775a1"
 
 [[package]]
 name = "watcher"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "chain-events",
  "client",
@@ -4916,7 +4916,7 @@ dependencies = [
 
 [[package]]
 name = "withdrawal-finalizer"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "chain-events",
  "client",
@@ -4942,7 +4942,7 @@ dependencies = [
 
 [[package]]
 name = "withdrawals-meterer"
-version = "0.1.59"
+version = "0.1.60"
 dependencies = [
  "client",
  "ethers",
