@@ -124,6 +124,8 @@ where
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
+        tracing::info!("finalizing tokens {token_list:?}");
+
         Self {
             pgpool,
             one_withdrawal_gas_limit,
