@@ -2,7 +2,7 @@
     "last-release-sha": "bc0a34bc175459e5662c7ab86e92e1e1db89f255",
     "packages": {
       ".": {
-        "release-type": "rust"
+        "release-type": "simple"
       }
     }
 }
