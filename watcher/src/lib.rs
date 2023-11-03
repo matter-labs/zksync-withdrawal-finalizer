@@ -266,7 +266,8 @@ where
             }
         }
         BlockEvent::BlocksRevert { .. } => {
-            tracing::error!("Received a blocks revert event: {event:?}")
+            tracing::error!("Received a blocks revert event: {event:?}");
+            Ok(None)
         }
         BlockEvent::L2ToL1Events { events } => Ok(Some(BlockRangesParams::L2ToL1Events { events })),
     }
