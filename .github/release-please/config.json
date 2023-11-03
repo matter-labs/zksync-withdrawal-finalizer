@@ -1,23 +1,8 @@
 {
-    "plugins": [
-        "cargo-workspace"
-    ],
-    "changelog-path": "CHANGELOG.md",
-    "release-type": "rust",
-    "last-release-sha": "6883ba6efd565ea389e4e1b677d702032ffb0f41",
+    "last-release-sha": "bc0a34bc175459e5662c7ab86e92e1e1db89f255",
     "packages": {
-       "bin/delete-db-content-migration": {},
-        "bin/delete-finalization-data-migration": {},
-        "bin/prepare-calldata-for-withdrawal": {},
-        "bin/withdrawal-finalizer": {},
-        "chain-events": {},
-        "client": {},
-        "ethers-log-decode": {},
-        "finalizer": {},
-        "storage": {},
-        "tx-sender": {},
-        "vlog": {},
-        "watcher": {},
-        "withdrawals-meterer": {}
+      ".": {
+        "release-type": "rust"
+      }
     }
 }
