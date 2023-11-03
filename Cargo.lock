@@ -452,7 +452,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chain-events"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "client",
  "ethers",
@@ -529,7 +529,7 @@ checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
 name = "client"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "auto_impl",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "delete-db-content-migration"
-version = "0.1.60"
+version = "0.2.0"
 dependencies = [
  "color-eyre",
  "dotenvy",
@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "delete-finalization-data-migration"
-version = "0.1.60"
+version = "0.2.0"
 dependencies = [
  "color-eyre",
  "dotenvy",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "ethers-log-decode"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "ethers",
  "proc-macro2",
@@ -2810,7 +2810,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "prepare-calldata-for-withdrawal"
-version = "0.1.60"
+version = "0.2.0"
 dependencies = [
  "bincode",
  "clap",
@@ -4417,7 +4417,7 @@ dependencies = [
 
 [[package]]
 name = "tx-sender"
-version = "0.1.59"
+version = "0.2.0"
 dependencies = [
  "ethers",
  "pretty_assertions",
@@ -4612,7 +4612,7 @@ dependencies = [
 
 [[package]]
 name = "vlog"
-version = "1.0.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "sentry",
@@ -4714,7 +4714,7 @@ checksum = "ca6ad05a4870b2bf5fe995117d3728437bd27d7cd5f06f13c17443ef369775a1"
 
 [[package]]
 name = "watcher"
-version = "0.1.60"
+version = "0.2.0"
 dependencies = [
  "chain-events",
  "client",
@@ -4942,7 +4942,7 @@ dependencies = [
 
 [[package]]
 name = "withdrawals-meterer"
-version = "0.1.60"
+version = "0.2.0"
 dependencies = [
  "client",
  "ethers",
