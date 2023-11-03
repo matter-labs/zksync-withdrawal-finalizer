@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.0...v0.2.1) (2023-11-03)
+
+
+### Bug Fixes
+
+* nop line rearrange ([#268](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/268)) ([6d99d9a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/6d99d9ae72403ac51cb44a6a235ceebdf294c98d))
+
 ## [0.1.59](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.58...v0.1.59) (2023-10-20)
 
 
