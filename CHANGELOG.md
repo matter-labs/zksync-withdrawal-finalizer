@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.1...v0.2.2) (2023-11-03)
+
+
+### Bug Fixes
+
+* adds logging of tokens lists'  ([#271](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/271)) ([e11c8e8](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/e11c8e8786e766bd3f0ead6dcb32e1a8ff79fa74))
+
 ## [0.2.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.0...v0.2.1) (2023-11-03)
 
 
