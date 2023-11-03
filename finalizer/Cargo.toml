@@ -11,7 +11,7 @@ ethers = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 vise = { workspace = true }
 serde = { workspace = true }
