@@ -138,9 +138,9 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     dotenvy::dotenv().ok();
-    let config = Config::init_from_env()?;
-
     let sentry_guard = vlog::init();
+
+    let config = Config::init_from_env()?;
 
     if sentry_guard.is_some() {
         tracing::info!(
@@ -275,6 +275,7 @@ async fn main() -> Result<()> {
         l1_bridge,
         config.tx_retry_timeout,
         finalizer_account_address,
+        config.tokens_to_finalize.unwrap_or_default(),
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 

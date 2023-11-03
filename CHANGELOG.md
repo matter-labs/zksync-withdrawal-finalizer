@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.0...v0.2.1) (2023-11-03)
+
+
+### Bug Fixes
+
+* nop line rearrange ([#268](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/268)) ([6d99d9a](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/6d99d9ae72403ac51cb44a6a235ceebdf294c98d))
+
+## [0.1.59](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.58...v0.1.59) (2023-10-20)
+
+
+### Bug Fixes
+
+* correctly track last executed and seen blocks in metrics ([#245](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/245)) ([729d8cb](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/729d8cb8936fc1cfe0ee183f1bf7ed1ca1312735))
+
+## [0.1.58](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.57...v0.1.58) (2023-10-20)
+
+
+### Bug Fixes
+
+* adds logging sets of tokens ([#243](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/243)) ([5782ce7](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5782ce76f722b7f15141fcf61e403cba5e4170cb))
+
 ## [0.1.57](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.56...v0.1.57) (2023-10-20)
 
 

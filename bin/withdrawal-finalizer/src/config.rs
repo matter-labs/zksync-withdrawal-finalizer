@@ -1,5 +1,6 @@
 use envconfig::Envconfig;
 use ethers::types::Address;
+use finalizer::TokenList;
 use serde::Deserialize;
 use url::Url;
 
@@ -62,4 +63,7 @@ pub struct Config {
 
     #[envconfig(from = "TX_RETRY_TIMEOUT_SECS")]
     pub tx_retry_timeout: usize,
+
+    #[envconfig(from = "TOKENS_TO_FINALIZE")]
+    pub tokens_to_finalize: Option<TokenList>,
 }

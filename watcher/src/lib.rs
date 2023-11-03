@@ -308,7 +308,7 @@ async fn process_withdrawals_in_block(
     for (_tx_hash, group) in group_by.into_iter() {
         for (index, event) in group.into_iter().enumerate() {
             WATCHER_METRICS
-                .l2_last_executed_block
+                .l2_last_seen_block
                 .set(event.block_number as i64);
             tracing::info!("withdrawal {event:?} index in transaction is {index}");
 

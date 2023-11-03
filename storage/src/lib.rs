@@ -742,7 +742,150 @@ pub async fn set_withdrawal_unfinalizable(
 }
 
 /// Get the earliest withdrawals never attempted to be finalized before
-pub async fn withdrwals_to_finalize(pool: &PgPool, limit_by: u64) -> Result<Vec<WithdrawalParams>> {
+pub async fn withdrawals_to_finalize_with_blacklist(
+    pool: &PgPool,
+    limit_by: u64,
+    token_blacklist: &[Address],
+) -> Result<Vec<WithdrawalParams>> {
+    let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
+
+    let data = sqlx::query!(
+        "
+        SELECT
+          w.tx_hash,
+          w.event_index_in_tx,
+          withdrawal_id,
+          finalization_data.l2_block_number,
+          l1_batch_number,
+          l2_message_index,
+          l2_tx_number_in_block,
+          message,
+          sender,
+          proof
+        FROM
+          finalization_data
+          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+        WHERE
+          finalization_tx IS NULL
+          AND failed_finalization_attempts < 3
+          AND finalization_data.l2_block_number <= COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                execute_l1_block_number IS NOT NULL
+            ),
+            1
+          )
+          AND w.token NOT IN (SELECT * FROM UNNEST (
+            $2 :: BYTEA []
+          ))
+        ORDER BY
+          finalization_data.l2_block_number
+        LIMIT
+          $1
+        ",
+        limit_by as i64,
+        &blacklist,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|record| WithdrawalParams {
+        tx_hash: H256::from_slice(&record.tx_hash),
+        event_index_in_tx: record.event_index_in_tx as u32,
+        id: record.withdrawal_id as u64,
+        l2_block_number: record.l2_block_number as u64,
+        l1_batch_number: record.l1_batch_number.into(),
+        l2_message_index: record.l2_message_index as u32,
+        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+        message: record.message.into(),
+        sender: Address::from_slice(&record.sender),
+        proof: bincode::deserialize(&record.proof)
+            .expect("storage contains data correctly serialized by bincode; qed"),
+    })
+    .collect();
+
+    Ok(data)
+}
+
+/// Get the earliest withdrawals never attempted to be finalized before
+pub async fn withdrawals_to_finalize_with_whitelist(
+    pool: &PgPool,
+    limit_by: u64,
+    token_whitelist: &[Address],
+) -> Result<Vec<WithdrawalParams>> {
+    let whitelist: Vec<_> = token_whitelist.iter().map(|a| a.0.to_vec()).collect();
+
+    let data = sqlx::query!(
+        "
+        SELECT
+          w.tx_hash,
+          w.event_index_in_tx,
+          withdrawal_id,
+          finalization_data.l2_block_number,
+          l1_batch_number,
+          l2_message_index,
+          l2_tx_number_in_block,
+          message,
+          sender,
+          proof
+        FROM
+          finalization_data
+          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+        WHERE
+          finalization_tx IS NULL
+          AND failed_finalization_attempts < 3
+          AND finalization_data.l2_block_number <= COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                execute_l1_block_number IS NOT NULL
+            ),
+            1
+          )
+          AND w.token IN (SELECT * FROM UNNEST (
+            $2 :: BYTEA []
+          ))
+        ORDER BY
+          finalization_data.l2_block_number
+        LIMIT
+          $1
+        ",
+        limit_by as i64,
+        &whitelist,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|record| WithdrawalParams {
+        tx_hash: H256::from_slice(&record.tx_hash),
+        event_index_in_tx: record.event_index_in_tx as u32,
+        id: record.withdrawal_id as u64,
+        l2_block_number: record.l2_block_number as u64,
+        l1_batch_number: record.l1_batch_number.into(),
+        l2_message_index: record.l2_message_index as u32,
+        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+        message: record.message.into(),
+        sender: Address::from_slice(&record.sender),
+        proof: bincode::deserialize(&record.proof)
+            .expect("storage contains data correctly serialized by bincode; qed"),
+    })
+    .collect();
+
+    Ok(data)
+}
+
+/// Get the earliest withdrawals never attempted to be finalized before
+pub async fn withdrawals_to_finalize(
+    pool: &PgPool,
+    limit_by: u64,
+) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
 
     let data = sqlx::query!(
