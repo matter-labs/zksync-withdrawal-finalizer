@@ -138,9 +138,9 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     dotenvy::dotenv().ok();
-    let sentry_guard = vlog::init();
-
     let config = Config::init_from_env()?;
+
+    let sentry_guard = vlog::init();
 
     if sentry_guard.is_some() {
         tracing::info!(
