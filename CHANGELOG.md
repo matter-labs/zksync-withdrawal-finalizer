@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.2...v0.2.3) (2023-11-06)
+
+
+### Bug Fixes
+
+* adds logging for block revert event ([#273](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/273)) ([b1eec8d](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/b1eec8d599e50f40dedef57cbc139e05bca63233))
+* bump rustix to fix vulnerability report ([#277](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/277)) ([0e689b4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0e689b4d4674e9c0fcf2c166bb050eed9597be4b))
+
 ## [0.2.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.1...v0.2.2) (2023-11-03)
 
 
