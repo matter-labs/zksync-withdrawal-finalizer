@@ -5,6 +5,7 @@
 
 ### Bug Fixes
 
+
 * Revert "fix: nop line rearrange" ([#284](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/284)) ([55980fa](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/55980faa14c44d3a42b9f37469d03b234b08a490))
 
 ## [0.2.3](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.2...v0.2.3) (2023-11-06)
