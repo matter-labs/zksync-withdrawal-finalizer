@@ -29,6 +29,9 @@ jobs:
           release-please-output: ${{ toJSON(steps.release.outputs) }}
           slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_RELEASES }}
 
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.releases_created }}
+
       - name: Build and publish
         if: ${{ steps.release.outputs.releases_created }}
         uses: ./.github/workflows/build_and_publish.yml
