@@ -232,6 +232,17 @@ where
         let withdrawals = withdrawals.into_iter().map(|w| w.key()).collect::<Vec<_>>();
 
         match tx {
+            Ok(Some(tx)) if tx.status.expect("EIP-658 is enabled; qed").is_zero() => {
+                tracing::error!(
+                    "withdrawal transaction {:?} was reverted",
+                    tx.transaction_hash
+                );
+
+                FINALIZER_METRICS.reverted_withdrawal_transactions.inc();
+                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
+
+                return Ok(());
+            }
             Ok(Some(tx)) => {
                 tracing::info!(
                     "withdrawal transaction {:?} successfully mined",
