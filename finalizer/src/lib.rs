@@ -227,6 +227,7 @@ where
             tx.tx.clone(),
             self.tx_retry_timeout,
             nonce,
+            self.batch_finalization_gas_limit,
         )
         .await;
 
