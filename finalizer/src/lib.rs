@@ -243,7 +243,6 @@ where
                 );
 
                 FINALIZER_METRICS.reverted_withdrawal_transactions.inc();
-                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
 
                 return Err(Error::WithdrawalTransactionReverted);
             }
@@ -405,7 +404,16 @@ where
                         .finalize_batch(requests.clone(), one_withdrawal_gas_limit + 500 * i)
                         .await
                     {
-                        Err(Error::WithdrawalTransactionReverted) => {}
+                        Err(Error::WithdrawalTransactionReverted) => {
+                            if i == RETRY_REVERTED_TX - 1 {
+                                let keys: Vec<_> = requests.iter().map(|w| w.key()).collect();
+                                storage::inc_unsuccessful_finalization_attempts(
+                                    &self.pgpool,
+                                    &keys,
+                                )
+                                .await?;
+                            }
+                        }
                         Err(e) => return Err(e),
                         Ok(()) => break,
                     }
