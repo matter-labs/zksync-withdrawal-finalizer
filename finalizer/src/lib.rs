@@ -396,7 +396,6 @@ where
             if accumulator.ready_to_finalize() || iter.peek().is_none() {
                 let requests = accumulator.take_withdrawals();
                 self.finalize_batch(requests).await?;
-
                 accumulator = self.new_accumulator().await?;
             }
         }
