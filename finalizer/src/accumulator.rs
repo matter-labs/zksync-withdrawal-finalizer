@@ -85,7 +85,7 @@ impl WithdrawalsAccumulator {
 
     /// Is this batch of withdrawals ready to be finalized.
     pub fn ready_to_finalize(&self) -> bool {
-        let current_gas_usage = (self.current_gas_usage() * 64) / 63;
+        let current_gas_usage = self.current_gas_usage();
         current_gas_usage >= self.batch_finalization_gas_limit
             || current_gas_usage * self.gas_price >= self.tx_fee_limit
     }
