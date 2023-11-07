@@ -241,6 +241,8 @@ where
 
                 FINALIZER_METRICS.reverted_withdrawal_transactions.inc();
 
+                storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
+
                 return Err(Error::WithdrawalTransactionReverted);
             }
             Ok(Some(tx)) => {
