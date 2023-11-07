@@ -194,7 +194,11 @@ where
             .collect())
     }
 
-    async fn finalize_batch(&mut self, withdrawals: Vec<WithdrawalParams>) -> Result<()> {
+    async fn finalize_batch(
+        &mut self,
+        withdrawals: Vec<WithdrawalParams>,
+        one_withdrawal_gas_limit: U256,
+    ) -> Result<()> {
         let Some(highest_batch_number) = withdrawals.iter().map(|w| w.l1_batch_number).max() else {
             return Ok(());
         };
@@ -207,7 +211,7 @@ where
         let w: Vec<_> = withdrawals
             .iter()
             .cloned()
-            .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
+            .map(|r| r.into_request_with_gaslimit(one_withdrawal_gas_limit))
             .collect();
 
         let tx = self.finalizer_contract.finalize_withdrawals(w);
@@ -241,7 +245,7 @@ where
                 FINALIZER_METRICS.reverted_withdrawal_transactions.inc();
                 storage::inc_unsuccessful_finalization_attempts(&self.pgpool, &withdrawals).await?;
 
-                return Ok(());
+                return Err(Error::WithdrawalTransactionReverted);
             }
             Ok(Some(tx)) => {
                 tracing::info!(
@@ -393,7 +397,20 @@ where
 
             if accumulator.ready_to_finalize() || iter.peek().is_none() {
                 let requests = accumulator.take_withdrawals();
-                self.finalize_batch(requests).await?;
+                const RETRY_REVERTED_TX: usize = 3;
+                let one_withdrawal_gas_limit = self.one_withdrawal_gas_limit;
+
+                for i in 0..RETRY_REVERTED_TX {
+                    match self
+                        .finalize_batch(requests.clone(), one_withdrawal_gas_limit + 500 * i)
+                        .await
+                    {
+                        Err(Error::WithdrawalTransactionReverted) => {}
+                        Err(e) => return Err(e),
+                        Ok(()) => break,
+                    }
+                }
+
                 accumulator = self.new_accumulator().await?;
             }
         }
