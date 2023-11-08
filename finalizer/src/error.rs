@@ -16,6 +16,9 @@ pub enum Error {
 
     #[error("middleware error {0}")]
     Middleware(String),
+
+    #[error("withdrawal transaction was reverted")]
+    WithdrawalTransactionReverted,
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {

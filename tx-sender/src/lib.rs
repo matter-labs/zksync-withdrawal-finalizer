@@ -95,6 +95,7 @@ pub async fn send_tx_adjust_gas<M, T>(
     tx: T,
     retry_timeout: Duration,
     nonce: U256,
+    gas_limit: U256,
 ) -> Result<Option<TransactionReceipt>, <M as Middleware>::Error>
 where
     M: Middleware,
@@ -103,6 +104,7 @@ where
     let mut submit_tx = tx.into();
     m.fill_transaction(&mut submit_tx, None).await?;
     submit_tx.set_nonce(nonce);
+    submit_tx.set_gas(gas_limit);
 
     for retry_num in 0..usize::MAX {
         if retry_num > 0 {
@@ -174,9 +176,15 @@ mod tests {
             .gas_price(gas_price);
 
         tokio::time::timeout(Duration::from_secs(3), async {
-            send_tx_adjust_gas(provider.clone(), tx, Duration::from_secs(1), 0.into())
-                .await
-                .unwrap_err()
+            send_tx_adjust_gas(
+                provider.clone(),
+                tx,
+                Duration::from_secs(1),
+                0.into(),
+                6000000.into(),
+            )
+            .await
+            .unwrap_err()
         })
         .await
         .ok();
@@ -238,8 +246,20 @@ mod tests {
 
         tokio::time::timeout(Duration::from_secs(3), async {
             let (first, second) = tokio::join!(
-                send_tx_adjust_gas(provider.clone(), tx_1, Duration::from_secs(1), 0.into()),
-                send_tx_adjust_gas(provider.clone(), tx_2, Duration::from_secs(1), 1.into())
+                send_tx_adjust_gas(
+                    provider.clone(),
+                    tx_1,
+                    Duration::from_secs(1),
+                    0.into(),
+                    6000000.into()
+                ),
+                send_tx_adjust_gas(
+                    provider.clone(),
+                    tx_2,
+                    Duration::from_secs(1),
+                    1.into(),
+                    6000000.into()
+                )
             );
             first.unwrap();
             second.unwrap();
@@ -377,9 +397,15 @@ mod tests {
             .from(from);
 
         tokio::time::timeout(Duration::from_secs(3), async {
-            send_tx_adjust_gas(provider.clone(), tx, Duration::from_secs(1), 0.into())
-                .await
-                .unwrap()
+            send_tx_adjust_gas(
+                provider.clone(),
+                tx,
+                Duration::from_secs(1),
+                0.into(),
+                6000000.into(),
+            )
+            .await
+            .unwrap()
         })
         .await
         .ok();

@@ -17,6 +17,9 @@ pub(super) struct FinalizerMetrics {
 
     /// Number of withdrawals failed to fetch withdrawal parameters for.
     pub failed_to_fetch_withdrawal_params: Counter,
+
+    /// Number of withdrawal transactions that were reverted.
+    pub reverted_withdrawal_transactions: Counter,
 }
 
 #[vise::register]
