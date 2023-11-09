@@ -1,7 +1,6 @@
 name: Build and publish era-withdrawal-finalizer image
 
 on:
-  workflow_call:
   push:
     tags:
       - v*
