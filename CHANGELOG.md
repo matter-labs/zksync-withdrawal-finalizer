@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.5](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.4...v0.2.5) (2023-11-09)
+
+
+### Bug Fixes
+
+* detect reverted withdrawal transactions ([#287](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/287)) ([ccd3777](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ccd3777639b4cbb6a2b12252d77b60abf93e522e))
+* Update CONTRIBUTING.md ([#291](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/291)) ([5ec9570](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/5ec95701de2597bcdc4f193456bbbeebf1033ebe))
+
 ## [0.2.4](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.3...v0.2.4) (2023-11-06)
 
 
