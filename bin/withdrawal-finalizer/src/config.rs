@@ -1,7 +1,6 @@
 use envconfig::Envconfig;
 use ethers::types::Address;
-use finalizer::TokenList;
-use serde::Deserialize;
+use finalizer::{AddrList, TokenList};
 use url::Url;
 
 /// Withdrawal finalizer configuration.
@@ -9,7 +8,7 @@ use url::Url;
 /// Can be read from
 /// * `env` via [`Self::init_from_env()`]
 /// * TOML config file via [`Self::from_file()`]
-#[derive(Deserialize, Debug, Envconfig)]
+#[derive(Debug, Envconfig)]
 pub struct Config {
     /// L1 WS url.
     #[envconfig(from = "ETH_CLIENT_WS_URL")]
@@ -66,4 +65,10 @@ pub struct Config {
 
     #[envconfig(from = "TOKENS_TO_FINALIZE")]
     pub tokens_to_finalize: Option<TokenList>,
+
+    #[envconfig(from = "FINALIZE_ETH_TOKEN")]
+    pub finalize_eth_token: Option<bool>,
+
+    #[envconfig(from = "CUSTOM_TOKEN_DEPLOYER_ADDRESSES")]
+    pub custom_token_deployer_addresses: Option<AddrList>,
 }

@@ -4935,7 +4935,6 @@ dependencies = [
  "ethers",
  "eyre",
  "finalizer",
- "serde",
  "sqlx",
  "storage",
  "tokio",
