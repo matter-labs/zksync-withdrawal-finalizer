@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.5...v0.3.0) (2023-11-13)
+
+
+### Features
+
+* support custom token deployers and switching off ethereum token ([#295](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/295)) ([bfaabd4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/bfaabd450bee5a48c67aef425fa1b2d5b756c51f))
+
 ## [0.2.5](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.4...v0.2.5) (2023-11-09)
 
 
