@@ -71,4 +71,7 @@ pub struct Config {
 
     #[envconfig(from = "CUSTOM_TOKEN_DEPLOYER_ADDRESSES")]
     pub custom_token_deployer_addresses: Option<AddrList>,
+
+    #[envconfig(from = "CUSTOM_TOKEN_ADDRESSES")]
+    pub custom_token_addresses: Option<AddrList>,
 }
