@@ -30,7 +30,7 @@ struct NewTokenAdded;
 /// A convenience multiplexer for withdrawal-related events.
 pub struct L2EventsListener {
     url: String,
-    l2_erc20_bridge_addr: Address,
+    token_deployer_addrs: Vec<Address>,
     tokens: HashSet<Address>,
 }
 
@@ -59,14 +59,21 @@ impl L2EventsListener {
     /// # Arguments
     ///
     /// * `middleware`: The middleware to perform requests with.
-    pub fn new(url: &str, l2_erc20_bridge_addr: Address, mut tokens: HashSet<Address>) -> Self {
-        tokens.insert(ETH_TOKEN_ADDRESS);
-        tokens.insert(ETH_ADDRESS);
+    pub fn new(
+        url: &str,
+        token_deployer_addrs: Vec<Address>,
+        mut tokens: HashSet<Address>,
+        finalize_eth_token: bool,
+    ) -> Self {
+        if finalize_eth_token {
+            tokens.insert(ETH_TOKEN_ADDRESS);
+            tokens.insert(ETH_ADDRESS);
+        }
         tokens.insert(DEPLOYER_ADDRESS);
 
         Self {
             url: url.to_string(),
-            l2_erc20_bridge_addr,
+            token_deployer_addrs,
             tokens,
         }
     }
@@ -111,7 +118,7 @@ impl L2EventsListener {
             .to_block(to_block)
             .address(DEPLOYER_ADDRESS)
             .topic0(vec![ContractDeployedFilter::signature()])
-            .topic1(self.l2_erc20_bridge_addr);
+            .topic1(self.token_deployer_addrs.clone());
 
         // `get_logs` are used because there are not that many events
         // expected and `get_logs_paginated` contains a bug that incorrectly

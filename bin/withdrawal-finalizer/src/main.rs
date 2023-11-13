@@ -205,8 +205,12 @@ async fn main() -> Result<()> {
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
-        config.l2_erc20_bridge_addr,
+        config
+            .custom_token_deployer_addresses
+            .map(|list| list.0)
+            .unwrap_or(vec![config.l2_erc20_bridge_addr]),
         tokens.into_iter().collect(),
+        config.finalize_eth_token.unwrap_or(true),
     );
 
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());

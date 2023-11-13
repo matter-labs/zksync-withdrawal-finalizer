@@ -52,6 +52,8 @@ Deployment is done by deploying a dockerized image of the service.
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
 | `TX_RETRY_TIMEOUT_SECS` | Number of seconds to wait for a potentially stuck finalization transaction before readjusting its fees |
 | `TOKENS_TO_FINALIZE` | Configures the sets of tokens this instance of finalizer will finalize. It may be configured as a whitelist, a blacklist, a wildcard or completely disable any finalization. For more info see below. |
+| `FINALIZE_ETH_TOKEN` | (Optional) Configure, whether the Ethereum withdrawal events should be monitored. Useful to turn off for custom bridges that are only interested in a particular ERC20 token and have nothing to do with main Ethereum withdrawals |
+| `CUSTOM_TOKEN_DEPLOYER_ADDRESSES` | (Optional) Normally ERC20 tokens are deployed by the bridge contract. However, in custom cases it may be necessary to override that behavior with a custom set of addresses that have deployed tokens |
 
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 

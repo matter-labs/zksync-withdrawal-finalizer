@@ -73,6 +73,19 @@ impl FromStr for TokenList {
     }
 }
 
+/// A newtype that represents a set of addresses in JSON format.
+#[derive(Debug, Eq, PartialEq)]
+pub struct AddrList(pub Vec<Address>);
+
+impl FromStr for AddrList {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let res: Vec<Address> = serde_json::from_str(s)?;
+        Ok(AddrList(res))
+    }
+}
+
 /// Finalizer.
 pub struct Finalizer<M1, M2> {
     pgpool: PgPool,
@@ -629,6 +642,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use crate::AddrList;
+
     use super::TokenList;
     use ethers::abi::Address;
     use pretty_assertions::assert_eq;
@@ -670,5 +687,24 @@ mod tests {
 
         let allowed_usdc: TokenList = serde_json::from_str(white).unwrap();
         assert_eq!(allowed_usdc, TokenList::WhiteList(vec![usdc_addr]));
+    }
+
+    #[test]
+    fn addr_list_de() {
+        let addr_1: Address = "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"
+            .parse()
+            .unwrap();
+        let addr_2: Address = "0x1820495E7d1B8BA82B706FB972d2A2B8282023d0"
+            .parse()
+            .unwrap();
+
+        let addr_list = r#"[
+            "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4",
+            "0x1820495E7d1B8BA82B706FB972d2A2B8282023d0"
+        ]"#;
+
+        let list: AddrList = AddrList::from_str(addr_list).unwrap();
+
+        assert_eq!(list, AddrList(vec![addr_1, addr_2]));
     }
 }

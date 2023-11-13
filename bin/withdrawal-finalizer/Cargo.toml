@@ -9,9 +9,8 @@ authors.workspace = true
 [dependencies]
 color-eyre = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["ws", "rustls"] }
-serde = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-url = { workspace = true, features = ["serde"] }
+url = { workspace = true }
 eyre = { workspace = true }
 tokio-stream = { workspace = true }
 envconfig = { workspace = true }
