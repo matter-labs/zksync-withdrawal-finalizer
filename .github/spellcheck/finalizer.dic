@@ -36,3 +36,5 @@ txs
 unfinalizable
 meterer
 Timedout
+newtype
+JSON
