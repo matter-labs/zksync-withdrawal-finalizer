@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.2...v0.3.3) (2023-11-14)
+
+
+### Bug Fixes
+
+* correctly determine withdrawal params for withdrawalinitiated events ([#301](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/301)) ([94d6ecd](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/94d6ecdc3877c4a7db085aa655848c46019ed222))
+
 ## [0.3.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.1...v0.3.2) (2023-11-14)
 
 
