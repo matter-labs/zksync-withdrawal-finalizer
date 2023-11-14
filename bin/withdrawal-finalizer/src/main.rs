@@ -9,6 +9,7 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use envconfig::Envconfig;
 use ethers::{
+    contract::EthEvent,
     prelude::SignerMiddleware,
     providers::{Http, JsonRpcClient, Middleware, Provider},
     signers::LocalWallet,
@@ -18,7 +19,10 @@ use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
 use chain_events::{BlockEvents, L2EventsListener};
-use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
+use client::{
+    l1bridge::codegen::IL1Bridge, l2bridge::codegen::WithdrawalInitiatedFilter,
+    zksync_contract::codegen::IZkSync, ZksyncMiddleware,
+};
 use config::Config;
 use tokio::sync::watch;
 use vise_exporter::MetricsExporter;
@@ -153,6 +157,7 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
+    tracing::error!("bla {:?}", WithdrawalInitiatedFilter::signature());
     let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
@@ -203,9 +208,11 @@ async fn main() -> Result<()> {
 
     let (mut tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
-    if let Some(ref custom_tokens) = config.custom_token_deployer_addresses {
+    if let Some(ref custom_tokens) = config.custom_token_addresses {
         tokens.extend_from_slice(custom_tokens.0.as_slice());
     }
+
+    tracing::info!("tokens {tokens:?}");
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
@@ -221,7 +228,10 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let watcher = Watcher::new(client_l2.clone(), pgpool.clone());
+    // by default meter withdrawals
+    let meter_withdrawals = config.enable_withdrawal_metering.unwrap_or(true);
+
+    let watcher = Watcher::new(client_l2.clone(), pgpool.clone(), meter_withdrawals);
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,
@@ -284,6 +294,7 @@ async fn main() -> Result<()> {
         config.tx_retry_timeout,
         finalizer_account_address,
         config.tokens_to_finalize.unwrap_or_default(),
+        meter_withdrawals,
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 

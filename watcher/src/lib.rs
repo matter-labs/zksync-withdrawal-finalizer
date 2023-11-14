@@ -34,7 +34,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct Watcher<M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
-    withdrawals_meterer: WithdrawalsMeter,
+    withdrawals_meterer: Option<WithdrawalsMeter>,
 }
 
 impl<M2> Watcher<M2>
@@ -42,10 +42,11 @@ where
     M2: ZksyncMiddleware + 'static,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(l2_provider: Arc<M2>, pgpool: PgPool) -> Self {
-        let withdrawals_meterer =
-            WithdrawalsMeter::new(pgpool.clone(), MeteringComponent::RequestedWithdrawals);
+    pub fn new(l2_provider: Arc<M2>, pgpool: PgPool, meter_withdrawals: bool) -> Self {
+        let withdrawals_meterer = meter_withdrawals.then_some(WithdrawalsMeter::new(
+            pgpool.clone(),
+            MeteringComponent::RequestedWithdrawals,
+        ));
 
         Self {
             l2_provider,
@@ -302,7 +303,7 @@ where
 async fn process_withdrawals_in_block(
     pool: &PgPool,
     events: Vec<WithdrawalEvent>,
-    withdrawals_meterer: &mut WithdrawalsMeter,
+    withdrawals_meterer: &mut Option<WithdrawalsMeter>,
 ) -> Result<()> {
     use itertools::Itertools;
     let group_by = events.into_iter().group_by(|event| event.tx_hash);
@@ -328,11 +329,13 @@ async fn process_withdrawals_in_block(
         });
     }
 
-    if let Err(e) = withdrawals_meterer
-        .meter_withdrawals(&stored_withdrawals)
-        .await
-    {
-        tracing::error!("Failed to meter requested withdrawals: {e}");
+    if let Some(ref mut withdrawals_meterer) = withdrawals_meterer {
+        if let Err(e) = withdrawals_meterer
+            .meter_withdrawals(&stored_withdrawals)
+            .await
+        {
+            tracing::error!("Failed to meter requested withdrawals: {e}");
+        }
     }
 
     storage::add_withdrawals(pool, &stored_withdrawals).await?;
@@ -376,7 +379,7 @@ async fn run_l2_events_loop<WE>(
     pool: PgPool,
     we: WE,
     from_l2_block: u64,
-    mut withdrawals_meterer: WithdrawalsMeter,
+    mut withdrawals_meterer: Option<WithdrawalsMeter>,
 ) -> Result<()>
 where
     WE: Stream<Item = L2Event>,

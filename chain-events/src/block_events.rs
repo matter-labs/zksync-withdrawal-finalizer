@@ -90,6 +90,8 @@ impl BlockEvents {
         let mut from_block: BlockNumber = from_block.into();
 
         loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            continue;
             let Some(provider_l1) = self.connect().await else {
                 tokio::time::sleep(RECONNECT_BACKOFF).await;
                 continue;

@@ -74,4 +74,7 @@ pub struct Config {
 
     #[envconfig(from = "CUSTOM_TOKEN_ADDRESSES")]
     pub custom_token_addresses: Option<AddrList>,
+
+    #[envconfig(from = "ENABLE_WITHDRAWAL_METERING")]
+    pub enable_withdrawal_metering: Option<bool>,
 }
