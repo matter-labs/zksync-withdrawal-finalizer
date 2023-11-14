@@ -1,5 +1,8 @@
 use ethers::{
-    abi::EncodePackedError, contract::ContractError, prelude::Middleware, providers::ProviderError,
+    abi::{Address, EncodePackedError},
+    contract::ContractError,
+    prelude::Middleware,
+    providers::ProviderError,
     types::H256,
 };
 
@@ -44,6 +47,9 @@ pub enum Error {
 
     #[error("Message not RLP bytes encoded: {0}")]
     MessageNotRlpBytes(String),
+
+    #[error("L1 address of L2 token {0:?} is not known")]
+    L2TokenUnknown(Address),
 }
 
 impl<M: Middleware> From<ContractError<M>> for Error {

@@ -153,6 +153,7 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
+    client::add_predefined_token_addrs(config.token_mappings().as_ref()).await;
     let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the

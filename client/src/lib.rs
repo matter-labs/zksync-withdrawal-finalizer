@@ -8,7 +8,7 @@
 mod error;
 mod metrics;
 
-use std::num::NonZeroUsize;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub use error::{Error, Result};
@@ -28,7 +28,6 @@ use l1bridge::codegen::{FinalizeWithdrawalCall, IL1Bridge};
 use l1messenger::codegen::L1MessageSentFilter;
 use l2standard_token::codegen::{BridgeBurnFilter, L1AddressCall};
 use lazy_static::lazy_static;
-use lru::LruCache;
 use tokio::sync::Mutex;
 use withdrawal_finalizer::codegen::RequestFinalizeWithdrawal;
 use zksync_contract::codegen::{FinalizeEthWithdrawalCall, IZkSync};
@@ -82,11 +81,22 @@ pub fn is_eth(address: Address) -> bool {
 enum WithdrawalEvents {
     BridgeBurn(BridgeBurnFilter),
     Withdrawal(WithdrawalFilter),
+    WithdrawalInitiated(WithdrawalInitiatedFilter),
 }
 
 lazy_static! {
-    static ref TOKEN_ADDRS: Arc<Mutex<LruCache<Address, Address>>> =
-        Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(64).unwrap())));
+    static ref TOKEN_ADDRS: Arc<Mutex<HashMap<Address, Address>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+}
+
+/// Adds configurable sets of tokens with known deployment addresses
+pub async fn add_predefined_token_addrs(addrs: &[(Address, Address)]) {
+    println!("ADADAD {addrs:?}");
+    let mut addr_lock = TOKEN_ADDRS.lock().await;
+
+    for (addr_l1, addr_l2) in addrs {
+        addr_lock.insert(*addr_l2, *addr_l1);
+    }
 }
 
 impl WithdrawalParams {
@@ -339,6 +349,13 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         let withdrawal_event = WithdrawalEvents::decode_log(&raw_log)?;
 
         let l2_to_l1_message_hash = match withdrawal_event {
+            WithdrawalEvents::WithdrawalInitiated(w) => {
+                let addr_lock = TOKEN_ADDRS.lock().await;
+                let l_1_token = addr_lock
+                    .get(&w.l_2_token)
+                    .ok_or(Error::L2TokenUnknown(w.l_2_token))?;
+                get_l1_bridge_burn_message_keccak(w.amount, w.l_1_receiver, *l_1_token)?
+            }
             WithdrawalEvents::BridgeBurn(b) => {
                 let mut addr_lock = TOKEN_ADDRS.lock().await;
 
@@ -357,7 +374,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
 
                         let l1_address = Address::decode(self.call(&call, None).await?)?;
 
-                        addr_lock.put(withdrawal_log.address, l1_address);
+                        addr_lock.insert(withdrawal_log.address, l1_address);
 
                         l1_address
                     };
@@ -380,7 +397,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
 
                 let l1_receiver = withdrawal_initiated_event.l_1_receiver;
 
-                get_l1_bridge_burn_message_keccak(&b, l1_receiver, l1_address)?
+                get_l1_bridge_burn_message_keccak(b.amount, l1_receiver, l1_address)?
             }
             WithdrawalEvents::Withdrawal(w) => get_l1_withdraw_message_keccak(&w)?,
         };
@@ -562,7 +579,7 @@ where
 }
 
 fn get_l1_bridge_burn_message_keccak(
-    burn: &BridgeBurnFilter,
+    amount: U256,
     l1_receiver: Address,
     l1_token: Address,
 ) -> Result<H256> {
@@ -570,7 +587,7 @@ fn get_l1_bridge_burn_message_keccak(
         Token::FixedBytes(FinalizeWithdrawalCall::selector().to_vec()),
         Token::Address(l1_receiver),
         Token::Address(l1_token),
-        Token::Bytes(burn.amount.encode()),
+        Token::Bytes(amount.encode()),
     ])?;
     Ok(ethers::utils::keccak256(message).into())
 }
@@ -605,7 +622,7 @@ mod tests {
         };
 
         let a = super::get_l1_bridge_burn_message_keccak(
-            &bridge_burn,
+            bridge_burn.amount,
             // withdraws to the same account on L1, so can take this value.
             bridge_burn.account,
             dai_l1_addr,
@@ -656,7 +673,7 @@ mod tests {
         };
 
         let a = super::get_l1_bridge_burn_message_keccak(
-            &bridge_burn,
+            bridge_burn.amount,
             "d1ced2fBDFa24daa9920D37237ca2D4d5616a6e2".parse().unwrap(),
             dai_l1_addr,
         )
