@@ -9,7 +9,6 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 
 use envconfig::Envconfig;
 use ethers::{
-    contract::EthEvent,
     prelude::SignerMiddleware,
     providers::{Http, JsonRpcClient, Middleware, Provider},
     signers::LocalWallet,
@@ -19,10 +18,7 @@ use eyre::{anyhow, Result};
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
 
 use chain_events::{BlockEvents, L2EventsListener};
-use client::{
-    l1bridge::codegen::IL1Bridge, l2bridge::codegen::WithdrawalInitiatedFilter,
-    zksync_contract::codegen::IZkSync, ZksyncMiddleware,
-};
+use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
 use config::Config;
 use tokio::sync::watch;
 use vise_exporter::MetricsExporter;
@@ -157,7 +153,6 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
-    tracing::error!("bla {:?}", WithdrawalInitiatedFilter::signature());
     let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
