@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.0...v0.3.1) (2023-11-13)
+
+
+### Bug Fixes
+
+* adds an optional predefined token list ([#297](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/297)) ([ab46910](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ab469100bb3a6d48f2297e83474764970d377fc3))
+
 ## [0.3.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.2.5...v0.3.0) (2023-11-13)
 
 

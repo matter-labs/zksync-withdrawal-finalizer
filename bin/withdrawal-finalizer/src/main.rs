@@ -213,6 +213,9 @@ async fn main() -> Result<()> {
     }
 
     tracing::info!("tokens {tokens:?}");
+    if let Some(ref custom_tokens) = config.custom_token_deployer_addresses {
+        tokens.extend_from_slice(custom_tokens.0.as_slice());
+    }
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
