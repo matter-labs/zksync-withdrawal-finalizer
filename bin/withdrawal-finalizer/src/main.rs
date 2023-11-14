@@ -203,6 +203,11 @@ async fn main() -> Result<()> {
 
     let (mut tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
+    if let Some(ref custom_tokens) = config.custom_token_addresses {
+        tokens.extend_from_slice(custom_tokens.0.as_slice());
+    }
+
+    tracing::info!("tokens {tokens:?}");
     if let Some(ref custom_tokens) = config.custom_token_deployer_addresses {
         tokens.extend_from_slice(custom_tokens.0.as_slice());
     }
@@ -221,7 +226,10 @@ async fn main() -> Result<()> {
 
     let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
 
-    let watcher = Watcher::new(client_l2.clone(), pgpool.clone());
+    // by default meter withdrawals
+    let meter_withdrawals = config.enable_withdrawal_metering.unwrap_or(true);
+
+    let watcher = Watcher::new(client_l2.clone(), pgpool.clone(), meter_withdrawals);
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,
@@ -284,6 +292,7 @@ async fn main() -> Result<()> {
         config.tx_retry_timeout,
         finalizer_account_address,
         config.tokens_to_finalize.unwrap_or_default(),
+        meter_withdrawals,
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 

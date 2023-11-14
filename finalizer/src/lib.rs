@@ -101,7 +101,7 @@ pub struct Finalizer<M1, M2> {
     tx_fee_limit: U256,
     tx_retry_timeout: Duration,
     account_address: Address,
-    withdrawals_meterer: WithdrawalsMeter,
+    withdrawals_meterer: Option<WithdrawalsMeter>,
     token_list: TokenList,
 }
 
@@ -131,9 +131,12 @@ where
         tx_retry_timeout: usize,
         account_address: Address,
         token_list: TokenList,
+        meter_withdrawals: bool,
     ) -> Self {
-        let withdrawals_meterer =
-            WithdrawalsMeter::new(pgpool.clone(), MeteringComponent::FinalizedWithdrawals);
+        let withdrawals_meterer = meter_withdrawals.then_some(WithdrawalsMeter::new(
+            pgpool.clone(),
+            MeteringComponent::FinalizedWithdrawals,
+        ));
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
 
@@ -275,12 +278,10 @@ where
                     .highest_finalized_batch_number
                     .set(highest_batch_number.as_u64() as i64);
 
-                if let Err(e) = self
-                    .withdrawals_meterer
-                    .meter_withdrawals_storage(&ids)
-                    .await
-                {
-                    tracing::error!("Failed to meter the withdrawals: {e}");
+                if let Some(ref mut withdrawals_meterer) = self.withdrawals_meterer {
+                    if let Err(e) = withdrawals_meterer.meter_withdrawals_storage(&ids).await {
+                        tracing::error!("Failed to meter the withdrawals: {e}");
+                    }
                 }
             }
             // TODO: why would a pending tx resolve to `None`?
