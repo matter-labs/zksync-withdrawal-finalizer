@@ -91,7 +91,6 @@ lazy_static! {
 
 /// Adds configurable sets of tokens with known deployment addresses
 pub async fn add_predefined_token_addrs(addrs: &[(Address, Address)]) {
-    println!("ADADAD {addrs:?}");
     let mut addr_lock = TOKEN_ADDRS.lock().await;
 
     for (addr_l1, addr_l2) in addrs {
@@ -341,6 +340,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .filter(|log| {
                 log.topics[0] == BridgeBurnFilter::signature()
                     || log.topics[0] == WithdrawalFilter::signature()
+                    || log.topics[0] == WithdrawalInitiatedFilter::signature()
             })
             .nth(index)
             .ok_or(Error::WithdrawalLogNotFound(index, withdrawal_hash))?;
