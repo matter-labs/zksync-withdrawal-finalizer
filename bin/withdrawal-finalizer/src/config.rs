@@ -113,7 +113,7 @@ impl FromStr for CustomTokenAddressMappings {
 }
 
 impl Config {
-    /// Returns a mapping of tokens (L1, L2) addrs.
+    /// Returns a mapping of tokens (L1, L2) addresses.
     pub fn token_mappings(&self) -> Vec<(Address, Address)> {
         self.custom_token_address_mappings
             .as_ref()
