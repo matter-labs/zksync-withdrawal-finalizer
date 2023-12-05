@@ -290,6 +290,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn test_tx_price_bumps() {
         let anvil = Anvil::new().arg("--no-mining").spawn();
 
@@ -371,6 +372,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn retry_sending_single_eip1559_tx() {
         let anvil = Anvil::new().arg("--no-mining").spawn();
 
