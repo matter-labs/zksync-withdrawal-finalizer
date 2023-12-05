@@ -1,1 +1,7 @@
 /target
+node_modules
+cache
+artifacts
+typechain-types
+*.log
+dev.env
