@@ -75,6 +75,29 @@ You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
 1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize only these tokens
 1. `TOKENS_TO_FINALIZE = '{ "BlackList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize all tokens but these
 
+## Deploying the finalizer smart contract
+
+The finalizer smart contract needs to reference the addresses of the diamond proxy contract and l1 erc20 proxy contract.
+You also need to know the key of the account you want to use to deploy the finalizer contract.
+
+When you know those to deploy the contract you need to run (assume you are running `anvil` in a separate terminal):
+
+```
+$ yarn
+$ env CONTRACTS_DIAMOND_PROXY_ADDR="0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR="0x2Ae09702F77a4940621572fBcDAe2382D44a2cbA" MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
+```
+
+If all goes well the the result would be
+
+```
+...
+Compiled 18 Solidity files successfully (evm target: paris).
+CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS=0x712516e61C8B383dF4A63CFe83d7701Bce54B03e
+```
+
+And so you know the address of the deployed contract.
+
+
 ## License
 
 zkSync Withdrawal Finalizer is distributed under the terms of either
