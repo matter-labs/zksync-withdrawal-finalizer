@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "license": "MIT",
     "dependencies": {
-        "@matterlabs/zksync-contracts": "^0.5.2",
+        "@matterlabs/zksync-contracts": "^0.6.0",
         "@openzeppelin/contracts": "^4.8.1",
         "@sentry/node": "^7.2.0",
         "@sentry/tracing": "^7.2.0",
