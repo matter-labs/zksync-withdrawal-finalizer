@@ -10,7 +10,7 @@
         "ethers": "^5.6.0",
         "node-fetch": "^2.6.1",
         "prom-client": "^14.2.0",
-        "zksync-web3": "^0.13.3"
+        "zksync-web3": "^0.17.0"
     },
     "devDependencies": {
         "@nomiclabs/hardhat-ethers": "^2.0.5",
