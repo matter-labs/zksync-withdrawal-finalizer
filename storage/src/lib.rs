@@ -5,6 +5,8 @@
 
 //! Finalizer watcher.storage.operations.
 
+use std::collections::HashMap;
+
 use ethers::types::{Address, H160, H256};
 use sqlx::{PgConnection, PgPool};
 
@@ -521,6 +523,31 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
 
     latency.observe();
     Ok((tokens, last_l2_block_seen as u64))
+}
+
+/// Get a mapping of known tokens in L1 -> L2
+pub async fn get_l1_to_l2_tokens(pool: &PgPool) -> Result<HashMap<Address, Address>> {
+    let tokens: HashMap<Address, Address> = sqlx::query!(
+        "
+        SELECT
+            l2_token_address,
+            l1_token_address
+        FROM
+            tokens
+        "
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| {
+        (
+            Address::from_slice(&r.l1_token_address),
+            Address::from_slice(&r.l2_token_address),
+        )
+    })
+    .collect();
+
+    Ok(tokens)
 }
 
 /// Insert a token initialization event into the DB.

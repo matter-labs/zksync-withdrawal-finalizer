@@ -213,6 +213,7 @@ async fn main() -> Result<()> {
         tokens.extend_from_slice(custom_tokens.0.as_slice());
     }
 
+    let tokens = storage::get_l1_to_l2_tokens(&pgpool).await?;
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
         config
@@ -220,6 +221,7 @@ async fn main() -> Result<()> {
             .map(|list| list.0)
             .unwrap_or(vec![config.l2_erc20_bridge_addr]),
         tokens.into_iter().collect(),
+        config.l2_erc20_bridge_addr,
         config.finalize_eth_token.unwrap_or(true),
     );
 

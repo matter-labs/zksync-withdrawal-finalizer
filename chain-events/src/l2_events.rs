@@ -1,23 +1,22 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{Sink, SinkExt, StreamExt};
 
 use client::{
     contracts_deployer::codegen::ContractDeployedFilter,
-    ethtoken::codegen::WithdrawalFilter,
-    l2bridge::codegen::WithdrawalInitiatedFilter,
-    l2standard_token::codegen::{
-        BridgeBurnFilter, BridgeInitializationFilter, BridgeInitializeFilter,
-    },
+    l1bridge::codegen::FinalizeWithdrawalCall,
+    l1messenger::codegen::L1MessageSentFilter,
+    l2standard_token::codegen::{BridgeInitializationFilter, BridgeInitializeFilter},
+    zksync_contract::codegen::FinalizeEthWithdrawalCall,
     zksync_types::{Log as ZksyncLog, TransactionReceipt as ZksyncTransactionReceipt},
-    WithdrawalEvent, ZksyncMiddleware, DEPLOYER_ADDRESS, ETH_ADDRESS, ETH_TOKEN_ADDRESS,
+    WithdrawalEvent, ZksyncMiddleware, DEPLOYER_ADDRESS, ETH_TOKEN_ADDRESS, L1_MESSENGER_ADDRESS,
 };
 use ethers::{
     abi::{Address, RawLog},
-    contract::EthEvent,
+    contract::{EthCall, EthEvent},
     prelude::EthLogDecode,
     providers::{Middleware, Provider, PubsubClient, Ws},
-    types::{BlockNumber, Filter, Log},
+    types::{BlockNumber, Filter, Log, U256},
 };
 
 use crate::{
@@ -32,14 +31,14 @@ struct NewTokenAdded;
 pub struct L2EventsListener {
     url: String,
     token_deployer_addrs: Vec<Address>,
-    tokens: HashSet<Address>,
+    l2_erc20_bridge_addr: Address,
+    // L2 address -> L1 address
+    tokens: HashMap<Address, Address>,
 }
 
-#[derive(EthLogDecode)]
+#[derive(Debug, EthLogDecode)]
 enum L2Events {
-    BridgeBurn(BridgeBurnFilter),
-    Withdrawal(WithdrawalFilter),
-    WithdrawalInitiated(WithdrawalInitiatedFilter),
+    L1MessageSent(L1MessageSentFilter),
     ContractDeployed(ContractDeployedFilter),
 }
 
@@ -64,19 +63,19 @@ impl L2EventsListener {
     pub fn new(
         url: &str,
         token_deployer_addrs: Vec<Address>,
-        mut tokens: HashSet<Address>,
+        mut tokens: HashMap<Address, Address>,
+        l2_erc20_bridge_addr: Address,
         finalize_eth_token: bool,
     ) -> Self {
         if finalize_eth_token {
-            tokens.insert(ETH_TOKEN_ADDRESS);
-            tokens.insert(ETH_ADDRESS);
+            tokens.insert(ETH_TOKEN_ADDRESS, ETH_TOKEN_ADDRESS);
         }
-        tokens.insert(DEPLOYER_ADDRESS);
 
         Self {
             url: url.to_string(),
             token_deployer_addrs,
             tokens,
+            l2_erc20_bridge_addr,
         }
     }
 
@@ -145,8 +144,12 @@ impl L2EventsListener {
                 continue;
             };
 
-            if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log)? {
-                if self.tokens.insert(address) {
+            if let Some((l2_event, _address)) = self.bridge_initialize_event(bridge_init_log)? {
+                if self
+                    .tokens
+                    .insert(l2_event.l2_token_address, l2_event.l1_token_address)
+                    .is_none()
+                {
                     let event = l2_event.into();
 
                     tracing::info!("sending token event {event:?}");
@@ -179,7 +182,7 @@ impl L2EventsListener {
             return Ok(None);
         };
 
-        if self.tokens.contains(&bridge_init_log.address) {
+        if self.tokens.contains_key(&bridge_init_log.address) {
             return Ok(None);
         }
 
@@ -338,16 +341,13 @@ impl L2EventsListener {
         let from_block: BlockNumber = from_block.into();
 
         let past_topic0 = vec![
-            BridgeBurnFilter::signature(),
-            WithdrawalFilter::signature(),
-            WithdrawalInitiatedFilter::signature(),
+            ContractDeployedFilter::signature(),
+            L1MessageSentFilter::signature(),
         ];
 
         let topic0 = vec![
             ContractDeployedFilter::signature(),
-            BridgeBurnFilter::signature(),
-            WithdrawalFilter::signature(),
-            WithdrawalInitiatedFilter::signature(),
+            L1MessageSentFilter::signature(),
         ];
 
         tracing::info!("topic0 {topic0:?}");
@@ -373,7 +373,7 @@ impl L2EventsListener {
             .await?;
         }
 
-        let mut tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
+        let mut tokens = vec![L1_MESSENGER_ADDRESS, self.l2_erc20_bridge_addr]; // self.tokens.keys().cloned().collect::<Vec<_>>();
         tokens.extend_from_slice(self.token_deployer_addrs.as_slice());
 
         tracing::info!("Listeing to events from tokens {tokens:?}");
@@ -458,7 +458,7 @@ impl L2EventsListener {
         &mut self,
         log: &Log,
         l2_event: &L2Events,
-        sender: &mut S,
+        channel_sender: &mut S,
         middleware: M,
     ) -> Result<Option<NewTokenAdded>>
     where
@@ -469,42 +469,54 @@ impl L2EventsListener {
     {
         if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
             match l2_event {
-                L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
-                | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
-                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
+                L2Events::L1MessageSent(L1MessageSentFilter { message, .. }) => {
+                    if FinalizeEthWithdrawalCall::selector() == message[..4] && message.len() >= 56
+                    {
+                        let amount = U256::from(
+                            TryInto::<[u8; 32]>::try_into(&message[24..56])
+                                .expect("message length was checked; qed"),
+                        );
+                        let we = WithdrawalEvent {
+                            tx_hash,
+                            block_number: block_number.as_u64(),
+                            token: ETH_TOKEN_ADDRESS,
+                            amount,
+                        };
+                        let event = we.into();
+                        tracing::info!("sending withdrawal event {event:?}");
+                        channel_sender
+                            .send(event)
+                            .await
+                            .map_err(|_| Error::ChannelClosing)?;
+                    }
 
-                    let we = WithdrawalEvent {
-                        tx_hash,
-                        block_number: block_number.as_u64(),
-                        token: log.address,
-                        amount: *amount,
-                    };
-                    let event = we.into();
-                    tracing::info!("sending withdrawal event {event:?}");
-                    sender
-                        .send(event)
-                        .await
-                        .map_err(|_| Error::ChannelClosing)?;
-                }
-                L2Events::WithdrawalInitiated(WithdrawalInitiatedFilter {
-                    amount,
-                    l_2_token,
-                    ..
-                }) => {
-                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
+                    if FinalizeWithdrawalCall::selector() == message[..4] && message.len() >= 68 {
+                        let token = Address::from(
+                            TryInto::<[u8; 20]>::try_into(&message[24..44])
+                                .expect("message length was checked; qed"),
+                        );
+                        let Some(token) = self.tokens.get(&token).cloned() else {
+                            return Ok(None);
+                        };
+                        let amount = U256::from(
+                            TryInto::<[u8; 32]>::try_into(&message[44..76])
+                                .expect("message length was checked; qed"),
+                        );
+                        let we = WithdrawalEvent {
+                            tx_hash,
+                            block_number: block_number.as_u64(),
+                            token,
+                            amount,
+                        };
+                        let event = we.into();
+                        tracing::info!("sending withdrawal event {event:?}");
+                        channel_sender
+                            .send(event)
+                            .await
+                            .map_err(|_| Error::ChannelClosing)?;
+                    }
 
-                    let we = WithdrawalEvent {
-                        tx_hash,
-                        block_number: block_number.as_u64(),
-                        token: *l_2_token,
-                        amount: *amount,
-                    };
-                    let event = we.into();
-                    tracing::info!("sending withdrawal event {event:?}");
-                    sender
-                        .send(event)
-                        .await
-                        .map_err(|_| Error::ChannelClosing)?;
+                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
                 }
                 L2Events::ContractDeployed(_) => {
                     let tx = middleware
@@ -524,12 +536,16 @@ impl L2EventsListener {
                     if let Some((l2_event, address)) =
                         self.bridge_initialize_event(bridge_init_log)?
                     {
-                        if self.tokens.insert(address) {
+                        if self
+                            .tokens
+                            .insert(l2_event.l2_token_address, l2_event.l1_token_address)
+                            .is_none()
+                        {
                             CHAIN_EVENTS_METRICS.new_token_added.inc();
 
                             let event = l2_event.into();
                             tracing::info!("sending new token event {event:?}");
-                            sender
+                            channel_sender
                                 .send(event)
                                 .await
                                 .map_err(|_| Error::ChannelClosing)?;
