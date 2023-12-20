@@ -525,7 +525,7 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     Ok((tokens, last_l2_block_seen as u64))
 }
 
-/// Get a mapping of known tokens in L1 -> L2
+/// Get a mapping of known tokens with L1 address as key and L2 address as value.
 pub async fn get_l1_to_l2_tokens(pool: &PgPool) -> Result<HashMap<Address, Address>> {
     let tokens: HashMap<Address, Address> = sqlx::query!(
         "

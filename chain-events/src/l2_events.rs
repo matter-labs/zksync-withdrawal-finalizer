@@ -147,7 +147,7 @@ impl L2EventsListener {
             if let Some((l2_event, _address)) = self.bridge_initialize_event(bridge_init_log)? {
                 if self
                     .tokens
-                    .insert(l2_event.l2_token_address, l2_event.l1_token_address)
+                    .insert(l2_event.l1_token_address, l2_event.l2_token_address)
                     .is_none()
                 {
                     let event = l2_event.into();
@@ -373,7 +373,7 @@ impl L2EventsListener {
             .await?;
         }
 
-        let mut tokens = vec![L1_MESSENGER_ADDRESS, self.l2_erc20_bridge_addr]; // self.tokens.keys().cloned().collect::<Vec<_>>();
+        let mut tokens = vec![L1_MESSENGER_ADDRESS, self.l2_erc20_bridge_addr];
         tokens.extend_from_slice(self.token_deployer_addrs.as_slice());
 
         tracing::info!("Listeing to events from tokens {tokens:?}");
@@ -491,10 +491,24 @@ impl L2EventsListener {
                     }
 
                     if FinalizeWithdrawalCall::selector() == message[..4] && message.len() >= 68 {
+                        // We will be seeing all tokens that go through
+                        // `L1MessageSent` messages even those that go through
+                        // custom bridges that we may or may not know the deployments
+                        // of. At the beginning of the finalizer execution
+                        // the `self.tokens` table gets populated from two sources:
+                        //
+                        //  * Known data from the `tokens` DB table
+                        //  * Custom tokens that were configured in the configuration file.
+                        //
+                        //  Then througout the course of life of the service the new tokens may
+                        //  have been deployed on the bridge they get added to the
+                        //  `self.tokens` map in `ContractDeployed` branch of this `match`
+                        //  Tokens that are still unknown are ignored.
                         let token = Address::from(
                             TryInto::<[u8; 20]>::try_into(&message[24..44])
                                 .expect("message length was checked; qed"),
                         );
+
                         let Some(token) = self.tokens.get(&token).cloned() else {
                             return Ok(None);
                         };
@@ -538,7 +552,7 @@ impl L2EventsListener {
                     {
                         if self
                             .tokens
-                            .insert(l2_event.l2_token_address, l2_event.l1_token_address)
+                            .insert(l2_event.l1_token_address, l2_event.l2_token_address)
                             .is_none()
                         {
                             CHAIN_EVENTS_METRICS.new_token_added.inc();
