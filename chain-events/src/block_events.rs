@@ -63,7 +63,10 @@ impl BlockEvents {
                 Some(p)
             }
             Err(e) => {
-                tracing::warn!("Block events stream reconnect attempt failed: {e}");
+                tracing::warn!(
+                    "Block events stream reconnect attempt failed: {e} {}",
+                    self.url
+                );
                 CHAIN_EVENTS_METRICS.l1_reconnects_on_error.inc();
                 None
             }
