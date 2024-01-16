@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.4...v0.4.0) (2024-01-16)
+
+
+### Features
+
+* **contracts:** Add the WithdrawalFinalizer Contract ([#314](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/314)) ([aa71fcb](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/aa71fcb7cdac8c2dcc557a53431738b7be847da8))
+
+
+### Bug Fixes
+
+* **chain-events:** do not listen to withdrawalinitiated events ([#347](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/347)) ([08e6971](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/08e6971fb31c72fd55441b781ef185afd52953b3))
+* **deps:** update dependency @matterlabs/zksync-contracts to ^0.6.0 ([#317](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/317)) ([6067bc1](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/6067bc11751b7cdede63a38053b897df9a095d61))
+* **deps:** update dependency ethers to v6 ([#329](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/329)) ([a3ca0bd](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a3ca0bde3bb8ad1d69c6ff8ecde724b09b68e6ff))
+* **deps:** update dependency zksync-web3 to ^0.17.0 ([#318](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/318)) ([2cb7d58](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/2cb7d5820b267c7ba4068deccdfb8ed72019f121))
+* **finalizer:** introduce an optional threshold to eth withdrawals ([#348](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/348)) ([a4e91dd](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a4e91dd1fe20639314f9441185da6cb8ec0d598f))
+
 ## [0.3.4](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.3...v0.3.4) (2023-11-14)
 
 
