@@ -5,7 +5,6 @@ use futures::{Sink, SinkExt, StreamExt};
 use client::{
     contracts_deployer::codegen::ContractDeployedFilter,
     ethtoken::codegen::WithdrawalFilter,
-    l2bridge::codegen::WithdrawalInitiatedFilter,
     l2standard_token::codegen::{
         BridgeBurnFilter, BridgeInitializationFilter, BridgeInitializeFilter,
     },
@@ -39,7 +38,6 @@ pub struct L2EventsListener {
 enum L2Events {
     BridgeBurn(BridgeBurnFilter),
     Withdrawal(WithdrawalFilter),
-    WithdrawalInitiated(WithdrawalInitiatedFilter),
     ContractDeployed(ContractDeployedFilter),
 }
 
@@ -337,17 +335,12 @@ impl L2EventsListener {
         let last_seen_l2_token_block: BlockNumber = last_seen_l2_token_block.into();
         let from_block: BlockNumber = from_block.into();
 
-        let past_topic0 = vec![
-            BridgeBurnFilter::signature(),
-            WithdrawalFilter::signature(),
-            WithdrawalInitiatedFilter::signature(),
-        ];
+        let past_topic0 = vec![BridgeBurnFilter::signature(), WithdrawalFilter::signature()];
 
         let topic0 = vec![
             ContractDeployedFilter::signature(),
             BridgeBurnFilter::signature(),
             WithdrawalFilter::signature(),
-            WithdrawalInitiatedFilter::signature(),
         ];
 
         tracing::info!("topic0 {topic0:?}");
@@ -477,26 +470,6 @@ impl L2EventsListener {
                         tx_hash,
                         block_number: block_number.as_u64(),
                         token: log.address,
-                        amount: *amount,
-                    };
-                    let event = we.into();
-                    tracing::info!("sending withdrawal event {event:?}");
-                    sender
-                        .send(event)
-                        .await
-                        .map_err(|_| Error::ChannelClosing)?;
-                }
-                L2Events::WithdrawalInitiated(WithdrawalInitiatedFilter {
-                    amount,
-                    l_2_token,
-                    ..
-                }) => {
-                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
-
-                    let we = WithdrawalEvent {
-                        tx_hash,
-                        block_number: block_number.as_u64(),
-                        token: *l_2_token,
                         amount: *amount,
                     };
                     let event = we.into();
