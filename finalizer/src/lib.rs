@@ -103,6 +103,7 @@ pub struct Finalizer<M1, M2> {
     account_address: Address,
     withdrawals_meterer: Option<WithdrawalsMeter>,
     token_list: TokenList,
+    eth_threshold: Option<U256>,
 }
 
 const NO_NEW_WITHDRAWALS_BACKOFF: Duration = Duration::from_secs(5);
@@ -132,6 +133,7 @@ where
         account_address: Address,
         token_list: TokenList,
         meter_withdrawals: bool,
+        eth_threshold: Option<U256>,
     ) -> Self {
         let withdrawals_meterer = meter_withdrawals.then_some(WithdrawalsMeter::new(
             pgpool.clone(),
@@ -157,6 +159,7 @@ where
             account_address,
             withdrawals_meterer,
             token_list,
+            eth_threshold,
         }
     }
 
@@ -351,14 +354,19 @@ where
 
         let try_finalize_these = match &self.token_list {
             TokenList::All => {
-                storage::withdrawals_to_finalize(&self.pgpool, self.query_db_pagination_limit)
-                    .await?
+                storage::withdrawals_to_finalize(
+                    &self.pgpool,
+                    self.query_db_pagination_limit,
+                    self.eth_threshold,
+                )
+                .await?
             }
             TokenList::WhiteList(w) => {
                 storage::withdrawals_to_finalize_with_whitelist(
                     &self.pgpool,
                     self.query_db_pagination_limit,
                     w,
+                    self.eth_threshold,
                 )
                 .await?
             }
@@ -367,6 +375,7 @@ where
                     &self.pgpool,
                     self.query_db_pagination_limit,
                     b,
+                    self.eth_threshold,
                 )
                 .await?
             }

@@ -83,6 +83,9 @@ pub struct Config {
 
     #[envconfig(from = "CUSTOM_TOKEN_ADDRESS_MAPPINGS")]
     pub custom_token_address_mappings: Option<CustomTokenAddressMappings>,
+
+    #[envconfig(from = "ETH_FINALIZATION_THRESHOLD")]
+    pub eth_finalization_threshold: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]

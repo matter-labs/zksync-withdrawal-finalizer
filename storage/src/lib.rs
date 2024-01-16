@@ -5,7 +5,7 @@
 
 //! Finalizer watcher.storage.operations.
 
-use ethers::types::{Address, H160, H256};
+use ethers::types::{Address, H160, H256, U256};
 use sqlx::{PgConnection, PgPool};
 
 use chain_events::L2TokenInitEvent;
@@ -746,8 +746,11 @@ pub async fn withdrawals_to_finalize_with_blacklist(
     pool: &PgPool,
     limit_by: u64,
     token_blacklist: &[Address],
+    eth_threshold: Option<U256>,
 ) -> Result<Vec<WithdrawalParams>> {
     let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
+    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
+    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
 
     let data = sqlx::query!(
         "
@@ -782,6 +785,11 @@ pub async fn withdrawals_to_finalize_with_blacklist(
           AND w.token NOT IN (SELECT * FROM UNNEST (
             $2 :: BYTEA []
           ))
+          AND (
+            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
+            ELSE TRUE
+            END
+          )
         ORDER BY
           finalization_data.l2_block_number
         LIMIT
@@ -789,6 +797,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
         ",
         limit_by as i64,
         &blacklist,
+        u256_to_big_decimal(eth_threshold),
     )
     .fetch_all(pool)
     .await?
@@ -816,8 +825,11 @@ pub async fn withdrawals_to_finalize_with_whitelist(
     pool: &PgPool,
     limit_by: u64,
     token_whitelist: &[Address],
+    eth_threshold: Option<U256>,
 ) -> Result<Vec<WithdrawalParams>> {
     let whitelist: Vec<_> = token_whitelist.iter().map(|a| a.0.to_vec()).collect();
+    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
+    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
 
     let data = sqlx::query!(
         "
@@ -852,6 +864,11 @@ pub async fn withdrawals_to_finalize_with_whitelist(
           AND w.token IN (SELECT * FROM UNNEST (
             $2 :: BYTEA []
           ))
+          AND (
+            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
+            ELSE TRUE
+            END
+          )
         ORDER BY
           finalization_data.l2_block_number
         LIMIT
@@ -859,6 +876,7 @@ pub async fn withdrawals_to_finalize_with_whitelist(
         ",
         limit_by as i64,
         &whitelist,
+        u256_to_big_decimal(eth_threshold),
     )
     .fetch_all(pool)
     .await?
@@ -885,8 +903,11 @@ pub async fn withdrawals_to_finalize_with_whitelist(
 pub async fn withdrawals_to_finalize(
     pool: &PgPool,
     limit_by: u64,
+    eth_threshold: Option<U256>,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
+    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
+    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
 
     let data = sqlx::query!(
         "
@@ -923,12 +944,18 @@ pub async fn withdrawals_to_finalize(
           OR
             last_finalization_attempt < NOW() - INTERVAL '1 minutes'
           )
+          AND (
+            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
+            ELSE TRUE
+            END
+          )
         ORDER BY
           finalization_data.l2_block_number
         LIMIT
           $1
         ",
         limit_by as i64,
+        u256_to_big_decimal(eth_threshold),
     )
     .fetch_all(pool)
     .await?
