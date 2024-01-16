@@ -81,7 +81,6 @@ pub fn is_eth(address: Address) -> bool {
 enum WithdrawalEvents {
     BridgeBurn(BridgeBurnFilter),
     Withdrawal(WithdrawalFilter),
-    WithdrawalInitiated(WithdrawalInitiatedFilter),
 }
 
 lazy_static! {
@@ -340,7 +339,6 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
             .filter(|log| {
                 log.topics[0] == BridgeBurnFilter::signature()
                     || log.topics[0] == WithdrawalFilter::signature()
-                    || log.topics[0] == WithdrawalInitiatedFilter::signature()
             })
             .nth(index)
             .ok_or(Error::WithdrawalLogNotFound(index, withdrawal_hash))?;
@@ -349,13 +347,6 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         let withdrawal_event = WithdrawalEvents::decode_log(&raw_log)?;
 
         let l2_to_l1_message_hash = match withdrawal_event {
-            WithdrawalEvents::WithdrawalInitiated(w) => {
-                let addr_lock = TOKEN_ADDRS.lock().await;
-                let l_1_token = addr_lock
-                    .get(&w.l_2_token)
-                    .ok_or(Error::L2TokenUnknown(w.l_2_token))?;
-                get_l1_bridge_burn_message_keccak(w.amount, w.l_1_receiver, *l_1_token)?
-            }
             WithdrawalEvents::BridgeBurn(b) => {
                 let mut addr_lock = TOKEN_ADDRS.lock().await;
 
