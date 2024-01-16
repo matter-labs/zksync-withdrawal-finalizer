@@ -283,6 +283,12 @@ async fn main() -> Result<()> {
         config.batch_finalization_gas_limit,
     );
 
+    let eth_finalization_threshold = match config.eth_finalization_threshold {
+        Some(eth_finalization_threshold) => {
+            Some(ethers::utils::parse_ether(eth_finalization_threshold)?)
+        }
+        None => None,
+    };
     let finalizer = finalizer::Finalizer::new(
         pgpool,
         one_withdrawal_gas_limit,
@@ -294,6 +300,7 @@ async fn main() -> Result<()> {
         finalizer_account_address,
         config.tokens_to_finalize.unwrap_or_default(),
         meter_withdrawals,
+        eth_finalization_threshold,
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
