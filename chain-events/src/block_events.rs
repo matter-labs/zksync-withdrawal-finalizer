@@ -12,7 +12,7 @@ use futures::{Sink, SinkExt, StreamExt};
 use client::{
     zksync_contract::{
         codegen::{
-            BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter, CommitBlocksCall,
+            BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter, CommitBatchesCall,
         },
         parse_withdrawal_events_l1,
     },
@@ -282,7 +282,7 @@ where
 
             let mut events = vec![];
 
-            if let Ok(commit_blocks) = CommitBlocksCall::decode(&tx.input) {
+            if let Ok(commit_blocks) = CommitBatchesCall::decode(&tx.input) {
                 let mut res = parse_withdrawal_events_l1(
                     &commit_blocks,
                     tx.block_number
