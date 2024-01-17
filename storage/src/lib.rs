@@ -790,8 +790,6 @@ pub async fn withdrawals_to_finalize_with_blacklist(
             ELSE TRUE
             END
           )
-        ORDER BY
-          finalization_data.l2_block_number
         LIMIT
           $1
         ",
@@ -869,8 +867,6 @@ pub async fn withdrawals_to_finalize_with_whitelist(
             ELSE TRUE
             END
           )
-        ORDER BY
-          finalization_data.l2_block_number
         LIMIT
           $1
         ",
@@ -949,8 +945,6 @@ pub async fn withdrawals_to_finalize(
             ELSE TRUE
             END
           )
-        ORDER BY
-          finalization_data.l2_block_number
         LIMIT
           $1
         ",
