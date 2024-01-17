@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.4.0...v0.5.0) (2024-01-17)
+
+
+### Features
+
+* **l1:** parse l2 to l1 message ([#352](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/352)) ([c5eb7e5](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/c5eb7e5be2f76911f6d797a7b6de44f9c78ea42c))
+
+
+### Bug Fixes
+
+* **storage:** remove order by to optimize query ([#349](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/349)) ([0fbddd4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0fbddd49d17945778574ef8ab27522753f85ae7f))
+
 ## [0.4.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.3.4...v0.4.0) (2024-01-16)
 
 
