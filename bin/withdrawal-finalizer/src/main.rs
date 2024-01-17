@@ -290,7 +290,7 @@ async fn main() -> Result<()> {
         None => None,
     };
     let finalizer = finalizer::Finalizer::new(
-        pgpool,
+        pgpool.clone(),
         one_withdrawal_gas_limit,
         batch_finalization_gas_limit,
         contract,
@@ -304,6 +304,11 @@ async fn main() -> Result<()> {
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
+    let metrics_handle = tokio::spawn(metrics::meter_unfinalized_withdrawals(
+        pgpool,
+        eth_finalization_threshold,
+    ));
+
     tokio::select! {
         r = block_events_handle => {
             tracing::error!("Block Events stream ended with {r:?}");
@@ -316,6 +321,9 @@ async fn main() -> Result<()> {
         }
         r = finalizer_handle => {
             tracing::error!("Finalizer ended with {r:?}");
+        }
+        _ = metrics_handle => {
+            tracing::error!("Metrics loop has ended");
         }
     }
 

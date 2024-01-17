@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*)\n        FROM\n          finalization_data\n          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id\n        WHERE\n          finalization_tx IS NULL\n          AND failed_finalization_attempts = 0\n          AND finalization_data.l2_block_number <= COALESCE(\n            (\n              SELECT\n                MAX(l2_block_number)\n              FROM\n                l2_blocks\n              WHERE\n                execute_l1_block_number IS NOT NULL\n            ),\n            1\n          )\n          AND token = decode('000000000000000000000000000000000000800A', 'hex') \n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a3dbb0522919f63706f3576b394a5bc149d100f740be557d170e7f1e3a055532"
+}
