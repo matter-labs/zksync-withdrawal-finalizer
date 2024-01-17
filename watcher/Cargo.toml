@@ -15,8 +15,10 @@ tokio = { workspace = true, features = ["macros", "time"] }
 tracing = { workspace = true }
 vise = { workspace = true }
 ethers = { workspace = true }
+coingecko = { workspace = true }
 
 client = { workspace = true }
 chain-events = {  workspace = true }
 storage = { workspace = true }
 withdrawals-meterer = { workspace = true }
+price-feed = { workspace = true }

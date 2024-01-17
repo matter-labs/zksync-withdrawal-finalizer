@@ -7,6 +7,7 @@
 
 use std::{str::FromStr, sync::Arc, time::Duration};
 
+use coingecko::CoinGeckoClient;
 use envconfig::Envconfig;
 use ethers::{
     prelude::SignerMiddleware,
@@ -230,7 +231,17 @@ async fn main() -> Result<()> {
     // by default meter withdrawals
     let meter_withdrawals = config.enable_withdrawal_metering.unwrap_or(true);
 
-    let watcher = Watcher::new(client_l2.clone(), pgpool.clone(), meter_withdrawals);
+    let coingecko_client = Some(CoinGeckoClient::default()); /* config
+                                                             .coingecko_api_url
+                                                             .as_ref()
+                                                             .map(|key| CoinGeckoClient::default()); */
+
+    let watcher = Watcher::new(
+        client_l2.clone(),
+        pgpool.clone(),
+        meter_withdrawals,
+        coingecko_client,
+    );
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,

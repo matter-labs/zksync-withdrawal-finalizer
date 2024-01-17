@@ -616,7 +616,11 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
 }
 
 /// Insert a token initialization event into the DB.
-pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
+pub async fn add_token(
+    pool: &PgPool,
+    token: &L2TokenInitEvent,
+    usd_price: Option<f64>,
+) -> Result<()> {
     let latency = STORAGE_METRICS.call[&"add_token"].start();
 
     sqlx::query!(
@@ -629,10 +633,11 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
             symbol,
             decimals,
             l2_block_number,
-            initialization_transaction
+            initialization_transaction,
+            usd_price
           )
         VALUES
-          ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
+          ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
         ",
         token.l1_token_address.0.to_vec(),
         token.l2_token_address.0.to_vec(),
@@ -641,6 +646,7 @@ pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
         token.decimals as i64,
         token.l2_block_number as i64,
         token.initialization_transaction.0.to_vec(),
+        usd_price,
     )
     .execute(pool)
     .await?;

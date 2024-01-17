@@ -4,6 +4,7 @@ use std::{
 };
 
 use chain_events::L2Event;
+use coingecko::CoinGeckoClient;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::{stream::StreamExt, Stream};
 use sqlx::PgPool;
@@ -35,6 +36,7 @@ pub struct Watcher<M2> {
     l2_provider: Arc<M2>,
     pgpool: PgPool,
     withdrawals_meterer: Option<WithdrawalsMeter>,
+    coingecko_client: Option<CoinGeckoClient>,
 }
 
 impl<M2> Watcher<M2>
@@ -42,7 +44,12 @@ where
     M2: ZksyncMiddleware + 'static,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    pub fn new(l2_provider: Arc<M2>, pgpool: PgPool, meter_withdrawals: bool) -> Self {
+    pub fn new(
+        l2_provider: Arc<M2>,
+        pgpool: PgPool,
+        meter_withdrawals: bool,
+        coingecko_client: Option<CoinGeckoClient>,
+    ) -> Self {
         let withdrawals_meterer = meter_withdrawals.then_some(WithdrawalsMeter::new(
             pgpool.clone(),
             MeteringComponent::RequestedWithdrawals,
@@ -52,6 +59,7 @@ where
             l2_provider,
             pgpool,
             withdrawals_meterer,
+            coingecko_client,
         }
     }
 
@@ -69,6 +77,7 @@ where
             l2_provider,
             pgpool,
             withdrawals_meterer,
+            coingecko_client,
         } = self;
 
         // While reading the stream of withdrawal events asyncronously
@@ -97,6 +106,7 @@ where
                 withdrawal_events,
                 from_l2_block,
                 withdrawals_meterer,
+                coingecko_client,
             )
             .await
         });
@@ -380,6 +390,7 @@ async fn run_l2_events_loop<WE>(
     we: WE,
     from_l2_block: u64,
     mut withdrawals_meterer: Option<WithdrawalsMeter>,
+    coingecko_client: Option<coingecko::CoinGeckoClient>,
 ) -> Result<()>
 where
     WE: Stream<Item = L2Event>,
@@ -405,7 +416,15 @@ where
             }
             L2Event::L2TokenInitEvent(event) => {
                 tracing::debug!("l2 token init event {event:?}");
-                storage::add_token(&pool, &event).await?;
+                let price = match &coingecko_client {
+                    Some(coingecko_client) => {
+                        price_feed::current_token_price(&coingecko_client, event.l1_token_address)
+                            .await
+                    }
+                    None => None,
+                };
+
+                storage::add_token(&pool, &event, price).await?;
             }
             L2Event::RestartedFromBlock(_block_number) => {
                 // The event producer has been restarted at a given

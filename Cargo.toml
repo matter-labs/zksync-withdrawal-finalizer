@@ -15,8 +15,8 @@ members = [
     "tx-sender",
     "vlog",
     "watcher",
-    "withdrawals-meterer"
-, "price-feed"]
+    "withdrawals-meterer",
+]
 
 [workspace.package]
 version = "0.2.0"
@@ -58,6 +58,7 @@ vise = { git = "https://github.com/matter-labs/vise.git" }
 vise-exporter = { git = "https://github.com/matter-labs/vise.git" }
 client = { path = "./client" }
 chain-events = { path = "./chain-events" }
+price-feed = { path = "./price-feed" }
 storage = { path = "./storage" }
 withdrawals-meterer = { path = "./withdrawals-meterer" }
 watcher = { path = "./watcher" }
@@ -68,4 +69,4 @@ tokio-stream = "0.1.14"
 tokio-util = "0.7.10"
 url = "2.5.0"
 vlog = { path = "./vlog" }
-coingecko = "1.0.1"
+coingecko =  { path = "../../montekki/coingecko-rs" }

@@ -86,6 +86,9 @@ pub struct Config {
 
     #[envconfig(from = "ETH_FINALIZATION_THRESHOLD")]
     pub eth_finalization_threshold: Option<String>,
+
+    #[envconfig(from = "COINGECKO_API_KEY")]
+    pub coingecko_api_url: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
