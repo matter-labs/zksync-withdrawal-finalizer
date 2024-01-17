@@ -201,7 +201,7 @@ where
             event,
         } => {
             if let Some((range_begin, range_end)) = l2_middleware
-                .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                .get_l1_batch_block_range(event.batch_number.as_u64() as u32)
                 .await?
             {
                 WATCHER_METRICS
@@ -220,8 +220,8 @@ where
             block_number,
             event,
         } => {
-            let current_first_verified_batch = event.previous_last_verified_block.as_u64() + 1;
-            let current_last_verified_batch = event.current_last_verified_block.as_u64();
+            let current_first_verified_batch = event.previous_last_verified_batch.as_u64() + 1;
+            let current_last_verified_batch = event.current_last_verified_batch.as_u64();
             let range_begin = l2_middleware
                 .get_l1_batch_block_range(current_first_verified_batch as u32)
                 .await?
@@ -251,7 +251,7 @@ where
             event,
         } => {
             if let Some((range_begin, range_end)) = l2_middleware
-                .get_l1_batch_block_range(event.block_number.as_u64() as u32)
+                .get_l1_batch_block_range(event.batch_number.as_u64() as u32)
                 .await?
             {
                 WATCHER_METRICS
