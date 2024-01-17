@@ -1288,3 +1288,55 @@ pub async fn delete_finalization_data_content(
 
     Ok(())
 }
+
+struct UserWithdrawal {
+    pub tx_hash: H256,
+    pub token: Address,
+    pub amount: U256,
+    pub status: String
+}
+
+/// Request withdrawals for a given address.
+pub async fn withdrawals_for_address(
+    conn: &mut PgConnection,
+    address: Address,
+    limit: u64,
+) -> Result<Vec<UserWithdrawal>> {
+    let latency = STORAGE_METRICS.call[&"withdrawals_for_address"].start();
+
+    let events = sqlx::query!(
+        "
+         SELECT
+             l2_to_l1_events.l1_token_addr,
+             l2_to_l1_events.amount,
+             withdrawals.tx_hash
+         FROM
+             l2_to_l1_events
+         JOIN finalization_data ON
+             finalization_data.l1_batch_number = l2_to_l1_events.l2_block_number
+         JOIN withdrawals ON
+             withdrawals.id = finalization_data.withdrawal_id
+         AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block
+         WHERE l2_to_l1_events.to_address = $1
+         ORDER BY l2_to_l1_events.l2_block_number DESC
+         LIMIT $2
+        ",
+        address.as_bytes(),
+        limit as i64,
+    )
+        .fetch_all(conn)
+        .await?
+        .into_iter()
+        .map(|r| UserWithdrawal {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            token: Address::from_slice(&r.l1_token_addr),
+            amount: utils::bigdecimal_to_u256(r.amount),
+            status: "".to_string(),
+        })
+        .collect();
+
+    latency.observe();
+
+    Ok(events)
+}
+
