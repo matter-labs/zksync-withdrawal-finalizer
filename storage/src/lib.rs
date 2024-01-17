@@ -1289,16 +1289,21 @@ pub async fn delete_finalization_data_content(
     Ok(())
 }
 
-struct UserWithdrawal {
+/// Withdrawal event requested for address
+pub struct UserWithdrawal {
+    /// Transaction hash
     pub tx_hash: H256,
+    /// Token address
     pub token: Address,
+    /// Amount
     pub amount: U256,
-    pub status: String
+    /// Status
+    pub status: String,
 }
 
 /// Request withdrawals for a given address.
 pub async fn withdrawals_for_address(
-    conn: &mut PgConnection,
+    pool: &PgPool,
     address: Address,
     limit: u64,
 ) -> Result<Vec<UserWithdrawal>> {
@@ -1314,9 +1319,9 @@ pub async fn withdrawals_for_address(
              l2_to_l1_events
          JOIN finalization_data ON
              finalization_data.l1_batch_number = l2_to_l1_events.l2_block_number
+         AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block
          JOIN withdrawals ON
              withdrawals.id = finalization_data.withdrawal_id
-         AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block
          WHERE l2_to_l1_events.to_address = $1
          ORDER BY l2_to_l1_events.l2_block_number DESC
          LIMIT $2
@@ -1324,19 +1329,18 @@ pub async fn withdrawals_for_address(
         address.as_bytes(),
         limit as i64,
     )
-        .fetch_all(conn)
-        .await?
-        .into_iter()
-        .map(|r| UserWithdrawal {
-            tx_hash: H256::from_slice(&r.tx_hash),
-            token: Address::from_slice(&r.l1_token_addr),
-            amount: utils::bigdecimal_to_u256(r.amount),
-            status: "".to_string(),
-        })
-        .collect();
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| UserWithdrawal {
+        tx_hash: H256::from_slice(&r.tx_hash),
+        token: Address::from_slice(&r.l1_token_addr),
+        amount: utils::bigdecimal_to_u256(r.amount),
+        status: "".to_string(),
+    })
+    .collect();
 
     latency.observe();
 
     Ok(events)
 }
-
