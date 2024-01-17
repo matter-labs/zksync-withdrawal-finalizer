@@ -1,14 +1,12 @@
 //! ABI wrappers for the `ZkSync` contract.
 
 use std::fmt::Debug;
-use std::str::FromStr;
 
 use ethers::{
     abi::{AbiDecode, AbiError},
     prelude::EthCall,
     types::{Address, H256, U256},
 };
-use ethers::abi::Bytes;
 
 use crate::{l1bridge::codegen::FinalizeWithdrawalCall, ETH_TOKEN_ADDRESS, L1_MESSENGER_ADDRESS};
 
@@ -181,7 +179,7 @@ pub fn parse_withdrawal_events_l1(
             Some(b) => b,
             None => continue,
         };
-        cursor +=4;
+        cursor += 4;
 
         let length = u32::from_be_bytes(
             length_bytes
@@ -210,7 +208,7 @@ pub fn parse_withdrawal_events_l1(
         }
         cursor += length * L2_TO_L1_LOG_SERIALIZED_SIZE;
 
-        let messages_length_bytes = &logs_pubdata[cursor.. cursor + 4];
+        let messages_length_bytes = &logs_pubdata[cursor..cursor + 4];
         let messages_length = u32::from_be_bytes(
             messages_length_bytes
                 .try_into()
@@ -232,7 +230,7 @@ pub fn parse_withdrawal_events_l1(
                 ) as usize;
                 cursor += 4;
                 let message = &messages_bytes[cursor..cursor + current_message_length];
-                cursor += current_message_length ;
+                cursor += current_message_length;
                 // If the current message is not the one we are looking for, skip it and increase the cursor
                 if i < position {
                     continue;
@@ -296,25 +294,28 @@ pub fn parse_withdrawal_events_l1(
                 break;
             }
         }
-
-
     }
 
     withdrawals
 }
 
 #[cfg(test)]
-use hex::FromHex;
-#[test]
-fn parse_l2_to_l1(){
-    let input = include_str!("../../test_tx.txt");
-    let bytes = Bytes::from_hex(input).unwrap();
-    let block = CommitBatchesCall::decode(bytes).unwrap();
-    let withdrawals = parse_withdrawal_events_l1(
-      &block,
-        0,
-        Address::from_str("11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102").unwrap()
-    );
-    assert_eq!(withdrawals.len(), 19);
+mod tests {
+    use super::*;
+    use ethers::abi::Bytes;
+    use hex::FromHex;
+    use std::str::FromStr;
 
+    #[test]
+    fn parse_l2_to_l1() {
+        let input = include_str!("../../test_tx.txt");
+        let bytes = Bytes::from_hex(input).unwrap();
+        let block = CommitBatchesCall::decode(bytes).unwrap();
+        let withdrawals = parse_withdrawal_events_l1(
+            &block,
+            0,
+            Address::from_str("11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102").unwrap(),
+        );
+        assert_eq!(withdrawals.len(), 19);
+    }
 }
