@@ -1,0 +1,16 @@
+[package]
+name = "price-feed"
+version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+authors.workspace = true
+exclude.workspace = true
+
+[dependencies]
+coingecko = { workspace = true }
+storage = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
+ethers = { workspace = true }
+sqlx = { workspace = true }
+futures = { workspace = true }

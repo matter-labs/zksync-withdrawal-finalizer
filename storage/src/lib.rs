@@ -35,6 +35,98 @@ pub struct StoredWithdrawal {
     pub index_in_tx: usize,
 }
 
+/// A token as stored in the database
+pub struct StoredToken {
+    /// Address of token on L1
+    pub l1_token_address: Address,
+
+    /// Address of token on L2
+    pub l2_token_address: Address,
+
+    /// USD price of the token if known
+    pub usd_price: Option<f64>,
+
+    /// Name of the token
+    pub name: String,
+
+    /// Symbol of the token
+    pub symbol: String,
+
+    /// Decimals of the token
+    pub decimals: i32,
+}
+
+/// Update the prices of the tokens as received from the oracle
+pub async fn update_token_prices(
+    pool: &PgPool,
+    prices_and_addrs: &[(Address, Option<f64>)],
+) -> Result<()> {
+    let mut addrs = vec![];
+    let mut prices = vec![];
+
+    for (addr, price) in prices_and_addrs {
+        if let Some(price) = price {
+            addrs.push(addr.0.to_vec());
+            prices.push(*price);
+        }
+    }
+
+    sqlx::query!(
+        "
+        UPDATE
+            tokens
+        SET
+            usd_price = u.price
+        FROM
+            UNNEST (
+                $1 :: BYTEA [],
+                $2 :: FLOAT8 []
+            ) AS u(
+                l1_token_address,
+                price
+            )
+        WHERE
+            tokens.l1_token_address = u.l1_token_address
+        ",
+        &addrs,
+        &prices,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// A token as stored in the DB
+pub async fn get_all_tokens(pool: &PgPool) -> Result<Vec<StoredToken>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            l1_token_address,
+            l2_token_address,
+            name,
+            symbol,
+            decimals
+        FROM
+            tokens
+        "
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| StoredToken {
+        l1_token_address: Address::from_slice(&r.l1_token_address),
+        l2_token_address: Address::from_slice(&r.l2_token_address),
+        usd_price: None,
+        name: r.name,
+        symbol: r.symbol,
+        decimals: r.decimals,
+    })
+    .collect();
+
+    Ok(res)
+}
+
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
 pub async fn committed_new_batch(
     pool: &PgPool,

@@ -10,12 +10,13 @@ members = [
     "finalizer",
     "client",
     "chain-events",
+    "price-feed",
     "storage",
     "tx-sender",
     "vlog",
     "watcher",
     "withdrawals-meterer"
-]
+, "price-feed"]
 
 [workspace.package]
 version = "0.2.0"
@@ -67,3 +68,4 @@ tokio-stream = "0.1.14"
 tokio-util = "0.7.10"
 url = "2.5.0"
 vlog = { path = "./vlog" }
+coingecko = "1.0.1"
