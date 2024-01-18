@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.5.0...v0.6.0) (2024-01-18)
+
+
+### Features
+
+* **api:** adds api to finalizer to query withdrawals ([#354](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/354)) ([ef5e147](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ef5e14701d48534c12a5c31f4cc9b991b42e6576))
+
 ## [0.5.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.4.0...v0.5.0) (2024-01-17)
 
 
