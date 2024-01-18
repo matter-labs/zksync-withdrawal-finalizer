@@ -43,7 +43,9 @@ pub async fn run_server(pool: PgPool) {
 async fn health(
     State(pool): State<PgPool>,
 ) -> Result<&'static str,StatusCode> {
-    pool.acquire().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    pool.acquire()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok("ok")
 }
 
