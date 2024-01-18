@@ -15,7 +15,10 @@ use ethers::{
     types::U256,
 };
 use eyre::{anyhow, Result};
-use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    ConnectOptions, PgConnection,
+};
 
 use chain_events::{BlockEvents, L2EventsListener};
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
@@ -177,7 +180,10 @@ async fn main() -> Result<()> {
     let options =
         PgConnectOptions::from_str(config.database_url.as_str())?.disable_statement_logging();
 
-    let pgpool = PgPool::connect_with(options).await?;
+    let pgpool = PgPoolOptions::new()
+        .acquire_timeout(Duration::from_secs(2))
+        .connect_with(options)
+        .await?;
 
     let from_l2_block = start_from_l2_block(
         client_l2.clone(),
