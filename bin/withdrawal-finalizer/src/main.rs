@@ -305,7 +305,7 @@ async fn main() -> Result<()> {
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
     let metrics_handle = tokio::spawn(metrics::meter_unfinalized_withdrawals(
-        pgpool,
+        pgpool.clone(),
         eth_finalization_threshold,
     ));
 
