@@ -40,9 +40,7 @@ pub async fn run_server(pool: PgPool) {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn health(
-    State(pool): State<PgPool>,
-) -> Result<&'static str,StatusCode> {
+async fn health(State(pool): State<PgPool>) -> Result<&'static str, StatusCode> {
     pool.acquire()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
