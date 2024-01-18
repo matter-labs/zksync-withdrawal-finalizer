@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.0...v0.6.1) (2024-01-18)
+
+
+### Bug Fixes
+
+* **api:** Healtcheck and api fixes ([#360](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/360)) ([7f4a7e9](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7f4a7e9fd002c191b982dd3036dfb6986f448ccc))
+* change types on api ([#358](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/358)) ([a43e955](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a43e9553f16a3d8dcc486b4666f55bfaeb20f5ba))
+
 ## [0.6.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.5.0...v0.6.0) (2024-01-18)
 
 
