@@ -1,0 +1,15 @@
+[package]
+name = "api"
+version.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+axum = "0.7.4"
+storage.workspace = true
+sqlx.workspace = true
+serde.workspace = true
+tokio.workspace = true
+ethers.workspace = true

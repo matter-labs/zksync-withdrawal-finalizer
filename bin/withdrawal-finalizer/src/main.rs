@@ -290,7 +290,7 @@ async fn main() -> Result<()> {
         None => None,
     };
     let finalizer = finalizer::Finalizer::new(
-        pgpool,
+        pgpool.clone(),
         one_withdrawal_gas_limit,
         batch_finalization_gas_limit,
         contract,
@@ -304,7 +304,12 @@ async fn main() -> Result<()> {
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
+    let api_server = tokio::spawn(api::run_server(pgpool));
+
     tokio::select! {
+        r = api_server => {
+            tracing::error!("Api server ended with {r:?}");
+        }
         r = block_events_handle => {
             tracing::error!("Block Events stream ended with {r:?}");
         }
