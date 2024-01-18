@@ -310,6 +310,11 @@ async fn main() -> Result<()> {
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
+    let metrics_handle = tokio::spawn(metrics::meter_unfinalized_withdrawals(
+        pgpool.clone(),
+        eth_finalization_threshold,
+    ));
+
     let api_server = tokio::spawn(api::run_server(pgpool));
 
     tokio::select! {
@@ -327,6 +332,9 @@ async fn main() -> Result<()> {
         }
         r = finalizer_handle => {
             tracing::error!("Finalizer ended with {r:?}");
+        }
+        _ = metrics_handle => {
+            tracing::error!("Metrics loop has ended");
         }
     }
 
