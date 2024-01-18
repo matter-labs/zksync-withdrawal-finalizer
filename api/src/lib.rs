@@ -32,11 +32,19 @@ impl From<UserWithdrawal> for WithdrawalResponse {
 pub async fn run_server(pool: PgPool) {
     let app = Router::new()
         .route("/withdrawals/:from", get(get_withdrawals))
+        .route("/health", get(health))
         .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn health(
+    State(pool): State<PgPool>,
+) -> Result<&'static str,StatusCode> {
+    pool.acquire().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok("ok")
 }
 
 async fn get_withdrawals(
