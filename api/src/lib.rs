@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Path, Query, State};
 use axum::{http::StatusCode, routing::get, Json, Router};
 use ethers::abi::Address;
 use ethers::types::{H256, U256};
@@ -8,7 +8,6 @@ use storage::UserWithdrawal;
 
 #[derive(Deserialize, Serialize, Clone)]
 struct WithdrawalRequest {
-    pub from: Address,
     pub limit: u64,
 }
 #[derive(Deserialize, Serialize, Clone)]
@@ -32,7 +31,7 @@ impl From<UserWithdrawal> for WithdrawalResponse {
 
 pub async fn run_server(pool: PgPool) {
     let app = Router::new()
-        .route("/withdrawals", get(get_withdrawals))
+        .route("/withdrawals/:from", get(get_withdrawals))
         .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000
@@ -41,10 +40,11 @@ pub async fn run_server(pool: PgPool) {
 }
 
 async fn get_withdrawals(
+    Path(from): Path<Address>,
     State(pool): State<PgPool>,
-    Json(payload): Json<WithdrawalRequest>,
+    Query(payload): Query<WithdrawalRequest>,
 ) -> Result<Json<Vec<WithdrawalResponse>>, StatusCode> {
-    let result: Vec<_> = storage::withdrawals_for_address(&pool, payload.from, payload.limit)
+    let result: Vec<_> = storage::withdrawals_for_address(&pool, from, payload.limit)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .into_iter()
