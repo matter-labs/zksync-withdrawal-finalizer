@@ -21,7 +21,7 @@ use codegen::{
     BlockCommitFilter, BlockExecutionFilter, BlocksRevertFilter, BlocksVerificationFilter,
 };
 
-use self::codegen::{CommitBlocksCall, FinalizeEthWithdrawalCall};
+use self::codegen::{CommitBatchesCall, FinalizeEthWithdrawalCall};
 
 /// An `enum` wrapping different block `event`s
 #[derive(Debug)]
@@ -75,32 +75,32 @@ impl std::fmt::Display for BlockEvent {
         match self {
             Self::BlockCommit { event: bc, .. } => f
                 .debug_struct("BlockCommitFilter")
-                .field("block_number", &bc.block_number)
-                .field("block_hash", &H256::from(&bc.block_hash))
+                .field("block_number", &bc.batch_number)
+                .field("block_hash", &H256::from(&bc.batch_hash))
                 .field("commitment", &H256::from(&bc.commitment))
                 .finish(),
             Self::BlockExecution { event: be, .. } => f
                 .debug_struct("BlockExecution")
-                .field("block_number", &be.block_number)
-                .field("block_hash", &H256::from(&be.block_hash))
+                .field("block_number", &be.batch_number)
+                .field("block_hash", &H256::from(&be.batch_hash))
                 .field("commitment", &H256::from(&be.commitment))
                 .finish(),
             Self::BlocksVerification { event: bv, .. } => f
                 .debug_struct("BlocksVerification")
                 .field(
-                    "previous_last_verified_block",
-                    &bv.previous_last_verified_block,
+                    "previous_last_verified_batch",
+                    &bv.previous_last_verified_batch,
                 )
                 .field(
                     "current_last_verified_block",
-                    &bv.current_last_verified_block,
+                    &bv.current_last_verified_batch,
                 )
                 .finish(),
             Self::BlocksRevert { event: br, .. } => f
                 .debug_struct("BlocksRevert")
-                .field("total_blocks_commited", &br.total_blocks_committed)
-                .field("total_blocks_verified", &br.total_blocks_verified)
-                .field("total_blocks_executed", &br.total_blocks_executed)
+                .field("total_blocks_commited", &br.total_batches_committed)
+                .field("total_blocks_verified", &br.total_batches_verified)
+                .field("total_blocks_executed", &br.total_batches_executed)
                 .finish(),
             Self::L2ToL1Events { events } => f
                 .debug_struct("L2ToL1Events")
@@ -125,7 +125,7 @@ impl AbiDecode for L2LogCompresed {
         let inner = codegen::L2Log {
             l_2_shard_id: bytes[0],
             is_service: bytes[1] != 0,
-            tx_number_in_block: u16::from_be_bytes([bytes[2], bytes[3]]),
+            tx_number_in_batch: u16::from_be_bytes([bytes[2], bytes[3]]),
             sender: Address::from_slice(&bytes[4..24]),
             key: bytes[24..56]
                 .try_into()
@@ -163,33 +163,36 @@ pub struct L2ToL1Event {
     pub tx_number_in_block: u16,
 }
 
-/// Given a [`CommitBlocksCall`] parse all withdrawal events from [`L2ToL1`] logs.
+/// Given a [`CommitBatchesCall`] parse all withdrawal events from [`L2ToL1`] logs.
 // TODO: rewrite in `nom`.
 pub fn parse_withdrawal_events_l1(
-    call: &CommitBlocksCall,
+    call: &CommitBatchesCall,
     l1_block_number: u64,
     l2_erc20_bridge_addr: Address,
 ) -> Vec<L2ToL1Event> {
     let mut withdrawals = vec![];
 
-    for data in &call.new_blocks_data {
-        let logs = &data.l_2_logs;
-        let length_bytes = match logs.get(..4) {
+    for data in &call.new_batches_data {
+        let logs_pubdata = &data.total_l2_to_l1_pubdata;
+        let mut cursor = 0;
+        let length_bytes = match logs_pubdata.get(..4) {
             Some(b) => b,
             None => continue,
         };
+        cursor += 4;
 
         let length = u32::from_be_bytes(
             length_bytes
                 .try_into()
                 .expect("bytes length checked by .get(); qed"),
-        );
+        ) as usize;
 
-        let logs = &logs[4..];
+        let logs = &logs_pubdata[cursor..];
 
         let mut current_message = 0;
 
-        for i in 0..length as usize {
+        let mut l2_to_l1_compressed_messages = vec![];
+        for i in 0..length {
             let offset = i * L2_TO_L1_LOG_SERIALIZED_SIZE;
             let log_entry =
                 L2LogCompresed::decode(&logs[offset..(offset + L2_TO_L1_LOG_SERIALIZED_SIZE)])
@@ -199,61 +202,120 @@ pub fn parse_withdrawal_events_l1(
                 continue;
             }
 
-            let message = &data.l_2_arbitrary_length_messages[current_message];
-            let message_sender: Address = H256::from(log_entry.0.key).into();
-            let l2_block_number = data.block_number;
+            l2_to_l1_compressed_messages.push((log_entry, current_message));
 
-            if message_sender == ETH_TOKEN_ADDRESS
-                && FinalizeEthWithdrawalCall::selector() == message[..4]
-                && message.len() >= 56
-            {
-                let to = Address::from(
-                    TryInto::<[u8; 20]>::try_into(&message[4..24])
-                        .expect("message length was checked; qed"),
-                );
-                let amount = U256::from(
-                    TryInto::<[u8; 32]>::try_into(&message[24..56])
-                        .expect("message length was checked; qed"),
-                );
-
-                withdrawals.push(L2ToL1Event {
-                    token: ETH_TOKEN_ADDRESS,
-                    to,
-                    amount,
-                    l1_block_number,
-                    l2_block_number,
-                    tx_number_in_block: log_entry.0.tx_number_in_block,
-                });
-            }
-
-            if message_sender == l2_erc20_bridge_addr
-                && FinalizeWithdrawalCall::selector() == message[..4]
-                && message.len() >= 68
-            {
-                let to = Address::from(
-                    TryInto::<[u8; 20]>::try_into(&message[4..24])
-                        .expect("message length was checked; qed"),
-                );
-                let token = Address::from(
-                    TryInto::<[u8; 20]>::try_into(&message[24..44])
-                        .expect("message length was checked; qed"),
-                );
-                let amount = U256::from(
-                    TryInto::<[u8; 32]>::try_into(&message[44..76])
-                        .expect("message length was checked; qed"),
-                );
-                withdrawals.push(L2ToL1Event {
-                    token,
-                    to,
-                    amount,
-                    l1_block_number,
-                    l2_block_number,
-                    tx_number_in_block: log_entry.0.tx_number_in_block,
-                });
-            }
             current_message += 1;
+        }
+        cursor += length * L2_TO_L1_LOG_SERIALIZED_SIZE;
+
+        let messages_length_bytes = &logs_pubdata[cursor..cursor + 4];
+        let messages_length = u32::from_be_bytes(
+            messages_length_bytes
+                .try_into()
+                .expect("bytes length checked by .get(); qed"),
+        ) as usize;
+        cursor += 4;
+        let messages_bytes = &logs_pubdata[cursor..];
+
+        // reset cursor, now we are working with messages
+        cursor = 0;
+        let mut current_message = 0;
+        for (log_entry, position) in l2_to_l1_compressed_messages {
+            // We are assuming that the messages are sorted by position
+            for i in current_message..messages_length {
+                let current_message_length = u32::from_be_bytes(
+                    messages_bytes[cursor..cursor + 4]
+                        .try_into()
+                        .expect("bytes length checked by .get(); qed"),
+                ) as usize;
+                cursor += 4;
+                let message = &messages_bytes[cursor..cursor + current_message_length];
+                cursor += current_message_length;
+                // If the current message is not the one we are looking for, skip it and increase the cursor
+                if i < position {
+                    continue;
+                }
+                if i > position {
+                    panic!("We should've break before this point")
+                }
+
+                let message_sender: Address = H256::from(log_entry.0.key).into();
+                let l2_block_number = data.batch_number;
+
+                if message_sender == ETH_TOKEN_ADDRESS
+                    && FinalizeEthWithdrawalCall::selector() == message[..4]
+                    && message.len() >= 56
+                {
+                    let to = Address::from(
+                        TryInto::<[u8; 20]>::try_into(&message[4..24])
+                            .expect("message length was checked; qed"),
+                    );
+                    let amount = U256::from(
+                        TryInto::<[u8; 32]>::try_into(&message[24..56])
+                            .expect("message length was checked; qed"),
+                    );
+
+                    withdrawals.push(L2ToL1Event {
+                        token: ETH_TOKEN_ADDRESS,
+                        to,
+                        amount,
+                        l1_block_number,
+                        l2_block_number,
+                        tx_number_in_block: log_entry.0.tx_number_in_batch,
+                    });
+                }
+
+                if message_sender == l2_erc20_bridge_addr
+                    && FinalizeWithdrawalCall::selector() == message[..4]
+                    && message.len() >= 68
+                {
+                    let to = Address::from(
+                        TryInto::<[u8; 20]>::try_into(&message[4..24])
+                            .expect("message length was checked; qed"),
+                    );
+                    let token = Address::from(
+                        TryInto::<[u8; 20]>::try_into(&message[24..44])
+                            .expect("message length was checked; qed"),
+                    );
+                    let amount = U256::from(
+                        TryInto::<[u8; 32]>::try_into(&message[44..76])
+                            .expect("message length was checked; qed"),
+                    );
+                    withdrawals.push(L2ToL1Event {
+                        token,
+                        to,
+                        amount,
+                        l1_block_number,
+                        l2_block_number,
+                        tx_number_in_block: log_entry.0.tx_number_in_batch,
+                    });
+                }
+                current_message = i + 1;
+                break;
+            }
         }
     }
 
     withdrawals
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ethers::abi::Bytes;
+    use hex::FromHex;
+    use std::str::FromStr;
+
+    #[test]
+    fn parse_l2_to_l1() {
+        let input = include_str!("../../test_tx.txt");
+        let bytes = Bytes::from_hex(input).unwrap();
+        let block = CommitBatchesCall::decode(bytes).unwrap();
+        let withdrawals = parse_withdrawal_events_l1(
+            &block,
+            0,
+            Address::from_str("11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102").unwrap(),
+        );
+        assert_eq!(withdrawals.len(), 19);
+    }
 }
