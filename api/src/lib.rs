@@ -25,7 +25,7 @@ impl From<UserWithdrawal> for WithdrawalResponse {
             tx_hash: withdrawal.tx_hash,
             token: withdrawal.token,
             amount: withdrawal.amount,
-            status: withdrawal.status,
+            status: format!("{:?}", withdrawal.status),
         }
     }
 }

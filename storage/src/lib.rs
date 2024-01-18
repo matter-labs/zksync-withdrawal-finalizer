@@ -1289,6 +1289,15 @@ pub async fn delete_finalization_data_content(
     Ok(())
 }
 
+/// Finalization status of a withdrawal
+#[derive(Debug, Clone)]
+pub enum FinalizationStatus {
+    /// Withdrawal has been finalized
+    Finalized,
+    /// Withdrawal has not been finalized
+    NotFinalized,
+}
+
 /// Withdrawal event requested for address
 pub struct UserWithdrawal {
     /// Transaction hash
@@ -1298,7 +1307,7 @@ pub struct UserWithdrawal {
     /// Amount
     pub amount: U256,
     /// Status
-    pub status: String,
+    pub status: FinalizationStatus,
 }
 
 /// Request withdrawals for a given address.
@@ -1314,7 +1323,8 @@ pub async fn withdrawals_for_address(
          SELECT
              l2_to_l1_events.l1_token_addr,
              l2_to_l1_events.amount,
-             withdrawals.tx_hash
+             withdrawals.tx_hash,
+             finalization_data.finalization_tx
          FROM
              l2_to_l1_events
          JOIN finalization_data ON
@@ -1332,11 +1342,18 @@ pub async fn withdrawals_for_address(
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|r| UserWithdrawal {
-        tx_hash: H256::from_slice(&r.tx_hash),
-        token: Address::from_slice(&r.l1_token_addr),
-        amount: utils::bigdecimal_to_u256(r.amount),
-        status: "".to_string(),
+    .map(|r| {
+        let status = if r.finalization_tx.is_some() {
+            FinalizationStatus::Finalized
+        } else {
+            FinalizationStatus::NotFinalized
+        };
+        UserWithdrawal {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            token: Address::from_slice(&r.l1_token_addr),
+            amount: utils::bigdecimal_to_u256(r.amount),
+            status,
+        }
     })
     .collect();
 
