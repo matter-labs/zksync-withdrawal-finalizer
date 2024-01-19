@@ -4,9 +4,9 @@ use std::{
 };
 
 use chain_events::L2Event;
-use coingecko::CoinGeckoClient;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::{stream::StreamExt, Stream};
+use price_feed::CoinGeckoClient;
 use sqlx::PgPool;
 use storage::StoredWithdrawal;
 use tokio::pin;
@@ -390,7 +390,7 @@ async fn run_l2_events_loop<WE>(
     we: WE,
     from_l2_block: u64,
     mut withdrawals_meterer: Option<WithdrawalsMeter>,
-    coingecko_client: Option<coingecko::CoinGeckoClient>,
+    coingecko_client: Option<CoinGeckoClient>,
 ) -> Result<()>
 where
     WE: Stream<Item = L2Event>,
@@ -418,7 +418,8 @@ where
                 tracing::debug!("l2 token init event {event:?}");
                 let price = match &coingecko_client {
                     Some(coingecko_client) => {
-                        price_feed::current_token_price(&coingecko_client, event.l1_token_address)
+                        coingecko_client
+                            .current_token_price(event.l1_token_address)
                             .await
                     }
                     None => None,

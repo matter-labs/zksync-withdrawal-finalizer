@@ -69,4 +69,4 @@ tokio-stream = "0.1.14"
 tokio-util = "0.7.10"
 url = "2.5.0"
 vlog = { path = "./vlog" }
-coingecko =  { path = "../../montekki/coingecko-rs" }
+reqwest = "0.11"

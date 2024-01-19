@@ -22,7 +22,6 @@ dotenvy = { workspace = true }
 tracing = { workspace = true }
 vise-exporter = { workspace = true }
 vise = { workspace = true }
-coingecko = { workspace = true }
 
 client = { workspace = true }
 storage = { workspace = true }
@@ -30,3 +29,4 @@ chain-events = { workspace = true }
 vlog = {  workspace = true }
 finalizer = { workspace = true }
 watcher = { workspace = true }
+price-feed = { workspace = true }

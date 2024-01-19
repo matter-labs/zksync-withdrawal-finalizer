@@ -472,10 +472,8 @@ checksum = "7f2c685bad3eb3d45a01354cedb7d5faa66194d1d58ba6e267a8de788f79db38"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-targets 0.48.5",
 ]
 
@@ -545,17 +543,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "vise",
-]
-
-[[package]]
-name = "coingecko"
-version = "1.0.1"
-dependencies = [
- "chrono",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
@@ -2947,9 +2934,9 @@ dependencies = [
 name = "price-feed"
 version = "0.2.0"
 dependencies = [
- "coingecko",
  "ethers",
  "futures",
+ "reqwest",
  "sqlx",
  "storage",
  "tokio",
@@ -4929,7 +4916,6 @@ version = "0.2.0"
 dependencies = [
  "chain-events",
  "client",
- "coingecko",
  "ethers",
  "futures",
  "itertools 0.12.0",
@@ -5199,13 +5185,13 @@ version = "0.2.0"
 dependencies = [
  "chain-events",
  "client",
- "coingecko",
  "color-eyre",
  "dotenvy",
  "envconfig",
  "ethers",
  "eyre",
  "finalizer",
+ "price-feed",
  "serde",
  "serde_json",
  "sqlx",
