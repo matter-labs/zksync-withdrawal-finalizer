@@ -5,6 +5,7 @@ use ethers::types::{H256, U256};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use storage::UserWithdrawal;
+use tower_http::cors::CorsLayer;
 
 #[derive(Deserialize, Serialize, Clone)]
 struct WithdrawalRequest {
@@ -30,9 +31,11 @@ impl From<UserWithdrawal> for WithdrawalResponse {
 }
 
 pub async fn run_server(pool: PgPool) {
+    let cors_layer = CorsLayer::permissive();
     let app = Router::new()
         .route("/withdrawals/:from", get(get_withdrawals))
         .route("/health", get(health))
+        .layer(cors_layer)
         .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000
