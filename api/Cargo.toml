@@ -7,7 +7,8 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-axum = "0.7.4"
+axum = { workspace = true }
+tower-http = { workspace = true, features = ["cors"] }
 storage.workspace = true
 sqlx.workspace = true
 serde.workspace = true
