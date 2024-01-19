@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.1...v0.6.2) (2024-01-19)
+
+
+### Bug Fixes
+
+* **api:** use permissive cors ([#361](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/361)) ([dab6780](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/dab6780de8699c9b4fb5f9dccc85be7fdfd0af58))
+
 ## [0.6.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.0...v0.6.1) (2024-01-18)
 
 
