@@ -60,7 +60,7 @@ pub enum TokenList {
 
 impl Default for TokenList {
     fn default() -> Self {
-        Self::WhiteList(vec![client::ETH_TOKEN_ADDRESS])
+        Self::All
     }
 }
 
