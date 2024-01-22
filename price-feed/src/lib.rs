@@ -43,7 +43,7 @@ impl CoinGeckoClient {
         let res = self
             .client
             .get(format!(
-                "{}/coins/ethereum/contract/{}&x_cg_demo_api_key={}",
+                "{}/coins/ethereum/contract/{}?x_cg_demo_api_key={}",
                 self.url,
                 address.encode_hex(),
                 self.token
