@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.1...v0.6.2) (2024-01-19)
+
+
+### Bug Fixes
+
+* **api:** use permissive cors ([#361](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/361)) ([dab6780](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/dab6780de8699c9b4fb5f9dccc85be7fdfd0af58))
+
+## [0.6.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.0...v0.6.1) (2024-01-18)
+
+
+### Bug Fixes
+
+* **api:** Healtcheck and api fixes ([#360](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/360)) ([7f4a7e9](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7f4a7e9fd002c191b982dd3036dfb6986f448ccc))
+* change types on api ([#358](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/358)) ([a43e955](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a43e9553f16a3d8dcc486b4666f55bfaeb20f5ba))
+
+## [0.6.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.5.0...v0.6.0) (2024-01-18)
+
+
+### Features
+
+* **api:** adds api to finalizer to query withdrawals ([#354](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/354)) ([ef5e147](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/ef5e14701d48534c12a5c31f4cc9b991b42e6576))
+
 ## [0.5.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.4.0...v0.5.0) (2024-01-17)
 
 

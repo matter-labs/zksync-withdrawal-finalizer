@@ -16,7 +16,10 @@ use ethers::{
 };
 use eyre::{anyhow, Result};
 use price_feed::CoinGeckoClient;
-use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgConnection, PgPool};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    ConnectOptions, PgConnection,
+};
 
 use chain_events::{BlockEvents, L2EventsListener};
 use client::{l1bridge::codegen::IL1Bridge, zksync_contract::codegen::IZkSync, ZksyncMiddleware};
@@ -178,7 +181,10 @@ async fn main() -> Result<()> {
     let options =
         PgConnectOptions::from_str(config.database_url.as_str())?.disable_statement_logging();
 
-    let pgpool = PgPool::connect_with(options).await?;
+    let pgpool = PgPoolOptions::new()
+        .acquire_timeout(Duration::from_secs(2))
+        .connect_with(options)
+        .await?;
 
     let from_l2_block = start_from_l2_block(
         client_l2.clone(),
@@ -301,7 +307,7 @@ async fn main() -> Result<()> {
         None => None,
     };
     let finalizer = finalizer::Finalizer::new(
-        pgpool,
+        pgpool.clone(),
         one_withdrawal_gas_limit,
         batch_finalization_gas_limit,
         contract,
@@ -315,7 +321,17 @@ async fn main() -> Result<()> {
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
+    let metrics_handle = tokio::spawn(metrics::meter_unfinalized_withdrawals(
+        pgpool.clone(),
+        eth_finalization_threshold,
+    ));
+
+    let api_server = tokio::spawn(api::run_server(pgpool));
+
     tokio::select! {
+        r = api_server => {
+            tracing::error!("Api server ended with {r:?}");
+        }
         r = block_events_handle => {
             tracing::error!("Block Events stream ended with {r:?}");
         }
@@ -327,6 +343,9 @@ async fn main() -> Result<()> {
         }
         r = finalizer_handle => {
             tracing::error!("Finalizer ended with {r:?}");
+        }
+        _ = metrics_handle => {
+            tracing::error!("Metrics loop has ended");
         }
     }
 

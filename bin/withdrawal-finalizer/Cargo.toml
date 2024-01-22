@@ -30,3 +30,4 @@ vlog = {  workspace = true }
 finalizer = { workspace = true }
 watcher = { workspace = true }
 price-feed = { workspace = true }
+api = { workspace = true }

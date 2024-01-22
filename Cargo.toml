@@ -16,6 +16,7 @@ members = [
     "vlog",
     "watcher",
     "withdrawals-meterer",
+    "api"
 ]
 
 [workspace.package]
@@ -57,6 +58,7 @@ chrono = { version = "0.4.31", default-features = false }
 vise = { git = "https://github.com/matter-labs/vise.git" }
 vise-exporter = { git = "https://github.com/matter-labs/vise.git" }
 client = { path = "./client" }
+api = { path = "./api" }
 chain-events = { path = "./chain-events" }
 price-feed = { path = "./price-feed" }
 storage = { path = "./storage" }
@@ -67,6 +69,8 @@ tx-sender = { path = "./tx-sender" }
 finalizer = { path = "./finalizer" }
 tokio-stream = "0.1.14"
 tokio-util = "0.7.10"
+tower-http = "0.5.1"
 url = "2.5.0"
+axum = "0.7.4"
 vlog = { path = "./vlog" }
 reqwest = "0.11"

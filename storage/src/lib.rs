@@ -1072,6 +1072,77 @@ pub async fn withdrawals_to_finalize(
     Ok(data)
 }
 
+/// Get the number of ETH withdrawals not yet executed and finalized and above some threshold
+pub async fn get_unexecuted_withdrawals_count(
+    pool: &PgPool,
+    eth_threshold: Option<U256>,
+) -> Result<i64> {
+    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
+    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
+
+    let count = sqlx::query!(
+        "
+        SELECT
+            COUNT(*)
+        FROM
+          finalization_data
+          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+        WHERE
+          finalization_tx IS NULL
+          AND finalization_data.l2_block_number > COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                execute_l1_block_number IS NOT NULL
+            ),
+            1
+          )
+          AND token = decode('000000000000000000000000000000000000800A', 'hex') 
+          AND amount >= $1
+        ",
+        u256_to_big_decimal(eth_threshold),
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(count.count.unwrap_or(0))
+}
+
+/// Get the number of ETH withdrawals executed but not finalized
+pub async fn get_executed_and_not_finalized_withdrawals_count(pool: &PgPool) -> Result<i64> {
+    let count = sqlx::query!(
+        "
+        SELECT
+            COUNT(*)
+        FROM
+          finalization_data
+          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+        WHERE
+          finalization_tx IS NULL
+          AND failed_finalization_attempts = 0
+          AND finalization_data.l2_block_number <= COALESCE(
+            (
+              SELECT
+                MAX(l2_block_number)
+              FROM
+                l2_blocks
+              WHERE
+                execute_l1_block_number IS NOT NULL
+            ),
+            1
+          )
+          AND token = decode('000000000000000000000000000000000000800A', 'hex') 
+        ",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(count.count.unwrap_or(0))
+}
+
 /// Fetch finalization parameters for some withdrawal
 pub async fn get_finalize_withdrawal_params(
     pool: &PgPool,
@@ -1385,4 +1456,77 @@ pub async fn delete_finalization_data_content(
     wipe_finalization_data(pool, delete_batch_size).await?;
 
     Ok(())
+}
+
+/// Finalization status of a withdrawal
+#[derive(Debug, Clone)]
+pub enum FinalizationStatus {
+    /// Withdrawal has been finalized
+    Finalized,
+    /// Withdrawal has not been finalized
+    NotFinalized,
+}
+
+/// Withdrawal event requested for address
+pub struct UserWithdrawal {
+    /// Transaction hash
+    pub tx_hash: H256,
+    /// Token address
+    pub token: Address,
+    /// Amount
+    pub amount: U256,
+    /// Status
+    pub status: FinalizationStatus,
+}
+
+/// Request withdrawals for a given address.
+pub async fn withdrawals_for_address(
+    pool: &PgPool,
+    address: Address,
+    limit: u64,
+) -> Result<Vec<UserWithdrawal>> {
+    let latency = STORAGE_METRICS.call[&"withdrawals_for_address"].start();
+
+    let events = sqlx::query!(
+        "
+         SELECT
+             l2_to_l1_events.l1_token_addr,
+             l2_to_l1_events.amount,
+             withdrawals.tx_hash,
+             finalization_data.finalization_tx
+         FROM
+             l2_to_l1_events
+         JOIN finalization_data ON
+             finalization_data.l1_batch_number = l2_to_l1_events.l2_block_number
+         AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block
+         JOIN withdrawals ON
+             withdrawals.id = finalization_data.withdrawal_id
+         WHERE l2_to_l1_events.to_address = $1
+         ORDER BY l2_to_l1_events.l2_block_number DESC
+         LIMIT $2
+        ",
+        address.as_bytes(),
+        limit as i64,
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| {
+        let status = if r.finalization_tx.is_some() {
+            FinalizationStatus::Finalized
+        } else {
+            FinalizationStatus::NotFinalized
+        };
+        UserWithdrawal {
+            tx_hash: H256::from_slice(&r.tx_hash),
+            token: Address::from_slice(&r.l1_token_addr),
+            amount: utils::bigdecimal_to_u256(r.amount),
+            status,
+        }
+    })
+    .collect();
+
+    latency.observe();
+
+    Ok(events)
 }
