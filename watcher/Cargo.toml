@@ -20,4 +20,3 @@ client = { workspace = true }
 chain-events = {  workspace = true }
 storage = { workspace = true }
 withdrawals-meterer = { workspace = true }
-price-feed = { workspace = true }

@@ -1,13 +1,8 @@
-use std::time::Duration;
-
-use ethers::abi::{AbiEncode, Address};
+use ethers::abi::Address;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, ClientBuilder, Url,
 };
-use sqlx::PgPool;
-
-const PRICE_UPDATER_LOOP: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Clone)]
 pub struct CoinGeckoClient {
@@ -40,38 +35,54 @@ impl CoinGeckoClient {
     }
 
     pub async fn current_token_price(&self, address: Address) -> Option<f64> {
-        let res = self
+        let res = match self
             .client
             .get(format!(
-                "{}/coins/ethereum/contract/{}?x_cg_demo_api_key={}",
-                self.url,
-                address.encode_hex(),
-                self.token
+                "{}/coins/ethereum/contract/{:?}?x_cg_demo_api_key={}",
+                self.url, address, self.token
             ))
             .send()
             .await
             .unwrap()
             .text()
             .await
-            .unwrap();
+        {
+            Ok(res) => res,
+            Err(e) => {
+                tracing::warn!("Failed to query token {address:?} price: {e}");
+                return None;
+            }
+        };
 
-        panic!("res {res:?}");
+        let json: serde_json::Value = serde_json::from_str(&res).unwrap();
+        let token_price = &json["market_data"]["current_price"]["usd"];
+
+        tracing::error!("res {token_price:?}");
 
         None
     }
-}
 
-pub async fn price_updater_loop(pool: PgPool, client: CoinGeckoClient) {
-    loop {
-        tokio::time::sleep(PRICE_UPDATER_LOOP).await;
+    pub async fn historical_token_price(&self, address: Address, timestamp: u64) -> Option<f64> {
+        let res = match self.client
+            .get(
+                format!("{}/coins/ethereum/contract/{address:?}/market_chart/range?vs_currency=usd&from={timestamp}&to={}", self.url, timestamp + 10000))
+            .send()
+            .await
+            .unwrap()
+            .text()
+            .await {
+                Ok(res) => res,
+                Err(e) => {
+                    tracing::warn!("Failed to query token {address:?} price: {e}");
+                    return None;
+                }};
 
-        let tokens = storage::get_all_tokens(&pool).await.unwrap();
-        let prices = futures::future::join_all(tokens.iter().map(|token| async {
-            (
-                token.l1_token_address,
-                client.current_token_price(token.l1_token_address).await,
-            )
-        }))
-        .await;
+        let response: serde_json::Value = serde_json::from_str(&res).unwrap();
+
+        let price = &response["prices"][0][1];
+
+        tracing::error!("past timestamp is {price:?} {:?}", price.as_f64());
+
+        price.as_f64()
     }
 }

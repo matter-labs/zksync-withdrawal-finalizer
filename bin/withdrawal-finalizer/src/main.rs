@@ -157,7 +157,6 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
-    client::add_predefined_token_addrs(config.token_mappings().as_ref()).await;
     let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
@@ -209,16 +208,14 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting from L1 block number {from_l1_block}");
 
-    let (mut tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
-
-    if let Some(ref custom_tokens) = config.custom_token_addresses {
-        tokens.extend_from_slice(custom_tokens.0.as_slice());
-    }
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
     tracing::info!("tokens {tokens:?}");
-    if let Some(ref custom_tokens) = config.custom_token_deployer_addresses {
-        tokens.extend_from_slice(custom_tokens.0.as_slice());
-    }
+
+    let coingecko_client = match (config.coingecko_api_url, config.coingecko_api_token) {
+        (Some(url), Some(token)) => Some(CoinGeckoClient::new(url, &token)),
+        _ => None,
+    };
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
@@ -228,6 +225,7 @@ async fn main() -> Result<()> {
             .unwrap_or(vec![config.l2_erc20_bridge_addr]),
         tokens.into_iter().collect(),
         config.finalize_eth_token.unwrap_or(true),
+        coingecko_client,
     );
 
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
@@ -237,17 +235,7 @@ async fn main() -> Result<()> {
     // by default meter withdrawals
     let meter_withdrawals = config.enable_withdrawal_metering.unwrap_or(true);
 
-    let coingecko_client = match (config.coingecko_api_url, config.coingecko_api_token) {
-        (Some(url), Some(token)) => Some(CoinGeckoClient::new(url, &token)),
-        _ => None,
-    };
-
-    let watcher = Watcher::new(
-        client_l2.clone(),
-        pgpool.clone(),
-        meter_withdrawals,
-        coingecko_client,
-    );
+    let watcher = Watcher::new(client_l2.clone(), pgpool.clone(), meter_withdrawals);
 
     let withdrawal_events_handle = tokio::spawn(l2_events.run_with_reconnects(
         from_l2_block,

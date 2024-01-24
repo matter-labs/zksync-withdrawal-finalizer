@@ -36,6 +36,16 @@ pub enum L2Event {
     L2TokenInitEvent(L2TokenInitEvent),
 }
 
+/// A helper struct coupling together L1 token address and decimals.
+#[derive(Debug)]
+pub struct L1TokenInfo {
+    /// Address
+    pub address: Address,
+
+    /// Decimals
+    pub decimals: i32,
+}
+
 impl From<WithdrawalEvent> for L2Event {
     fn from(value: WithdrawalEvent) -> Self {
         Self::Withdrawal(value)

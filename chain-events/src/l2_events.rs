@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{Sink, SinkExt, StreamExt};
 
@@ -20,10 +20,11 @@ use ethers::{
 };
 
 use crate::{
-    metrics::CHAIN_EVENTS_METRICS, rpc_query_too_large, Error, L2Event, L2TokenInitEvent, Result,
-    RECONNECT_BACKOFF,
+    metrics::CHAIN_EVENTS_METRICS, rpc_query_too_large, Error, L1TokenInfo, L2Event,
+    L2TokenInitEvent, Result, RECONNECT_BACKOFF,
 };
 use ethers_log_decode::EthLogDecode;
+use price_feed::CoinGeckoClient;
 
 struct NewTokenAdded;
 
@@ -31,7 +32,10 @@ struct NewTokenAdded;
 pub struct L2EventsListener {
     url: String,
     token_deployer_addrs: Vec<Address>,
-    tokens: HashSet<Address>,
+    // Tokens addrs l2->l1 info
+    tokens: HashMap<Address, L1TokenInfo>,
+    finalize_eth_token: bool,
+    coingecko_client: Option<CoinGeckoClient>,
 }
 
 #[derive(EthLogDecode)]
@@ -62,19 +66,16 @@ impl L2EventsListener {
     pub fn new(
         url: &str,
         token_deployer_addrs: Vec<Address>,
-        mut tokens: HashSet<Address>,
+        tokens: HashMap<Address, L1TokenInfo>,
         finalize_eth_token: bool,
+        coingecko_client: Option<CoinGeckoClient>,
     ) -> Self {
-        if finalize_eth_token {
-            tokens.insert(ETH_TOKEN_ADDRESS);
-            tokens.insert(ETH_ADDRESS);
-        }
-        tokens.insert(DEPLOYER_ADDRESS);
-
         Self {
             url: url.to_string(),
             token_deployer_addrs,
             tokens,
+            finalize_eth_token,
+            coingecko_client,
         }
     }
 
@@ -143,8 +144,18 @@ impl L2EventsListener {
                 continue;
             };
 
-            if let Some((l2_event, address)) = self.bridge_initialize_event(bridge_init_log)? {
-                if self.tokens.insert(address) {
+            if let Some(l2_event) = self.bridge_initialize_event(bridge_init_log)? {
+                if self
+                    .tokens
+                    .insert(
+                        l2_event.l2_token_address,
+                        L1TokenInfo {
+                            address: l2_event.l1_token_address,
+                            decimals: l2_event.decimals as i32,
+                        },
+                    )
+                    .is_none()
+                {
                     let event = l2_event.into();
 
                     tracing::info!("sending token event {event:?}");
@@ -170,14 +181,14 @@ impl L2EventsListener {
     fn bridge_initialize_event(
         &self,
         bridge_init_log: ZksyncLog,
-    ) -> Result<Option<(L2TokenInitEvent, Address)>> {
+    ) -> Result<Option<L2TokenInitEvent>> {
         let raw_log: RawLog = bridge_init_log.clone().into();
 
         let Ok(bridge_initialize) = BridgeInitEvents::decode_log(&raw_log) else {
             return Ok(None);
         };
 
-        if self.tokens.contains(&bridge_init_log.address) {
+        if self.tokens.contains_key(&bridge_init_log.address) {
             return Ok(None);
         }
 
@@ -213,7 +224,7 @@ impl L2EventsListener {
             }),
         };
 
-        Ok(Some((l2_event, bridge_init_log.address)))
+        Ok(Some(l2_event))
     }
 
     /// Run the main loop with re-connecting on websocket disconnects
@@ -366,8 +377,14 @@ impl L2EventsListener {
             .await?;
         }
 
-        let mut tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
+        let mut tokens = self.tokens.keys().cloned().collect::<Vec<_>>();
         tokens.extend_from_slice(self.token_deployer_addrs.as_slice());
+
+        if self.finalize_eth_token {
+            tokens.push(ETH_TOKEN_ADDRESS);
+            tokens.push(ETH_ADDRESS);
+        }
+        tokens.push(DEPLOYER_ADDRESS);
 
         tracing::info!("Listeing to events from tokens {tokens:?}");
 
@@ -466,11 +483,52 @@ impl L2EventsListener {
                 | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
                     CHAIN_EVENTS_METRICS.withdrawal_events.inc();
 
+                    let block = middleware
+                        .get_block(BlockNumber::Number(block_number))
+                        .await
+                        .map_err(|e| Error::Middleware(e.to_string()))?
+                        .unwrap();
+
+                    let usd_price = if let Some(coingecko_client) = &self.coingecko_client {
+                        if log.address != ETH_TOKEN_ADDRESS {
+                            if let Some(l1_token) = self.tokens.get(&log.address) {
+                                let price = coingecko_client
+                                    .historical_token_price(
+                                        l1_token.address,
+                                        block.timestamp.as_u64(),
+                                    )
+                                    .await;
+
+                                match price {
+                                    None => None,
+                                    Some(price) => Some(
+                                        price
+                                            * ethers::utils::format_units(
+                                                *amount,
+                                                l1_token.decimals,
+                                            )
+                                            .unwrap()
+                                            .parse::<f64>()
+                                            .unwrap(),
+                                    ),
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
                     let we = WithdrawalEvent {
                         tx_hash,
                         block_number: block_number.as_u64(),
                         token: log.address,
                         amount: *amount,
+                        timestamp: Some(block.timestamp.as_u64()),
+                        usd_price,
                     };
                     let event = we.into();
                     tracing::info!("sending withdrawal event {event:?}");
@@ -494,19 +552,30 @@ impl L2EventsListener {
                         return Ok(None);
                     };
 
-                    if let Some((l2_event, address)) =
-                        self.bridge_initialize_event(bridge_init_log)?
-                    {
-                        if self.tokens.insert(address) {
+                    if let Some(l2_event) = self.bridge_initialize_event(bridge_init_log)? {
+                        if self
+                            .tokens
+                            .insert(
+                                l2_event.l2_token_address,
+                                L1TokenInfo {
+                                    address: l2_event.l1_token_address,
+                                    decimals: l2_event.decimals as i32,
+                                },
+                            )
+                            .is_none()
+                        {
                             CHAIN_EVENTS_METRICS.new_token_added.inc();
 
+                            let l2_token_address = l2_event.l2_token_address;
                             let event = l2_event.into();
                             tracing::info!("sending new token event {event:?}");
                             sender
                                 .send(event)
                                 .await
                                 .map_err(|_| Error::ChannelClosing)?;
-                            tracing::info!("Restarting on the token added event {address}");
+                            tracing::info!(
+                                "Restarting on the token added event {l2_token_address}",
+                            );
                             return Ok(Some(NewTokenAdded));
                         }
                     }

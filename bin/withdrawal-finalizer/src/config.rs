@@ -1,9 +1,6 @@
-use std::str::FromStr;
-
 use envconfig::Envconfig;
 use ethers::types::Address;
 use finalizer::{AddrList, TokenList};
-use serde::{Deserialize, Serialize};
 use url::Url;
 
 /// Withdrawal finalizer configuration.
@@ -75,14 +72,8 @@ pub struct Config {
     #[envconfig(from = "CUSTOM_TOKEN_DEPLOYER_ADDRESSES")]
     pub custom_token_deployer_addresses: Option<AddrList>,
 
-    #[envconfig(from = "CUSTOM_TOKEN_ADDRESSES")]
-    pub custom_token_addresses: Option<AddrList>,
-
     #[envconfig(from = "ENABLE_WITHDRAWAL_METERING")]
     pub enable_withdrawal_metering: Option<bool>,
-
-    #[envconfig(from = "CUSTOM_TOKEN_ADDRESS_MAPPINGS")]
-    pub custom_token_address_mappings: Option<CustomTokenAddressMappings>,
 
     #[envconfig(from = "ETH_FINALIZATION_THRESHOLD")]
     pub eth_finalization_threshold: Option<String>,
@@ -92,44 +83,4 @@ pub struct Config {
 
     #[envconfig(from = "COINGECKO_API_TOKEN")]
     pub coingecko_api_token: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
-pub struct CustomTokenAddressMapping {
-    pub l_1_addr: Address,
-    pub l_2_addr: Address,
-}
-
-impl FromStr for CustomTokenAddressMapping {
-    type Err = serde_json::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        serde_json::from_str(s)
-    }
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct CustomTokenAddressMappings(pub Vec<CustomTokenAddressMapping>);
-
-impl FromStr for CustomTokenAddressMappings {
-    type Err = serde_json::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let res: CustomTokenAddressMappings = serde_json::from_str(s)?;
-
-        Ok(res)
-    }
-}
-
-impl Config {
-    /// Returns a mapping of tokens (L1, L2) addresses.
-    pub fn token_mappings(&self) -> Vec<(Address, Address)> {
-        self.custom_token_address_mappings
-            .as_ref()
-            .map(|f| &f.0)
-            .unwrap_or(&vec![])
-            .iter()
-            .map(|m| (m.l_1_addr, m.l_2_addr))
-            .collect()
-    }
 }

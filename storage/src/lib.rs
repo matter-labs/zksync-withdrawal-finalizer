@@ -5,10 +5,13 @@
 
 //! Finalizer watcher.storage.operations.
 
+use std::collections::HashMap;
+
+use chrono::NaiveDateTime;
 use ethers::types::{Address, H160, H256, U256};
 use sqlx::{PgConnection, PgPool};
 
-use chain_events::L2TokenInitEvent;
+use chain_events::{L1TokenInfo, L2TokenInitEvent};
 use client::{
     is_eth, withdrawal_finalizer::codegen::RequestFinalizeWithdrawal, zksync_contract::L2ToL1Event,
     WithdrawalEvent, WithdrawalKey, WithdrawalParams,
@@ -43,9 +46,6 @@ pub struct StoredToken {
     /// Address of token on L2
     pub l2_token_address: Address,
 
-    /// USD price of the token if known
-    pub usd_price: Option<f64>,
-
     /// Name of the token
     pub name: String,
 
@@ -54,47 +54,6 @@ pub struct StoredToken {
 
     /// Decimals of the token
     pub decimals: i32,
-}
-
-/// Update the prices of the tokens as received from the oracle
-pub async fn update_token_prices(
-    pool: &PgPool,
-    prices_and_addrs: &[(Address, Option<f64>)],
-) -> Result<()> {
-    let mut addrs = vec![];
-    let mut prices = vec![];
-
-    for (addr, price) in prices_and_addrs {
-        if let Some(price) = price {
-            addrs.push(addr.0.to_vec());
-            prices.push(*price);
-        }
-    }
-
-    sqlx::query!(
-        "
-        UPDATE
-            tokens
-        SET
-            usd_price = u.price
-        FROM
-            UNNEST (
-                $1 :: BYTEA [],
-                $2 :: FLOAT8 []
-            ) AS u(
-                l1_token_address,
-                price
-            )
-        WHERE
-            tokens.l1_token_address = u.l1_token_address
-        ",
-        &addrs,
-        &prices,
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
 }
 
 /// A token as stored in the DB
@@ -117,7 +76,6 @@ pub async fn get_all_tokens(pool: &PgPool) -> Result<Vec<StoredToken>> {
     .map(|r| StoredToken {
         l1_token_address: Address::from_slice(&r.l1_token_address),
         l2_token_address: Address::from_slice(&r.l2_token_address),
-        usd_price: None,
         name: r.name,
         symbol: r.symbol,
         decimals: r.decimals,
@@ -355,6 +313,8 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
             block_number: r.l2_block_number as u64,
             token: Address::from_slice(&r.token),
             amount: utils::bigdecimal_to_u256(r.amount),
+            timestamp: r.timestamp.map(|t| t.timestamp() as u64),
+            usd_price: r.usd_price,
         },
         index_in_tx: r.event_index_in_tx as usize,
     })
@@ -364,6 +324,10 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
 
     Ok(events)
 }
+
+#[derive(sqlx::Type)]
+#[sqlx(transparent)]
+struct UsdPrice(Option<f64>);
 
 /// Adds a withdrawal event to the DB.
 ///
@@ -377,6 +341,8 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
+    let mut usd_prices = Vec::with_capacity(events.len());
+    let mut timestamps = Vec::with_capacity(events.len());
 
     events.iter().for_each(|sw| {
         tx_hashes.push(sw.event.tx_hash.0.to_vec());
@@ -384,6 +350,12 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         tokens.push(sw.event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(sw.event.amount));
         indices_in_tx.push(sw.index_in_tx as i32);
+        usd_prices.push(sw.event.usd_price);
+        timestamps.push(
+            NaiveDateTime::from_timestamp_opt(sw.event.timestamp.unwrap_or_default() as i64, 0)
+                .expect("always a correct unix timestamp in seconds; qed")
+                .into(),
+        );
     });
 
     let latency = STORAGE_METRICS.call[&"add_withdrawals"].start();
@@ -396,27 +368,35 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
             l2_block_number,
             token,
             amount,
-            event_index_in_tx
+            event_index_in_tx,
+            usd_price,
+            timestamp
           )
         SELECT
           u.tx_hash,
           u.l2_block_number,
           u.token,
           u.amount,
-          u.index_in_tx
+          u.index_in_tx,
+          u.usd_price,
+          u.timestamp
         FROM
           unnest(
             $1 :: BYTEA [],
             $2 :: bigint [],
             $3 :: BYTEA [],
             $4 :: numeric [],
-            $5 :: integer []
+            $5 :: integer [],
+            $6 :: FLOAT8 [],
+            $7 :: TIMESTAMP []
           ) AS u(
             tx_hash,
             l2_block_number,
             token,
             amount,
-            index_in_tx
+            index_in_tx,
+            usd_price,
+            timestamp
           ) ON CONFLICT (
             tx_hash,
             event_index_in_tx
@@ -427,6 +407,8 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         &tokens,
         amounts.as_slice(),
         &indices_in_tx,
+        usd_prices.as_slice() as &[Option<f64>],
+        &timestamps,
     )
     .execute(pool)
     .await?;
@@ -582,7 +564,7 @@ pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()
 }
 
 /// Get addresses of known tokens on L2 and the last seen block.
-pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
+pub async fn get_tokens(pool: &PgPool) -> Result<(HashMap<Address, L1TokenInfo>, u64)> {
     let latency = STORAGE_METRICS.call[&"get_tokens"].start();
     let last_l2_block_seen = sqlx::query!(
         "
@@ -600,7 +582,9 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     let tokens = sqlx::query!(
         "
         SELECT
-          l2_token_address
+          l2_token_address,
+          l1_token_address,
+          decimals
         FROM
           tokens
         "
@@ -608,7 +592,15 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|r| H160::from_slice(&r.l2_token_address))
+    .map(|r| {
+        (
+            H160::from_slice(&r.l2_token_address),
+            L1TokenInfo {
+                address: H160::from_slice(&r.l1_token_address),
+                decimals: r.decimals,
+            },
+        )
+    })
     .collect();
 
     latency.observe();
@@ -616,11 +608,7 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
 }
 
 /// Insert a token initialization event into the DB.
-pub async fn add_token(
-    pool: &PgPool,
-    token: &L2TokenInitEvent,
-    usd_price: Option<f64>,
-) -> Result<()> {
+pub async fn add_token(pool: &PgPool, token: &L2TokenInitEvent) -> Result<()> {
     let latency = STORAGE_METRICS.call[&"add_token"].start();
 
     sqlx::query!(
@@ -633,11 +621,10 @@ pub async fn add_token(
             symbol,
             decimals,
             l2_block_number,
-            initialization_transaction,
-            usd_price
+            initialization_transaction
           )
         VALUES
-          ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
+          ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (l1_token_address, l2_token_address) DO NOTHING
         ",
         token.l1_token_address.0.to_vec(),
         token.l2_token_address.0.to_vec(),
@@ -646,7 +633,6 @@ pub async fn add_token(
         token.decimals as i64,
         token.l2_block_number as i64,
         token.initialization_transaction.0.to_vec(),
-        usd_price,
     )
     .execute(pool)
     .await?;
