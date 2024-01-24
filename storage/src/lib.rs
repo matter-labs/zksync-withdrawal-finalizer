@@ -353,8 +353,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         usd_prices.push(sw.event.usd_price);
         timestamps.push(
             NaiveDateTime::from_timestamp_opt(sw.event.timestamp.unwrap_or_default() as i64, 0)
-                .expect("always a correct unix timestamp in seconds; qed")
-                .into(),
+                .expect("always a correct unix timestamp in seconds; qed"),
         );
     });
 

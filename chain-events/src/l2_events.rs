@@ -499,19 +499,13 @@ impl L2EventsListener {
                                     )
                                     .await;
 
-                                match price {
-                                    None => None,
-                                    Some(price) => Some(
-                                        price
-                                            * ethers::utils::format_units(
-                                                *amount,
-                                                l1_token.decimals,
-                                            )
+                                price.map(|price| {
+                                    price
+                                        * ethers::utils::format_units(*amount, l1_token.decimals)
                                             .unwrap()
                                             .parse::<f64>()
-                                            .unwrap(),
-                                    ),
-                                }
+                                            .unwrap()
+                                })
                             } else {
                                 None
                             }
