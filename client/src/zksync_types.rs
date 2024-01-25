@@ -192,7 +192,7 @@ pub struct WithdrawalEvent {
     /// block timestamp.
     pub timestamp: Option<u64>,
 
-    /// Price in usd at the moment of withdrawal
+    /// Price in USD at the moment of withdrawal
     pub usd_price: Option<f64>,
 }
 
