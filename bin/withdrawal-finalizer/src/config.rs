@@ -78,6 +78,9 @@ pub struct Config {
     #[envconfig(from = "ETH_FINALIZATION_THRESHOLD")]
     pub eth_finalization_threshold: Option<String>,
 
+    #[envconfig(from = "ERC20_USD_FINALIZATION_THRESHOLD")]
+    pub erc20_usd_finalization_threshold: Option<f64>,
+
     #[envconfig(from = "COINGECKO_API_URL")]
     pub coingecko_api_url: Option<Url>,
 

@@ -830,6 +830,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
     limit_by: u64,
     token_blacklist: &[Address],
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -869,8 +870,12 @@ pub async fn withdrawals_to_finalize_with_blacklist(
             $2 :: BYTEA []
           ))
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $3
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $4
+                ELSE TRUE
             END
           )
         LIMIT
@@ -879,6 +884,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
         limit_by as i64,
         &blacklist,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?
@@ -907,6 +913,7 @@ pub async fn withdrawals_to_finalize_with_whitelist(
     limit_by: u64,
     token_whitelist: &[Address],
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let whitelist: Vec<_> = token_whitelist.iter().map(|a| a.0.to_vec()).collect();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -946,8 +953,12 @@ pub async fn withdrawals_to_finalize_with_whitelist(
             $2 :: BYTEA []
           ))
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $3
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $4
+                ELSE TRUE
             END
           )
         LIMIT
@@ -956,6 +967,7 @@ pub async fn withdrawals_to_finalize_with_whitelist(
         limit_by as i64,
         &whitelist,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?
@@ -983,6 +995,7 @@ pub async fn withdrawals_to_finalize(
     pool: &PgPool,
     limit_by: u64,
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -1024,8 +1037,12 @@ pub async fn withdrawals_to_finalize(
             last_finalization_attempt < NOW() - INTERVAL '1 minutes'
           )
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $2
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $3
+                ELSE TRUE
             END
           )
         LIMIT
@@ -1033,6 +1050,7 @@ pub async fn withdrawals_to_finalize(
         ",
         limit_by as i64,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?
