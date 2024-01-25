@@ -22,6 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # v4
 
+      - name: Install pkg-config
+        run: |
+          sudo apt-get update && sudo apt-get install pkg-config
+
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
