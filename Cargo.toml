@@ -36,7 +36,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 sentry = { version = "0", default-features = false }
 lazy_static = "1.4.0"
-itertools = "0.12.0"
+itertools = "0.12.1"
 serde = "1.0.196"
 thiserror = "1.0.56"
 serde_json = "1.0"
