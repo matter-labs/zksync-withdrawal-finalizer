@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.2...v0.6.3) (2024-01-30)
+
+
+### Bug Fixes
+
+* **storage:** return withdrawals for address for l1 and l2 addrs matches ([#378](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/378)) ([b0628f1](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/b0628f17a29f954065f1cae4a632f82bc1f2262d))
+
 ## [0.6.2](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.1...v0.6.2) (2024-01-19)
 
 
