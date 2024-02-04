@@ -4,7 +4,7 @@ A Withdrawal Finalizer in Rust.
 
 ## Purpose
 
-Withdrawal Finalizer is a component of `zksync-era` responsible for monitoring and finalizing [L2->L1 withdrawals](https://github.com/matter-labs/zksync-era/blob/main/docs/advanced/03_withdrawals.md). It does so by continiously monitoring events happening on both L2 and L1, keeping some state in persistent storage (which is PostgreSQL) and sending withdrawal finalization transactions whenever necessary.
+Withdrawal Finalizer is a component of `zksync-era` responsible for monitoring and finalizing [L2->L1 withdrawals](https://github.com/matter-labs/zksync-era/blob/main/docs/advanced/03_withdrawals.md). It does so by continuously monitoring events happening on both L2 and L1, keeping some state in persistent storage (which is PostgreSQL) and sending withdrawal finalization transactions whenever necessary.
 
 ## Building
 
@@ -33,7 +33,7 @@ $ env DATABASE_URL=postgres://mycreds@myhost/mydb sqlx migrate run
 ```
 ### Configuration
 
-Configuration is done via enviromnent variables that can also be read from `.env` file if it is present. 
+Configuration is done via environment variables that can also be read from `.env` file if it is present. 
 Deployment is done by deploying a dockerized image of the service.
 
 | Variable | Description |
@@ -48,7 +48,7 @@ Deployment is done by deploying a dockerized image of the service.
 | `API_WEB3_JSON_RPC_HTTP_URL` | Address of the zkSync Era HTTP RPC endpoint |
 | `DATABSE_URL` | The url of PostgreSQL database the service stores its state into |
 | `GAS_LIMIT` | The gas limit of a single withdrawal finalization within the batch of withdrawals finalized in a call to `finalizeWithdrawals` in WithdrawalFinalizerContract |
-| `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalizastion of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
+| `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalization of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
 | `TX_RETRY_TIMEOUT_SECS` | Number of seconds to wait for a potentially stuck finalization transaction before readjusting its fees |
 | `TOKENS_TO_FINALIZE` | Configures the sets of tokens this instance of finalizer will finalize. It may be configured as a whitelist, a blacklist, a wildcard or completely disable any finalization. For more info see below. |
@@ -66,7 +66,7 @@ The configuration structure describing the service config can be found in [`conf
 
 It may be handy to limit a set of tokens the Finalizer is finalizing. This
 configuration may be specified by setting a rule in the `TOKENS_TO_FINALIZE` value.
-If this enviromnent variable is not set then by default Finalizer will only finalize
+If this environment variable is not set then by default Finalizer will only finalize
 ETH token (`0x000...0800a`).
 
 You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
