@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.4](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.3...v0.6.4) (2024-02-11)
+
+
+### Bug Fixes
+
+* typos ([16a4159](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/16a4159806f8001d65d1dbbbc6312124a660b49d))
+* typos ([#383](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/383)) ([16a4159](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/16a4159806f8001d65d1dbbbc6312124a660b49d))
+
 ## [0.6.3](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.2...v0.6.3) (2024-01-30)
 
 
