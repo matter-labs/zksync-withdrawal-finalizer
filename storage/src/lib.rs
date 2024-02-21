@@ -1403,10 +1403,7 @@ pub async fn withdrawals_for_address(
          AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block
          JOIN withdrawals ON
              withdrawals.id = finalization_data.withdrawal_id
-         WHERE
-            l2_to_l1_events.to_address = $1
-            OR
-            finalization_data.sender = $1
+         WHERE l2_to_l1_events.to_address = $1
          ORDER BY l2_to_l1_events.l2_block_number DESC
          LIMIT $2
         ",
