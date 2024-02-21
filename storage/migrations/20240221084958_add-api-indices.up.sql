@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS ix_l2_to_l1_events_to_addres_l2_block_number ON l2_to_l1_events (to_address,l2_block_number);
+CREATE INDEX IF NOT EXISTS ix_finalization_data_l1_batch_number_l2_tx_number_in_block on finalization_data (l1_batch_number,l2_tx_number_in_block);
