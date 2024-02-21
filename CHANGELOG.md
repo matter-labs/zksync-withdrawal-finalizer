@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.5](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.4...v0.6.5) (2024-02-21)
+
+
+### Bug Fixes
+
+* **storage:** add necessary indices for api query ([#392](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/392)) ([a7a5918](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/a7a5918f7edcc8f762a25db4c2e968e120e0c9c2))
+* **storage:** remove filtering by l2 addrs ([#394](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/394)) ([6d7e7a4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/6d7e7a402dc7deffba18fcfd74b50000cc995587))
+
 ## [0.6.4](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.3...v0.6.4) (2024-02-11)
 
 
