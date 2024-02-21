@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n         SELECT\n             l2_to_l1_events.l1_token_addr,\n             l2_to_l1_events.amount,\n             withdrawals.tx_hash,\n             finalization_data.finalization_tx\n         FROM\n             l2_to_l1_events\n         JOIN finalization_data ON\n             finalization_data.l1_batch_number = l2_to_l1_events.l2_block_number\n         AND finalization_data.l2_tx_number_in_block = l2_to_l1_events.tx_number_in_block\n         JOIN withdrawals ON\n             withdrawals.id = finalization_data.withdrawal_id\n         WHERE l2_to_l1_events.to_address = $1\n         ORDER BY l2_to_l1_events.l2_block_number DESC\n         LIMIT $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "l1_token_addr",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 1,
+        "name": "amount",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 2,
+        "name": "tx_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "finalization_tx",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "1439a51cb9304493287a9c54c13e59ab42e1511a38989dfc83f0a240d85a511a"
+}
