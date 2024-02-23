@@ -67,7 +67,7 @@ tx-sender = { path = "./tx-sender" }
 finalizer = { path = "./finalizer" }
 tokio-stream = "0.1.14"
 tokio-util = "0.7.10"
-tower-http = "0.5.1"
+tower-http = "0.5.2"
 url = "2.5.0"
 axum = "0.7.4"
 vlog = { path = "./vlog" }
