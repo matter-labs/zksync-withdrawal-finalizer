@@ -27,7 +27,7 @@ authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 exclude = ["./github"]
 
 [workspace.dependencies]
-auto_impl = "1.1.2"
+auto_impl = "1.2.0"
 async-trait = "0.1.77"
 ethers = { version = "2.0.13", default-features = false }
 tokio = "1.36.0"
