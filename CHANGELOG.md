@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.6](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.5...v0.6.6) (2024-03-04)
+
+
+### Bug Fixes
+
+* disable l2 to l1 events because of eip4844 ([#398](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/398)) ([29b6a72](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/29b6a72bb3927fe1a100332f664d40f41042099e))
+
 ## [0.6.5](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.4...v0.6.5) (2024-02-21)
 
 
