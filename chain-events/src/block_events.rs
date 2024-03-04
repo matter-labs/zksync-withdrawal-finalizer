@@ -1,30 +1,21 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use ethers::{
-    abi::{AbiDecode, Address, RawLog},
+    abi::{Address, RawLog},
     contract::EthEvent,
     prelude::EthLogDecode,
     providers::{Middleware, Provider, PubsubClient, Ws},
-    types::{BlockNumber, Filter, Log, Transaction, ValueOrArray, H256},
+    types::{BlockNumber, Filter, Log, ValueOrArray},
 };
 use futures::{Sink, SinkExt, StreamExt};
 
 use client::{
-    zksync_contract::{
-        codegen::{
-            BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter, CommitBatchesCall,
-        },
-        parse_withdrawal_events_l1,
-    },
+    zksync_contract::codegen::{BlockCommitFilter, BlockExecutionFilter, BlocksVerificationFilter},
     BlockEvent,
 };
 use ethers_log_decode::EthLogDecode;
 
 use crate::{metrics::CHAIN_EVENTS_METRICS, Error, Result, RECONNECT_BACKOFF};
-
-// Total timecap for tx querying retry 10 minutes
-const PENDING_TX_RETRY: usize = 12 * 10;
-const PENDING_TX_RETRY_BACKOFF: Duration = Duration::from_secs(5);
 
 #[derive(EthLogDecode)]
 enum L1Events {
@@ -223,32 +214,11 @@ impl BlockEvents {
     }
 }
 
-async fn get_tx_with_retries<M>(
-    middleware: &M,
-    tx_hash: H256,
-    retries: usize,
-) -> Result<Option<Transaction>>
-where
-    M: Middleware,
-{
-    for _ in 0..retries {
-        if let Ok(Some(tx)) = middleware.get_transaction(tx_hash).await {
-            if tx.block_number.is_some() {
-                return Ok(Some(tx));
-            }
-        }
-
-        tokio::time::sleep(PENDING_TX_RETRY_BACKOFF).await;
-    }
-
-    Ok(None)
-}
-
 async fn process_l1_event<M, S>(
-    l2_erc20_bridge_addr: Address,
+    _l2_erc20_bridge_addr: Address,
     log: &Log,
     l1_event: &L1Events,
-    middleware: M,
+    _middleware: M,
     sender: &mut S,
 ) -> Result<()>
 where
@@ -263,42 +233,6 @@ where
 
     match l1_event {
         L1Events::BlockCommit(bc) => {
-            let Ok(tx) = get_tx_with_retries(
-                &middleware,
-                log.transaction_hash.unwrap_or_else(|| {
-                    panic!("log always has a related transaction {:?}; qed", log)
-                }),
-                PENDING_TX_RETRY,
-            )
-            .await
-            else {
-                tracing::error!("Failed to retreive transaction {:?}", log.transaction_hash);
-                return Err(Error::NoTransaction);
-            };
-
-            let tx = tx.unwrap_or_else(|| {
-                panic!("mined transaction exists {:?}; qed", log.transaction_hash)
-            });
-
-            let mut events = vec![];
-
-            if let Ok(commit_blocks) = CommitBatchesCall::decode(&tx.input) {
-                let mut res = parse_withdrawal_events_l1(
-                    &commit_blocks,
-                    tx.block_number
-                        .unwrap_or_else(|| {
-                            panic!("a mined transaction {:?} has a block number; qed", tx.hash)
-                        })
-                        .as_u64(),
-                    l2_erc20_bridge_addr,
-                );
-                events.append(&mut res);
-            }
-            sender
-                .send(BlockEvent::L2ToL1Events { events })
-                .await
-                .map_err(|_| Error::ChannelClosing)?;
-
             CHAIN_EVENTS_METRICS.block_commit_events.inc();
             sender
                 .send(BlockEvent::BlockCommit {
