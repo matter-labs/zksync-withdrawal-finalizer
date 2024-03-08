@@ -40,7 +40,7 @@ jobs:
           gcloud auth configure-docker us-docker.pkg.dev -q
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5.1.0
+        uses: docker/build-push-action@v5.2.0
         if: ${{ startsWith(github.ref, 'refs/tags') }}
         with:
           push: true
