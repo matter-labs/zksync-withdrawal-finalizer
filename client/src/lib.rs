@@ -88,15 +88,6 @@ lazy_static! {
         Arc::new(Mutex::new(HashMap::new()));
 }
 
-/// Adds configurable sets of tokens with known deployment addresses
-pub async fn add_predefined_token_addrs(addrs: &[(Address, Address)]) {
-    let mut addr_lock = TOKEN_ADDRS.lock().await;
-
-    for (addr_l1, addr_l2) in addrs {
-        addr_lock.insert(*addr_l2, *addr_l1);
-    }
-}
-
 impl WithdrawalParams {
     /// Convert `WithdrawalData` into a `RequestFinalizeWithdrawal` given a gas limit.
     pub fn into_request_with_gaslimit(

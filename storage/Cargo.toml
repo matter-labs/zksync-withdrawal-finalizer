@@ -11,7 +11,8 @@ sqlx = { workspace = true, features = [
     "bigdecimal",
     "postgres",
     "runtime-tokio-rustls",
-    "macros"
+    "macros",
+    "chrono"
 ] }
 num = { workspace = true }
 vise = { workspace = true }
@@ -20,3 +21,4 @@ chain-events = { workspace = true }
 ethers = { workspace = true } 
 thiserror = { workspace = true }
 bincode = { workspace = true }
+chrono = { workspace = true }

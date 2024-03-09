@@ -188,6 +188,12 @@ pub struct WithdrawalEvent {
 
     /// The amount transferred.
     pub amount: U256,
+
+    /// block timestamp.
+    pub timestamp: Option<u64>,
+
+    /// Price in USD at the moment of withdrawal
+    pub usd_price: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

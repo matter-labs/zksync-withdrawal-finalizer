@@ -5,10 +5,13 @@
 
 //! Finalizer watcher.storage.operations.
 
+use std::collections::HashMap;
+
+use chrono::NaiveDateTime;
 use ethers::types::{Address, H160, H256, U256};
 use sqlx::{PgConnection, PgPool};
 
-use chain_events::L2TokenInitEvent;
+use chain_events::{L1TokenInfo, L2TokenInitEvent};
 use client::{
     is_eth, withdrawal_finalizer::codegen::RequestFinalizeWithdrawal, zksync_contract::L2ToL1Event,
     WithdrawalEvent, WithdrawalKey, WithdrawalParams,
@@ -33,6 +36,53 @@ pub struct StoredWithdrawal {
 
     /// Index of this event within the transaction
     pub index_in_tx: usize,
+}
+
+/// A token as stored in the database
+pub struct StoredToken {
+    /// Address of token on L1
+    pub l1_token_address: Address,
+
+    /// Address of token on L2
+    pub l2_token_address: Address,
+
+    /// Name of the token
+    pub name: String,
+
+    /// Symbol of the token
+    pub symbol: String,
+
+    /// Decimals of the token
+    pub decimals: i32,
+}
+
+/// A token as stored in the DB
+pub async fn get_all_tokens(pool: &PgPool) -> Result<Vec<StoredToken>> {
+    let res = sqlx::query!(
+        "
+        SELECT
+            l1_token_address,
+            l2_token_address,
+            name,
+            symbol,
+            decimals
+        FROM
+            tokens
+        "
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|r| StoredToken {
+        l1_token_address: Address::from_slice(&r.l1_token_address),
+        l2_token_address: Address::from_slice(&r.l2_token_address),
+        name: r.name,
+        symbol: r.symbol,
+        decimals: r.decimals,
+    })
+    .collect();
+
+    Ok(res)
 }
 
 /// A new batch with a given range has been committed, update statuses of withdrawal records.
@@ -263,6 +313,8 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
             block_number: r.l2_block_number as u64,
             token: Address::from_slice(&r.token),
             amount: utils::bigdecimal_to_u256(r.amount),
+            timestamp: r.timestamp.map(|t| t.timestamp() as u64),
+            usd_price: r.usd_price,
         },
         index_in_tx: r.event_index_in_tx as usize,
     })
@@ -272,6 +324,10 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
 
     Ok(events)
 }
+
+#[derive(sqlx::Type)]
+#[sqlx(transparent)]
+struct UsdPrice(Option<f64>);
 
 /// Adds a withdrawal event to the DB.
 ///
@@ -285,6 +341,8 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
+    let mut usd_prices = Vec::with_capacity(events.len());
+    let mut timestamps = Vec::with_capacity(events.len());
 
     events.iter().for_each(|sw| {
         tx_hashes.push(sw.event.tx_hash.0.to_vec());
@@ -292,6 +350,11 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         tokens.push(sw.event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(sw.event.amount));
         indices_in_tx.push(sw.index_in_tx as i32);
+        usd_prices.push(sw.event.usd_price);
+        timestamps.push(
+            NaiveDateTime::from_timestamp_opt(sw.event.timestamp.unwrap_or_default() as i64, 0)
+                .expect("always a correct unix timestamp in seconds; qed"),
+        );
     });
 
     let latency = STORAGE_METRICS.call[&"add_withdrawals"].start();
@@ -304,27 +367,35 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
             l2_block_number,
             token,
             amount,
-            event_index_in_tx
+            event_index_in_tx,
+            usd_price,
+            timestamp
           )
         SELECT
           u.tx_hash,
           u.l2_block_number,
           u.token,
           u.amount,
-          u.index_in_tx
+          u.index_in_tx,
+          u.usd_price,
+          u.timestamp
         FROM
           unnest(
             $1 :: BYTEA [],
             $2 :: bigint [],
             $3 :: BYTEA [],
             $4 :: numeric [],
-            $5 :: integer []
+            $5 :: integer [],
+            $6 :: FLOAT8 [],
+            $7 :: TIMESTAMP []
           ) AS u(
             tx_hash,
             l2_block_number,
             token,
             amount,
-            index_in_tx
+            index_in_tx,
+            usd_price,
+            timestamp
           ) ON CONFLICT (
             tx_hash,
             event_index_in_tx
@@ -335,6 +406,8 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         &tokens,
         amounts.as_slice(),
         &indices_in_tx,
+        usd_prices.as_slice() as &[Option<f64>],
+        &timestamps,
     )
     .execute(pool)
     .await?;
@@ -490,7 +563,7 @@ pub async fn l2_to_l1_events(pool: &PgPool, events: &[L2ToL1Event]) -> Result<()
 }
 
 /// Get addresses of known tokens on L2 and the last seen block.
-pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
+pub async fn get_tokens(pool: &PgPool) -> Result<(HashMap<Address, L1TokenInfo>, u64)> {
     let latency = STORAGE_METRICS.call[&"get_tokens"].start();
     let last_l2_block_seen = sqlx::query!(
         "
@@ -508,7 +581,9 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     let tokens = sqlx::query!(
         "
         SELECT
-          l2_token_address
+          l2_token_address,
+          l1_token_address,
+          decimals
         FROM
           tokens
         "
@@ -516,7 +591,15 @@ pub async fn get_tokens(pool: &PgPool) -> Result<(Vec<Address>, u64)> {
     .fetch_all(pool)
     .await?
     .into_iter()
-    .map(|r| H160::from_slice(&r.l2_token_address))
+    .map(|r| {
+        (
+            H160::from_slice(&r.l2_token_address),
+            L1TokenInfo {
+                address: H160::from_slice(&r.l1_token_address),
+                decimals: r.decimals,
+            },
+        )
+    })
     .collect();
 
     latency.observe();
@@ -747,6 +830,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
     limit_by: u64,
     token_blacklist: &[Address],
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -786,8 +870,12 @@ pub async fn withdrawals_to_finalize_with_blacklist(
             $2 :: BYTEA []
           ))
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $3
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $4
+                ELSE TRUE
             END
           )
         LIMIT
@@ -796,6 +884,7 @@ pub async fn withdrawals_to_finalize_with_blacklist(
         limit_by as i64,
         &blacklist,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?
@@ -824,6 +913,7 @@ pub async fn withdrawals_to_finalize_with_whitelist(
     limit_by: u64,
     token_whitelist: &[Address],
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let whitelist: Vec<_> = token_whitelist.iter().map(|a| a.0.to_vec()).collect();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -863,8 +953,12 @@ pub async fn withdrawals_to_finalize_with_whitelist(
             $2 :: BYTEA []
           ))
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $3
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $4
+                ELSE TRUE
             END
           )
         LIMIT
@@ -873,6 +967,7 @@ pub async fn withdrawals_to_finalize_with_whitelist(
         limit_by as i64,
         &whitelist,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?
@@ -900,6 +995,7 @@ pub async fn withdrawals_to_finalize(
     pool: &PgPool,
     limit_by: u64,
     eth_threshold: Option<U256>,
+    erc20_usd_threshold: Option<f64>,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -941,8 +1037,12 @@ pub async fn withdrawals_to_finalize(
             last_finalization_attempt < NOW() - INTERVAL '1 minutes'
           )
           AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
-            ELSE TRUE
+            CASE
+                WHEN token = decode('000000000000000000000000000000000000800A', 'hex')
+                    THEN amount >= $2
+                WHEN $3::FLOAT8 IS NOT NULL
+                    THEN usd_price >= $3
+                ELSE TRUE
             END
           )
         LIMIT
@@ -950,6 +1050,7 @@ pub async fn withdrawals_to_finalize(
         ",
         limit_by as i64,
         u256_to_big_decimal(eth_threshold),
+        erc20_usd_threshold,
     )
     .fetch_all(pool)
     .await?

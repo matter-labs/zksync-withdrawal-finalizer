@@ -16,3 +16,4 @@ vise = { workspace = true }
 tracing = { workspace = true }
 client = { workspace = true }
 ethers-log-decode = { workspace = true }
+price-feed = { workspace = true }

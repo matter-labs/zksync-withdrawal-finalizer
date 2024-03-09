@@ -405,6 +405,7 @@ where
             }
             L2Event::L2TokenInitEvent(event) => {
                 tracing::debug!("l2 token init event {event:?}");
+
                 storage::add_token(&pool, &event).await?;
             }
             L2Event::RestartedFromBlock(_block_number) => {

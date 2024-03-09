@@ -15,6 +15,7 @@ use ethers::{
     types::U256,
 };
 use eyre::{anyhow, Result};
+use price_feed::CoinGeckoClient;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     ConnectOptions, PgConnection,
@@ -156,7 +157,6 @@ async fn main() -> Result<()> {
         tracing::info!("No sentry url configured");
     }
 
-    client::add_predefined_token_addrs(config.token_mappings().as_ref()).await;
     let stop_vise_exporter = run_vise_exporter()?;
 
     // Successful reconnections do not reset the reconnection count trackers in the
@@ -208,16 +208,14 @@ async fn main() -> Result<()> {
 
     tracing::info!("Starting from L1 block number {from_l1_block}");
 
-    let (mut tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
-
-    if let Some(ref custom_tokens) = config.custom_token_addresses {
-        tokens.extend_from_slice(custom_tokens.0.as_slice());
-    }
+    let (tokens, last_token_seen_at_block) = storage::get_tokens(&pgpool.clone()).await?;
 
     tracing::info!("tokens {tokens:?}");
-    if let Some(ref custom_tokens) = config.custom_token_deployer_addresses {
-        tokens.extend_from_slice(custom_tokens.0.as_slice());
-    }
+
+    let coingecko_client = match (config.coingecko_api_url, config.coingecko_api_token) {
+        (Some(url), Some(token)) => Some(CoinGeckoClient::new(url, &token)),
+        _ => None,
+    };
 
     let l2_events = L2EventsListener::new(
         config.api_web3_json_rpc_ws_url.as_str(),
@@ -227,6 +225,7 @@ async fn main() -> Result<()> {
             .unwrap_or(vec![config.l2_erc20_bridge_addr]),
         tokens.into_iter().collect(),
         config.finalize_eth_token.unwrap_or(true),
+        coingecko_client,
     );
 
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
@@ -307,6 +306,7 @@ async fn main() -> Result<()> {
         config.tokens_to_finalize.unwrap_or_default(),
         meter_withdrawals,
         eth_finalization_threshold,
+        config.erc20_usd_finalization_threshold,
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
