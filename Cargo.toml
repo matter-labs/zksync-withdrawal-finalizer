@@ -65,7 +65,7 @@ watcher = { path = "./watcher" }
 ethers-log-decode = { path = "./ethers-log-decode" }
 tx-sender = { path = "./tx-sender" }
 finalizer = { path = "./finalizer" }
-tokio-stream = "0.1.14"
+tokio-stream = "0.1.15"
 tokio-util = "0.7.10"
 tower-http = "0.5.2"
 url = "2.5.0"
