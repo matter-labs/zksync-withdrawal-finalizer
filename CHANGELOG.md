@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.6...v0.7.0) (2024-03-15)
+
+
+### Features
+
+* removes finalizer api ([#411](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/411)) ([2bda706](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/2bda70609d03daa1f36a8bfe8b86969c223cf488))
+
+
+### Bug Fixes
+
+* **ci:** update whoami ([#403](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/403)) ([0c99c23](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/0c99c232b8d41de4dc954a884c62ce1360f96a09))
+
 ## [0.6.6](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.5...v0.6.6) (2024-03-04)
 
 
