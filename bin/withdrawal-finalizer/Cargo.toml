@@ -29,4 +29,3 @@ chain-events = { workspace = true }
 vlog = {  workspace = true }
 finalizer = { workspace = true }
 watcher = { workspace = true }
-api = { workspace = true }
