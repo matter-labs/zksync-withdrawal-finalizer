@@ -315,12 +315,7 @@ async fn main() -> Result<()> {
         eth_finalization_threshold,
     ));
 
-    let api_server = tokio::spawn(api::run_server(pgpool));
-
     tokio::select! {
-        r = api_server => {
-            tracing::error!("Api server ended with {r:?}");
-        }
         r = block_events_handle => {
             tracing::error!("Block Events stream ended with {r:?}");
         }
