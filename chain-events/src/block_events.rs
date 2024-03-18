@@ -26,7 +26,7 @@ enum L1Events {
 
 // A convenience multiplexer for `Block`-related events.
 //
-// The only purose of this structure is multpliexing together
+// The only purpose of this structure is multiplexing together
 // the `Block` events from the middleware as currently `ethers` events
 // api relies on lifetimes and borrowing is hard to use otherwise
 // in the async context.

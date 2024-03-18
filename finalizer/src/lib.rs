@@ -311,7 +311,7 @@ where
                     tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                 }
                 // no need to bump the counter here, waiting for tx
-                // has failed becuase of networking or smth, but at
+                // has failed because of networking or smth, but at
                 // this point tx has already been accepted into tx pool
             }
         }
@@ -472,7 +472,7 @@ where
 
         // if the withdrawal has already been finalized set its
         // finalization transaction to zero which is signals exactly this
-        // it is known that withdrawal has been fianlized but not known
+        // it is known that withdrawal has been finalized but not known
         // in which exact transaction.
         //
         // this may happen in two cases:
@@ -554,7 +554,7 @@ where
 {
     let mut ok_results = Vec::with_capacity(hash_and_indices.len());
 
-    // Run all parametere fetching in parallel.
+    // Run all parameter fetching in parallel.
     // Filter out errors and log them and increment a metric counter.
     // Return successful fetches.
     for (i, result) in futures::future::join_all(hash_and_indices.iter().map(|(h, i, id)| {
@@ -591,7 +591,7 @@ where
     ok_results
 }
 
-// Continiously query the new withdrawals that have been seen by watcher
+// Continuously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
 async fn params_fetcher_loop<M1, M2>(
