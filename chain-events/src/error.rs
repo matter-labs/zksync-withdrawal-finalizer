@@ -14,7 +14,7 @@ pub enum Error {
     #[error("Channel closing")]
     ChannelClosing,
 
-    #[error("Failed to retreive transaction")]
+    #[error("Failed to retrieve transaction")]
     NoTransaction,
 }
 

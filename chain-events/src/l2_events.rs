@@ -369,7 +369,7 @@ impl L2EventsListener {
         let mut tokens = self.tokens.iter().cloned().collect::<Vec<_>>();
         tokens.extend_from_slice(self.token_deployer_addrs.as_slice());
 
-        tracing::info!("Listeing to events from tokens {tokens:?}");
+        tracing::info!("Listening to events from tokens {tokens:?}");
 
         let past_filter = Filter::new()
             .from_block(from_block)

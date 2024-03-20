@@ -311,7 +311,7 @@ where
                     tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                 }
                 // no need to bump the counter here, waiting for tx
-                // has failed becuase of networking or smth, but at
+                // has failed because of networking or smth, but at
                 // this point tx has already been accepted into tx pool
             }
         }
@@ -591,7 +591,7 @@ where
     ok_results
 }
 
-// Continiously query the new withdrawals that have been seen by watcher
+// Continuously query the new withdrawals that have been seen by watcher
 // request finalizing params for them and store this information into
 // finalizer db table.
 async fn params_fetcher_loop<M1, M2>(

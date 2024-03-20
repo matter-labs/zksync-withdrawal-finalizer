@@ -98,7 +98,7 @@ impl std::fmt::Display for BlockEvent {
                 .finish(),
             Self::BlocksRevert { event: br, .. } => f
                 .debug_struct("BlocksRevert")
-                .field("total_blocks_commited", &br.total_batches_committed)
+                .field("total_blocks_committed", &br.total_batches_committed)
                 .field("total_blocks_verified", &br.total_batches_verified)
                 .field("total_blocks_executed", &br.total_batches_executed)
                 .finish(),
