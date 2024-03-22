@@ -38,6 +38,7 @@ pub struct L2EventsListener {
 enum L2Events {
     BridgeBurn(BridgeBurnFilter),
     Withdrawal(WithdrawalFilter),
+    #[allow(unused)]
     ContractDeployed(ContractDeployedFilter),
 }
 
