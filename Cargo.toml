@@ -67,5 +67,5 @@ tokio-stream = "0.1.15"
 tokio-util = "0.7.10"
 tower-http = "0.5.2"
 url = "2.5.0"
-axum = "0.7.4"
+axum = "0.7.5"
 vlog = { path = "./vlog" }
