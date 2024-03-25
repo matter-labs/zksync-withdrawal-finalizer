@@ -87,8 +87,8 @@ pub struct Config {
     #[envconfig(from = "ETH_FINALIZATION_THRESHOLD")]
     pub eth_finalization_threshold: Option<String>,
 
-    #[envconfig(from = "ONLY_L1_RECEPIENTS")]
-    pub only_l1_recepients: Option<AddrList>,
+    #[envconfig(from = "ONLY_L1_RECIPIENTS")]
+    pub only_l1_recipients: Option<AddrList>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]

@@ -909,7 +909,7 @@ pub async fn withdrawals_to_finalize(
     pool: &PgPool,
     limit_by: u64,
     eth_threshold: Option<U256>,
-    l1_receivers: Option<&[Address]>,
+    only_l1_recipients: Option<&[Address]>,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -972,7 +972,7 @@ pub async fn withdrawals_to_finalize(
           "#,
           _ // where clause
         ],
-        match (l1_receivers) {
+        match (only_l1_recipients) {
             Some(receivers) => ("AND l1_receiver = ANY($3) limit $1"; limit_by as i64, u256_to_big_decimal(eth_threshold), &receivers.iter().map(Address::as_bytes).collect::<Vec<_>>() as &[&[u8]]),
             None => ("limit $1"; limit_by as i64, u256_to_big_decimal(eth_threshold)),
         }
