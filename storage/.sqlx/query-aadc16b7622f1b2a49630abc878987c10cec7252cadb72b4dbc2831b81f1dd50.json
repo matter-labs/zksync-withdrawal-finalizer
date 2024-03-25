@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO\n          withdrawals (\n            tx_hash,\n            l2_block_number,\n            token,\n            amount,\n            event_index_in_tx,\n            l1_receiver\n          )\n        SELECT\n          u.tx_hash,\n          u.l2_block_number,\n          u.token,\n          u.amount,\n          u.index_in_tx,\n          u.l1_receiver\n        FROM\n          unnest(\n            $1 :: BYTEA [],\n            $2 :: bigint [],\n            $3 :: BYTEA [],\n            $4 :: numeric [],\n            $5 :: integer [],\n            $6 :: BYTEA []\n          ) AS u(\n            tx_hash,\n            l2_block_number,\n            token,\n            amount,\n            index_in_tx,\n            l1_receiver\n          ) ON CONFLICT (\n            tx_hash,\n            event_index_in_tx\n          ) DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "ByteaArray",
+        "Int8Array",
+        "ByteaArray",
+        "NumericArray",
+        "Int4Array",
+        "ByteaArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aadc16b7622f1b2a49630abc878987c10cec7252cadb72b4dbc2831b81f1dd50"
+}

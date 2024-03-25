@@ -188,6 +188,9 @@ pub struct WithdrawalEvent {
 
     /// The amount transferred.
     pub amount: U256,
+
+    /// Address on L1 that will receive this withdrawal.
+    pub l1_receiver: Option<Address>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

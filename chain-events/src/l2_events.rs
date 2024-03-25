@@ -463,8 +463,7 @@ impl L2EventsListener {
     {
         if let (Some(tx_hash), Some(block_number)) = (log.transaction_hash, log.block_number) {
             match l2_event {
-                L2Events::BridgeBurn(BridgeBurnFilter { amount, .. })
-                | L2Events::Withdrawal(WithdrawalFilter { amount, .. }) => {
+                L2Events::BridgeBurn(BridgeBurnFilter { amount, .. }) => {
                     CHAIN_EVENTS_METRICS.withdrawal_events.inc();
 
                     let we = WithdrawalEvent {
@@ -472,6 +471,28 @@ impl L2EventsListener {
                         block_number: block_number.as_u64(),
                         token: log.address,
                         amount: *amount,
+                        l1_receiver: None,
+                    };
+                    let event = we.into();
+                    tracing::info!("sending withdrawal event {event:?}");
+                    sender
+                        .send(event)
+                        .await
+                        .map_err(|_| Error::ChannelClosing)?;
+                }
+                L2Events::Withdrawal(WithdrawalFilter {
+                    amount,
+                    l_1_receiver,
+                    ..
+                }) => {
+                    CHAIN_EVENTS_METRICS.withdrawal_events.inc();
+
+                    let we = WithdrawalEvent {
+                        tx_hash,
+                        block_number: block_number.as_u64(),
+                        token: log.address,
+                        amount: *amount,
+                        l1_receiver: Some(*l_1_receiver),
                     };
                     let event = we.into();
                     tracing::info!("sending withdrawal event {event:?}");

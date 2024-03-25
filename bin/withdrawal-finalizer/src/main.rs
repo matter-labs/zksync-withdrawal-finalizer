@@ -307,6 +307,7 @@ async fn main() -> Result<()> {
         config.tokens_to_finalize.unwrap_or_default(),
         meter_withdrawals,
         eth_finalization_threshold,
+        config.only_l1_recepients.map(|v| v.0.into_iter().collect()),
     );
     let finalizer_handle = tokio::spawn(finalizer.run(client_l2));
 
