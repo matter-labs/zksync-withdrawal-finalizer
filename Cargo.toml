@@ -30,7 +30,7 @@ auto_impl = "1.2.0"
 async-trait = "0.1.79"
 ethers = { version = "2.0.14", default-features = false }
 tokio = "1.36.0"
-clap = "4.5.3"
+clap = "4.5.4"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 sentry = { version = "0", default-features = false }
