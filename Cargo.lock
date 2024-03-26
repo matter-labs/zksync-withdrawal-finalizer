@@ -1439,7 +1439,6 @@ dependencies = [
  "client",
  "ethers",
  "futures",
- "pretty_assertions",
  "serde_json",
  "sqlx",
  "storage",

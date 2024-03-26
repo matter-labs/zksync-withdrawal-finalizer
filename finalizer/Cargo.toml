@@ -20,6 +20,3 @@ client = { workspace = true }
 storage = { workspace = true }
 tx-sender = { workspace = true }
 withdrawals-meterer = { workspace = true }
-
-[dev-dependencies]
-pretty_assertions = { workspace = true }
