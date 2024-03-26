@@ -14,7 +14,6 @@ use ethers::{
     types::{H256, U256},
 };
 use futures::TryFutureExt;
-use serde::Deserialize;
 use sqlx::PgPool;
 
 use client::{
@@ -45,34 +44,6 @@ const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 /// Backoff period if one of the loop iterations has failed.
 const LOOP_ITERATION_ERROR_BACKOFF: Duration = Duration::from_secs(5);
 
-/// An `enum` that defines a set of tokens that Finalizer finalizes.
-#[derive(Deserialize, Debug, Eq, PartialEq)]
-pub enum TokenList {
-    /// Finalize all known tokens
-    All,
-    /// Finalize nothing
-    None,
-    /// Finalize everything but these tokens, this is a blacklist.
-    BlackList(Vec<Address>),
-    /// Finalize nothing but these tokens, this is a whitelist.
-    WhiteList(Vec<Address>),
-}
-
-impl Default for TokenList {
-    fn default() -> Self {
-        Self::All
-    }
-}
-
-impl FromStr for TokenList {
-    type Err = serde_json::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let res = serde_json::from_str(s)?;
-        Ok(res)
-    }
-}
-
 /// A newtype that represents a set of addresses in JSON format.
 #[derive(Debug, Eq, PartialEq)]
 pub struct AddrList(pub Vec<Address>);
@@ -102,7 +73,6 @@ pub struct Finalizer<M1, M2> {
     tx_retry_timeout: Duration,
     account_address: Address,
     withdrawals_meterer: Option<WithdrawalsMeter>,
-    token_list: TokenList,
     eth_threshold: Option<U256>,
     only_l1_recipients: Option<Vec<Address>>,
 }
@@ -132,7 +102,6 @@ where
         l1_bridge: IL1Bridge<M>,
         tx_retry_timeout: usize,
         account_address: Address,
-        token_list: TokenList,
         meter_withdrawals: bool,
         eth_threshold: Option<U256>,
         only_l1_recipients: Option<Vec<Address>>,
@@ -143,8 +112,6 @@ where
         ));
         let tx_fee_limit = ethers::utils::parse_ether(TX_FEE_LIMIT)
             .expect("{TX_FEE_LIMIT} ether is a parsable amount; qed");
-
-        tracing::info!("finalizing tokens {token_list:?}");
 
         Self {
             pgpool,
@@ -160,7 +127,6 @@ where
             tx_retry_timeout: Duration::from_secs(tx_retry_timeout as u64),
             account_address,
             withdrawals_meterer,
-            token_list,
             eth_threshold,
             only_l1_recipients,
         }
@@ -355,36 +321,13 @@ where
     async fn loop_iteration(&mut self) -> Result<()> {
         tracing::debug!("begin iteration of the finalizer loop");
 
-        let try_finalize_these = match &self.token_list {
-            TokenList::All => {
-                storage::withdrawals_to_finalize(
-                    &self.pgpool,
-                    self.query_db_pagination_limit,
-                    self.eth_threshold,
-                    self.only_l1_recipients.as_deref(),
-                )
-                .await?
-            }
-            TokenList::WhiteList(w) => {
-                storage::withdrawals_to_finalize_with_whitelist(
-                    &self.pgpool,
-                    self.query_db_pagination_limit,
-                    w,
-                    self.eth_threshold,
-                )
-                .await?
-            }
-            TokenList::BlackList(b) => {
-                storage::withdrawals_to_finalize_with_blacklist(
-                    &self.pgpool,
-                    self.query_db_pagination_limit,
-                    b,
-                    self.eth_threshold,
-                )
-                .await?
-            }
-            TokenList::None => return Ok(()),
-        };
+        let try_finalize_these = storage::withdrawals_to_finalize(
+            &self.pgpool,
+            self.query_db_pagination_limit,
+            self.eth_threshold,
+            self.only_l1_recipients.as_deref(),
+        )
+        .await?;
 
         tracing::debug!("trying to finalize these {try_finalize_these:?}");
 

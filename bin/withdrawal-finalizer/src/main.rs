@@ -304,7 +304,6 @@ async fn main() -> Result<()> {
         l1_bridge,
         config.tx_retry_timeout,
         finalizer_account_address,
-        config.tokens_to_finalize.unwrap_or_default(),
         meter_withdrawals,
         eth_finalization_threshold,
         config.only_l1_recipients.map(|v| v.0.into_iter().collect()),
