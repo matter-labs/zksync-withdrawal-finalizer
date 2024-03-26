@@ -945,36 +945,51 @@ pub async fn withdrawals_to_finalize(
             FROM
                 finalization_data
             JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
-        WHERE
-          finalization_tx IS NULL
-          AND failed_finalization_attempts < 3
-          AND finalization_data.l2_block_number <= COALESCE(
-            (
-              SELECT
-                MAX(l2_block_number)
-              FROM
-                l2_blocks
-              WHERE
-                execute_l1_block_number IS NOT NULL
-            ),
-            1
-          )
-          AND (
-            last_finalization_attempt IS NULL
-          OR
-            last_finalization_attempt < NOW() - INTERVAL '1 minutes'
-          )
-          AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
-            ELSE TRUE
-            END
-          )
+            WHERE
+                finalization_tx IS NULL
+                AND
+                failed_finalization_attempts < 3
+                AND
+                finalization_data.l2_block_number <= COALESCE(
+                    (
+                        SELECT
+                        MAX(l2_block_number)
+                        FROM
+                        l2_blocks
+                            WHERE
+                        execute_l1_block_number IS NOT NULL
+                    ),
+                    1
+                )
+                AND
+                (
+                    last_finalization_attempt IS NULL
+                    OR
+                    last_finalization_attempt < NOW() - INTERVAL '1 minutes'
+                )
+                AND
+                (
+                    CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
+                    ELSE TRUE
+                    END
+                )
           "#,
-          _ // where clause
+          _ // Maybe filter by l1 receiver
         ],
         match (only_l1_recipients) {
-            Some(receivers) => ("AND l1_receiver = ANY($3) limit $1"; limit_by as i64, u256_to_big_decimal(eth_threshold), &receivers.iter().map(Address::as_bytes).collect::<Vec<_>>() as &[&[u8]]),
-            None => ("limit $1"; limit_by as i64, u256_to_big_decimal(eth_threshold)),
+            Some(receivers) => (
+                "AND l1_receiver = ANY($3) limit $1";
+                limit_by as i64,
+                u256_to_big_decimal(eth_threshold),
+                &receivers.iter()
+                    .map(Address::as_bytes)
+                    .collect::<Vec<_>>() as &[&[u8]]
+            ),
+            None => (
+                "limit $1";
+                limit_by as i64,
+                u256_to_big_decimal(eth_threshold)
+            ),
         }
     );
 
