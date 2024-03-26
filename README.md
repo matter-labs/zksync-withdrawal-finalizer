@@ -61,20 +61,6 @@ The configuration structure describing the service config can be found in [`conf
 
 ** more about zkSync contracts can be found [here](https://github.com/matter-labs/era-contracts/blob/main/docs/Overview.md)
 
-## Configuring Tokens to finalize.
-
-It may be handy to limit a set of tokens the Finalizer is finalizing. This
-configuration may be specified by setting a rule in the `TOKENS_TO_FINALIZE` value.
-If this environment variable is not set then by default Finalizer will only finalize
-ETH token (`0x000...0800a`).
-
-You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
-
-1. `TOKENS_TO_FINALIZE = '"All"'` - Finalize everything
-1. `TOKENS_TO_FINALIZE = '"None"'` - Finalize nothing
-1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize only these tokens
-1. `TOKENS_TO_FINALIZE = '{ "BlackList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize all tokens but these
-
 ## Deploying the finalizer smart contract
 
 The finalizer smart contract needs to reference the addresses of the diamond proxy contract and l1 erc20 proxy contract.
