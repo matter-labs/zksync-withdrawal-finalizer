@@ -14,13 +14,9 @@ sqlx = { workspace = true, features = ["postgres", "runtime-tokio-rustls"] }
 tokio = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
 vise = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 
 client = { workspace = true }
 storage = { workspace = true }
 tx-sender = { workspace = true }
 withdrawals-meterer = { workspace = true }
-
-[dev-dependencies]
-pretty_assertions = { workspace = true }

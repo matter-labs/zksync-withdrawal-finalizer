@@ -37,6 +37,11 @@
         "ordinal": 6,
         "name": "finalizable",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "l1_receiver",
+        "type_info": "Bytea"
       }
     ],
     "parameters": {
@@ -51,7 +56,8 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
   "hash": "bec6b9ad565f05d3587ce1db853e273f30a3e3ec884b0c1310aafbbf06a8f165"

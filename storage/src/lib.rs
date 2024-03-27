@@ -15,6 +15,7 @@ use client::{
 };
 
 mod error;
+mod macro_utils;
 mod metrics;
 mod utils;
 
@@ -263,6 +264,7 @@ pub async fn get_withdrawals(pool: &PgPool, ids: &[i64]) -> Result<Vec<StoredWit
             block_number: r.l2_block_number as u64,
             token: Address::from_slice(&r.token),
             amount: utils::bigdecimal_to_u256(r.amount),
+            l1_receiver: r.l1_receiver.map(|v| Address::from_slice(&v)),
         },
         index_in_tx: r.event_index_in_tx as usize,
     })
@@ -285,6 +287,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
     let mut tokens = Vec::with_capacity(events.len());
     let mut amounts = Vec::with_capacity(events.len());
     let mut indices_in_tx = Vec::with_capacity(events.len());
+    let mut l1_receivers = Vec::with_capacity(events.len());
 
     events.iter().for_each(|sw| {
         tx_hashes.push(sw.event.tx_hash.0.to_vec());
@@ -292,6 +295,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         tokens.push(sw.event.token.0.to_vec());
         amounts.push(u256_to_big_decimal(sw.event.amount));
         indices_in_tx.push(sw.index_in_tx as i32);
+        l1_receivers.push(sw.event.l1_receiver.map(|a| a.0.to_vec()));
     });
 
     let latency = STORAGE_METRICS.call[&"add_withdrawals"].start();
@@ -304,27 +308,31 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
             l2_block_number,
             token,
             amount,
-            event_index_in_tx
+            event_index_in_tx,
+            l1_receiver
           )
         SELECT
           u.tx_hash,
           u.l2_block_number,
           u.token,
           u.amount,
-          u.index_in_tx
+          u.index_in_tx,
+          u.l1_receiver
         FROM
           unnest(
             $1 :: BYTEA [],
             $2 :: bigint [],
             $3 :: BYTEA [],
             $4 :: numeric [],
-            $5 :: integer []
+            $5 :: integer [],
+            $6 :: BYTEA []
           ) AS u(
             tx_hash,
             l2_block_number,
             token,
             amount,
-            index_in_tx
+            index_in_tx,
+            l1_receiver
           ) ON CONFLICT (
             tx_hash,
             event_index_in_tx
@@ -335,6 +343,7 @@ pub async fn add_withdrawals(pool: &PgPool, events: &[StoredWithdrawal]) -> Resu
         &tokens,
         amounts.as_slice(),
         &indices_in_tx,
+        &l1_receivers as &[Option<Vec<u8>>],
     )
     .execute(pool)
     .await?;
@@ -742,232 +751,112 @@ pub async fn set_withdrawal_unfinalizable(
 }
 
 /// Get the earliest withdrawals never attempted to be finalized before
-pub async fn withdrawals_to_finalize_with_blacklist(
-    pool: &PgPool,
-    limit_by: u64,
-    token_blacklist: &[Address],
-    eth_threshold: Option<U256>,
-) -> Result<Vec<WithdrawalParams>> {
-    let blacklist: Vec<_> = token_blacklist.iter().map(|a| a.0.to_vec()).collect();
-    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
-    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
-
-    let data = sqlx::query!(
-        "
-        SELECT
-          w.tx_hash,
-          w.event_index_in_tx,
-          withdrawal_id,
-          finalization_data.l2_block_number,
-          l1_batch_number,
-          l2_message_index,
-          l2_tx_number_in_block,
-          message,
-          sender,
-          proof
-        FROM
-          finalization_data
-          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
-        WHERE
-          finalization_tx IS NULL
-          AND failed_finalization_attempts < 3
-          AND finalization_data.l2_block_number <= COALESCE(
-            (
-              SELECT
-                MAX(l2_block_number)
-              FROM
-                l2_blocks
-              WHERE
-                execute_l1_block_number IS NOT NULL
-            ),
-            1
-          )
-          AND w.token NOT IN (SELECT * FROM UNNEST (
-            $2 :: BYTEA []
-          ))
-          AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
-            END
-          )
-        LIMIT
-          $1
-        ",
-        limit_by as i64,
-        &blacklist,
-        u256_to_big_decimal(eth_threshold),
-    )
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(|record| WithdrawalParams {
-        tx_hash: H256::from_slice(&record.tx_hash),
-        event_index_in_tx: record.event_index_in_tx as u32,
-        id: record.withdrawal_id as u64,
-        l2_block_number: record.l2_block_number as u64,
-        l1_batch_number: record.l1_batch_number.into(),
-        l2_message_index: record.l2_message_index as u32,
-        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
-        message: record.message.into(),
-        sender: Address::from_slice(&record.sender),
-        proof: bincode::deserialize(&record.proof)
-            .expect("storage contains data correctly serialized by bincode; qed"),
-    })
-    .collect();
-
-    Ok(data)
-}
-
-/// Get the earliest withdrawals never attempted to be finalized before
-pub async fn withdrawals_to_finalize_with_whitelist(
-    pool: &PgPool,
-    limit_by: u64,
-    token_whitelist: &[Address],
-    eth_threshold: Option<U256>,
-) -> Result<Vec<WithdrawalParams>> {
-    let whitelist: Vec<_> = token_whitelist.iter().map(|a| a.0.to_vec()).collect();
-    // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
-    let eth_threshold = eth_threshold.unwrap_or(U256::zero());
-
-    let data = sqlx::query!(
-        "
-        SELECT
-          w.tx_hash,
-          w.event_index_in_tx,
-          withdrawal_id,
-          finalization_data.l2_block_number,
-          l1_batch_number,
-          l2_message_index,
-          l2_tx_number_in_block,
-          message,
-          sender,
-          proof
-        FROM
-          finalization_data
-          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
-        WHERE
-          finalization_tx IS NULL
-          AND failed_finalization_attempts < 3
-          AND finalization_data.l2_block_number <= COALESCE(
-            (
-              SELECT
-                MAX(l2_block_number)
-              FROM
-                l2_blocks
-              WHERE
-                execute_l1_block_number IS NOT NULL
-            ),
-            1
-          )
-          AND w.token IN (SELECT * FROM UNNEST (
-            $2 :: BYTEA []
-          ))
-          AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $3
-            ELSE TRUE
-            END
-          )
-        LIMIT
-          $1
-        ",
-        limit_by as i64,
-        &whitelist,
-        u256_to_big_decimal(eth_threshold),
-    )
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(|record| WithdrawalParams {
-        tx_hash: H256::from_slice(&record.tx_hash),
-        event_index_in_tx: record.event_index_in_tx as u32,
-        id: record.withdrawal_id as u64,
-        l2_block_number: record.l2_block_number as u64,
-        l1_batch_number: record.l1_batch_number.into(),
-        l2_message_index: record.l2_message_index as u32,
-        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
-        message: record.message.into(),
-        sender: Address::from_slice(&record.sender),
-        proof: bincode::deserialize(&record.proof)
-            .expect("storage contains data correctly serialized by bincode; qed"),
-    })
-    .collect();
-
-    Ok(data)
-}
-
-/// Get the earliest withdrawals never attempted to be finalized before
 pub async fn withdrawals_to_finalize(
     pool: &PgPool,
     limit_by: u64,
     eth_threshold: Option<U256>,
+    only_l1_recipients: Option<&[Address]>,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
     let eth_threshold = eth_threshold.unwrap_or(U256::zero());
+    struct WithdrawalParamsInner {
+        tx_hash: Vec<u8>,
+        event_index_in_tx: i32,
+        withdrawal_id: i64,
+        l2_block_number: i64,
+        l1_batch_number: i64,
+        l2_message_index: i32,
+        l2_tx_number_in_block: i16,
+        message: Vec<u8>,
+        sender: Vec<u8>,
+        proof: Vec<u8>,
+    }
 
-    let data = sqlx::query!(
-        "
-        SELECT
-          w.tx_hash,
-          w.event_index_in_tx,
-          withdrawal_id,
-          finalization_data.l2_block_number,
-          l1_batch_number,
-          l2_message_index,
-          l2_tx_number_in_block,
-          message,
-          sender,
-          proof
-        FROM
-          finalization_data
-          JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
-        WHERE
-          finalization_tx IS NULL
-          AND failed_finalization_attempts < 3
-          AND finalization_data.l2_block_number <= COALESCE(
-            (
-              SELECT
-                MAX(l2_block_number)
-              FROM
-                l2_blocks
-              WHERE
-                execute_l1_block_number IS NOT NULL
+    let query = match_query_as!(
+        WithdrawalParamsInner,
+        [
+        r#"
+            SELECT
+                w.tx_hash,
+                w.event_index_in_tx,
+                withdrawal_id,
+                finalization_data.l2_block_number,
+                l1_batch_number,
+                l2_message_index,
+                l2_tx_number_in_block,
+                message,
+                sender,
+                proof
+            FROM
+                finalization_data
+            JOIN withdrawals w ON finalization_data.withdrawal_id = w.id
+            WHERE
+                finalization_tx IS NULL
+                AND
+                failed_finalization_attempts < 3
+                AND
+                finalization_data.l2_block_number <= COALESCE(
+                    (
+                        SELECT
+                        MAX(l2_block_number)
+                        FROM
+                        l2_blocks
+                            WHERE
+                        execute_l1_block_number IS NOT NULL
+                    ),
+                    1
+                )
+                AND
+                (
+                    last_finalization_attempt IS NULL
+                    OR
+                    last_finalization_attempt < NOW() - INTERVAL '1 minutes'
+                )
+                AND
+                (
+                    CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
+                    ELSE TRUE
+                    END
+                )
+          "#,
+          _ // Maybe filter by l1 receiver
+        ],
+        match (only_l1_recipients) {
+            Some(receivers) => (
+                "AND l1_receiver = ANY($3) limit $1";
+                limit_by as i64,
+                u256_to_big_decimal(eth_threshold),
+                &receivers.iter()
+                    .map(Address::as_bytes)
+                    .collect::<Vec<_>>() as &[&[u8]]
             ),
-            1
-          )
-          AND (
-            last_finalization_attempt IS NULL
-          OR
-            last_finalization_attempt < NOW() - INTERVAL '1 minutes'
-          )
-          AND (
-            CASE WHEN token = decode('000000000000000000000000000000000000800A', 'hex') THEN amount >= $2
-            ELSE TRUE
-            END
-          )
-        LIMIT
-          $1
-        ",
-        limit_by as i64,
-        u256_to_big_decimal(eth_threshold),
-    )
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(|record| WithdrawalParams {
-        tx_hash: H256::from_slice(&record.tx_hash),
-        event_index_in_tx: record.event_index_in_tx as u32,
-        id: record.withdrawal_id as u64,
-        l2_block_number: record.l2_block_number as u64,
-        l1_batch_number: record.l1_batch_number.into(),
-        l2_message_index: record.l2_message_index as u32,
-        l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
-        message: record.message.into(),
-        sender: Address::from_slice(&record.sender),
-        proof: bincode::deserialize(&record.proof)
-            .expect("storage contains data correctly serialized by bincode; qed"),
-    })
-    .collect();
+            None => (
+                "limit $1";
+                limit_by as i64,
+                u256_to_big_decimal(eth_threshold)
+            ),
+        }
+    );
+
+    let data = query
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .map(|record| WithdrawalParams {
+            tx_hash: H256::from_slice(&record.tx_hash),
+            event_index_in_tx: record.event_index_in_tx as u32,
+            id: record.withdrawal_id as u64,
+            l2_block_number: record.l2_block_number as u64,
+            l1_batch_number: record.l1_batch_number.into(),
+            l2_message_index: record.l2_message_index as u32,
+            l2_tx_number_in_block: record.l2_tx_number_in_block as u16,
+            message: record.message.into(),
+            sender: Address::from_slice(&record.sender),
+            proof: bincode::deserialize(&record.proof)
+                .expect("storage contains data correctly serialized by bincode; qed"),
+        })
+        .collect();
 
     latency.observe();
 

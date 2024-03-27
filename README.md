@@ -51,7 +51,6 @@ Deployment is done by deploying a dockerized image of the service.
 | `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalization of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
 | `TX_RETRY_TIMEOUT_SECS` | Number of seconds to wait for a potentially stuck finalization transaction before readjusting its fees |
-| `TOKENS_TO_FINALIZE` | Configures the sets of tokens this instance of finalizer will finalize. It may be configured as a whitelist, a blacklist, a wildcard or completely disable any finalization. For more info see below. |
 | `FINALIZE_ETH_TOKEN` | (Optional) Configure, whether the Ethereum withdrawal events should be monitored. Useful to turn off for custom bridges that are only interested in a particular ERC20 token and have nothing to do with main Ethereum withdrawals |
 | `CUSTOM_TOKEN_DEPLOYER_ADDRESSES` | (Optional) Normally ERC20 tokens are deployed by the bridge contract. However, in custom cases it may be necessary to override that behavior with a custom set of addresses that have deployed tokens |
 | `CUSTOM_TOKEN_ADDRESSES` | (Optional) Adds a predefined list of tokens to finalize. May be useful in case of custom bridge setups when the regular technique of finding token deployments does not work. |
@@ -61,20 +60,6 @@ Deployment is done by deploying a dockerized image of the service.
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 
 ** more about zkSync contracts can be found [here](https://github.com/matter-labs/era-contracts/blob/main/docs/Overview.md)
-
-## Configuring Tokens to finalize.
-
-It may be handy to limit a set of tokens the Finalizer is finalizing. This
-configuration may be specified by setting a rule in the `TOKENS_TO_FINALIZE` value.
-If this environment variable is not set then by default Finalizer will only finalize
-ETH token (`0x000...0800a`).
-
-You may specify `All`, `None`, `BlackList` or `WhiteList` as json documents:
-
-1. `TOKENS_TO_FINALIZE = '"All"'` - Finalize everything
-1. `TOKENS_TO_FINALIZE = '"None"'` - Finalize nothing
-1. `TOKENS_TO_FINALIZE = '{ "WhiteList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize only these tokens
-1. `TOKENS_TO_FINALIZE = '{ "BlackList":[ "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4" ] }'` - Finalize all tokens but these
 
 ## Deploying the finalizer smart contract
 
