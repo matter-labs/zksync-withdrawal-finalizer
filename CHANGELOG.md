@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.7.0...v0.8.0) (2024-03-27)
+
+
+### Features
+
+* add filtering by l1 recepient ([#423](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/423)) ([cef3f12](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/cef3f1247d89265a18d3f39ce3315ccb4eb9b458))
+
 ## [0.7.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.6.6...v0.7.0) (2024-03-15)
 
 
