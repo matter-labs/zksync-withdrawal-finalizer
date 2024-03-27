@@ -52,7 +52,7 @@ syn = "2.0.55"
 hex = "0.4"
 pretty_assertions = "1"
 sqlx = "0.7"
-chrono = { version = "0.4.35", default-features = false }
+chrono = { version = "0.4.37", default-features = false }
 vise = { git = "https://github.com/matter-labs/vise.git" }
 vise-exporter = { git = "https://github.com/matter-labs/vise.git" }
 client = { path = "./client" }
