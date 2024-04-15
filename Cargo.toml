@@ -27,7 +27,7 @@ exclude = ["./github"]
 
 [workspace.dependencies]
 auto_impl = "1.2.0"
-async-trait = "0.1.79"
+async-trait = "0.1.80"
 ethers = { version = "2.0.14", default-features = false }
 tokio = "1.37.0"
 clap = "4.5.4"
