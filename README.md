@@ -56,6 +56,7 @@ Deployment is done by deploying a dockerized image of the service.
 | `CUSTOM_TOKEN_ADDRESSES` | (Optional) Adds a predefined list of tokens to finalize. May be useful in case of custom bridge setups when the regular technique of finding token deployments does not work. |
 | `ENABLE_WITHDRAWAL_METERING` | (Optional, default: `"true"`) By default Finalizer collects metrics about withdrawn token volumens. Users may optionally switch off this metering. |
 | `ETH_FINALIZATION_THRESHOLD`| (Optional, default: "0") Finalizer will only finalize ETH withdrawals that are greater or equal to this value |
+| `ONLY_FINALIZE_THESE_TOKENS` | (Optional, default: `None`) If specified, creates a whitelist of erc20 tokens that will be finalized.
 
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 
