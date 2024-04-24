@@ -36,7 +36,7 @@ tracing-subscriber = "0.3"
 sentry = { version = "0", default-features = false }
 lazy_static = "1.4.0"
 itertools = "0.12.1"
-serde = "1.0.197"
+serde = "1.0.198"
 thiserror = "1.0.58"
 serde_json = "1.0"
 color-eyre = "0.6.3"
