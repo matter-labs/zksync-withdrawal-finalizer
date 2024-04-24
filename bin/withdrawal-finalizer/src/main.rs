@@ -56,25 +56,13 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    match (
-        storage::last_l2_to_l1_events_block_seen(conn).await?,
-        storage::last_l1_block_seen(conn).await?,
-    ) {
-        (Some(b1), Some(b2)) => Ok(std::cmp::min(b1, b2)),
-        (b1, b2) => {
-            if b1.is_none() {
-                tracing::info!(concat!(
-                    "information about l2 to l1 events is missing, ",
-                    "starting from L1 block corresponding to L2 block 1"
-                ));
-            }
-
-            if b2.is_none() {
-                tracing::info!(concat!(
-                    "information about last block seen is missing, ",
-                    "starting from L1 block corresponding to L2 block 1"
-                ));
-            }
+    match storage::last_l1_block_seen(conn).await? {
+        Some(b2) => Ok(b2),
+        None => {
+            tracing::info!(concat!(
+                "information about last block seen is missing, ",
+                "starting from L1 block corresponding to L2 block 1"
+            ));
 
             let block_details = client_l2
                 .provider()
