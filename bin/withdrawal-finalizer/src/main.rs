@@ -207,10 +207,7 @@ async fn main() -> Result<()> {
     }
 
     if let Some(only_finalize_these_tokens) = config.only_finalize_these_tokens {
-        tokens = tokens
-            .into_iter()
-            .filter(|token| only_finalize_these_tokens.0.contains(token))
-            .collect();
+        tokens.retain(|token| only_finalize_these_tokens.0.contains(token));
     }
 
     tracing::info!("tokens {tokens:?}");
