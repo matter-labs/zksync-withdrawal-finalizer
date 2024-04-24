@@ -86,6 +86,10 @@ pub struct Config {
 
     #[envconfig(from = "ONLY_L1_RECIPIENTS")]
     pub only_l1_recipients: Option<AddrList>,
+
+    /// Only finalize these tokens specified by their L2 addresses
+    #[envconfig(from = "ONLY_FINALIZE_THESE_TOKENS")]
+    pub only_finalize_these_tokens: Option<AddrList>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq)]
