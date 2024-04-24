@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.8.0...v0.9.0) (2024-04-24)
+
+
+### Features
+
+* Adds filtering of erc20 tokens by their l2 address ([#447](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/447)) ([09f8810](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/09f88105090009cc39f8ba900044ddca41e13aaf))
+
+
+### Bug Fixes
+
+* do not track l2_to_l1_logs block height on restart ([#445](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/445)) ([90655c1](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/90655c11c4f5f0ceae60ecac8070a0da791b58d5))
+
 ## [0.8.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.7.0...v0.8.0) (2024-03-27)
 
 
