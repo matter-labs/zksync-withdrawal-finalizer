@@ -64,6 +64,6 @@ ethers-log-decode = { path = "./ethers-log-decode" }
 tx-sender = { path = "./tx-sender" }
 finalizer = { path = "./finalizer" }
 tokio-stream = "0.1.15"
-tokio-util = "0.7.10"
+tokio-util = "0.7.11"
 url = "2.5.0"
 vlog = { path = "./vlog" }
