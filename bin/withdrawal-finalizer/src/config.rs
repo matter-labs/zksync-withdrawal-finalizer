@@ -51,9 +51,6 @@ pub struct Config {
     #[envconfig(from = "START_FROM_L2_BLOCK")]
     pub start_from_l2_block: Option<u64>,
 
-    #[envconfig(from = "UPDATER_BACKOFF")]
-    pub updater_backoff: Option<u64>,
-
     #[envconfig(from = "GAS_LIMIT")]
     pub one_withdrawal_gas_limit: String,
 
