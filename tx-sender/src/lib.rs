@@ -5,7 +5,7 @@
 
 //! Wrapper for transaction sending with adjusting a gas price on retries.
 
-use std::{time::Duration, u8};
+use std::time::Duration;
 
 use ethers::{
     providers::{Middleware, MiddlewareError, ProviderError},
