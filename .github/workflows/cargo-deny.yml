@@ -12,7 +12,7 @@ env:
 
 jobs:
   cargo_deny:
-    runs-on: [matterlabs-ci-runner]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         checks:
