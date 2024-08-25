@@ -98,8 +98,8 @@ at your option.
 
 - [Website](https://zksync.io/)
 - [GitHub](https://github.com/matter-labs)
-- [Twitter](https://twitter.com/zksync)
-- [Twitter for Devs](https://twitter.com/zkSyncDevs)
+- [X (Twitter)](https://x.com/zksync)
+- [X (Twitter) for Devs](https://x.com/zkSyncDevs)
 - [Discord](https://discord.gg/nMaPGrDDwk)
 
 ## Disclaimer
