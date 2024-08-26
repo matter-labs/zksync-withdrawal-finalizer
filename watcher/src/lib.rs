@@ -306,7 +306,7 @@ async fn process_withdrawals_in_block(
     withdrawals_meterer: &mut Option<WithdrawalsMeter>,
 ) -> Result<()> {
     use itertools::Itertools;
-    let group_by = events.into_iter().group_by(|event| event.tx_hash);
+    let group_by = events.into_iter().chunk_by(|event| event.tx_hash);
     let mut withdrawals_vec = vec![];
 
     for (_tx_hash, group) in group_by.into_iter() {
