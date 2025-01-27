@@ -1,5 +1,7 @@
 //! Metrics for chain events
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Counter, Gauge, Metrics};
 
 /// Chain events metrics.

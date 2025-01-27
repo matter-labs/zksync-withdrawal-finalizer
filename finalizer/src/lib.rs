@@ -44,6 +44,9 @@ const OUT_OF_FUNDS_BACKOFF: Duration = Duration::from_secs(10);
 /// Backoff period if one of the loop iterations has failed.
 const LOOP_ITERATION_ERROR_BACKOFF: Duration = Duration::from_secs(5);
 
+/// Interval between successful loop iterations.
+const LOOP_ITERATION_OK_INTERVAL: Duration = Duration::from_secs(1);
+
 /// A newtype that represents a set of addresses in JSON format.
 #[derive(Debug, Eq, PartialEq)]
 pub struct AddrList(pub Vec<Address>);
@@ -491,11 +494,12 @@ fn is_gas_required_exceeds_allowance<M: Middleware>(e: &<M as Middleware>::Error
 }
 
 // Request finalization parameters for a set of withdrawals in parallel.
+// Returns `None` if params for some withdrawal are not ready yet.
 async fn request_finalize_params<M2>(
     pgpool: &PgPool,
     middleware: M2,
     hash_and_indices: &[(H256, u16, u64)],
-) -> Vec<WithdrawalParams>
+) -> Option<Vec<WithdrawalParams>>
 where
     M2: ZksyncMiddleware,
 {
@@ -504,20 +508,30 @@ where
     // Run all parametere fetching in parallel.
     // Filter out errors and log them and increment a metric counter.
     // Return successful fetches.
-    for (i, result) in futures::future::join_all(hash_and_indices.iter().map(|(h, i, id)| {
+    let params_opt = futures::future::join_all(hash_and_indices.iter().map(|(h, i, id)| {
         middleware
             .finalize_withdrawal_params(*h, *i as usize)
-            .map_ok(|r| {
-                let mut r = r.expect("always able to ask withdrawal params; qed");
-                r.id = *id;
+            .map_ok(|mut r| {
+                if let Some(r) = r.as_mut() {
+                    r.id = *id;
+                }
                 r
             })
             .map_err(crate::Error::from)
     }))
-    .await
-    .into_iter()
-    .enumerate()
-    {
+    .await;
+
+    // If any element is `None` then return `None`.
+    let mut params = Vec::with_capacity(params_opt.len());
+    for result in params_opt {
+        match result {
+            Ok(Some(param)) => params.push(Ok(param)),
+            Ok(None) => return None,
+            Err(err) => params.push(Err(err)),
+        }
+    }
+
+    for (i, result) in params.into_iter().enumerate() {
         match result {
             Ok(r) => ok_results.push(r),
             Err(e) => {
@@ -535,7 +549,7 @@ where
         }
     }
 
-    ok_results
+    Some(ok_results)
 }
 
 // Continiously query the new withdrawals that have been seen by watcher
@@ -556,6 +570,8 @@ async fn params_fetcher_loop<M1, M2>(
         {
             tracing::error!("params fetcher iteration ended with {e}");
             tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
+        } else {
+            tokio::time::sleep(LOOP_ITERATION_OK_INTERVAL).await;
         }
     }
 }
@@ -584,7 +600,12 @@ where
         .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16, p.id))
         .collect();
 
-    let params = request_finalize_params(pool, &middleware, &hash_and_index_and_id).await;
+    let Some(params) = request_finalize_params(pool, &middleware, &hash_and_index_and_id).await
+    else {
+        // Early-return if params are not ready.
+        tracing::info!("Params are not ready");
+        return Ok(());
+    };
 
     let already_finalized: Vec<_> = get_finalized_withdrawals(&params, zksync_contract, l1_bridge)
         .await?

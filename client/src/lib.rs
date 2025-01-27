@@ -415,10 +415,13 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
 
         let sender = log.topics[1].into();
 
-        let proof = self
+        // Proof can be not ready yet.
+        let Some(proof) = self
             .get_log_proof(withdrawal_hash, Some(l2_to_l1_log_index as u64))
             .await?
-            .expect("Log proof should be present. qed");
+        else {
+            return Ok(None);
+        };
 
         let message: Bytes = match ethers::abi::decode(&[ParamType::Bytes], &log.data)
             .expect("log data is valid rlp data; qed")

@@ -1,5 +1,7 @@
 //! Metrics for client
 
+#![allow(unexpected_cfgs)]
+
 use std::time::Duration;
 
 use vise::{Buckets, Histogram, LabeledFamily, Metrics};

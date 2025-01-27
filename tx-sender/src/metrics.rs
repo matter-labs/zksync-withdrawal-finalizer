@@ -1,5 +1,7 @@
 //! Metrics for tx sender
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Counter, Metrics};
 
 /// TX Sender metrics

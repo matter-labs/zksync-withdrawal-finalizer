@@ -1,5 +1,7 @@
 //! Metrics for finalizer
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Counter, Gauge, Metrics};
 
 /// Finalizer metrics

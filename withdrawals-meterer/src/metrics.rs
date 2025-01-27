@@ -1,5 +1,7 @@
 //! Metrics for withdrawal meterer
 
+#![allow(unexpected_cfgs)]
+
 use vise::{EncodeLabelSet, EncodeLabelValue, Family, Gauge, LabeledFamily, Metrics};
 
 /// Kinds of withdrawal volumes currently being metered by application

@@ -1,5 +1,7 @@
 //! Metrics for main binary
 
+#![allow(unexpected_cfgs)]
+
 use std::time::Duration;
 
 use ethers::types::U256;

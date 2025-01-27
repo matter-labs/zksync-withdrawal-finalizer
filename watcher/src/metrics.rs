@@ -1,5 +1,7 @@
 //! Metrics for withdrawal watcher
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Gauge, Metrics};
 
 /// Watcher metrics
