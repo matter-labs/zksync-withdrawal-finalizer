@@ -603,7 +603,7 @@ where
     let Some(params) = request_finalize_params(pool, &middleware, &hash_and_index_and_id).await
     else {
         // Early-return if params are not ready.
-        tracing::info!("newly committed withdrawals {newly_executed_withdrawals:?}");
+        tracing::info!("Params are not ready");
         return Ok(());
     };
 
