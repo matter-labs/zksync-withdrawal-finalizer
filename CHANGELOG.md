@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.9.0...v0.9.1) (2025-01-27)
+
+
+### Bug Fixes
+
+* do not panic if proof is null ([#533](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/533)) ([7994cfa](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/7994cfa63325990d6a0675cd56d9b32b87a5d4b3))
+
 ## [0.9.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.8.0...v0.9.0) (2024-04-24)
 
 
