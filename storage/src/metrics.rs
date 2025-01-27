@@ -1,5 +1,7 @@
 //! Metrics for storage
 
+#![allow(unexpected_cfgs)]
+
 use std::time::Duration;
 
 use vise::{Buckets, Histogram, LabeledFamily, Metrics};
@@ -12,6 +14,5 @@ pub(super) struct StorageMetrics {
     pub call: LabeledFamily<&'static str, Histogram<Duration>>,
 }
 
-#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static STORAGE_METRICS: vise::Global<StorageMetrics> = vise::Global::new();

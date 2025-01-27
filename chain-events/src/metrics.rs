@@ -1,5 +1,7 @@
 //! Metrics for chain events
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Counter, Gauge, Metrics};
 
 /// Chain events metrics.
@@ -43,6 +45,5 @@ pub(super) struct ChainEventsMetrics {
     pub block_execution_events: Counter,
 }
 
-#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static CHAIN_EVENTS_METRICS: vise::Global<ChainEventsMetrics> = vise::Global::new();

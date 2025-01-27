@@ -1,5 +1,7 @@
 //! Metrics for finalizer
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Counter, Gauge, Metrics};
 
 /// Finalizer metrics
@@ -22,6 +24,5 @@ pub(super) struct FinalizerMetrics {
     pub reverted_withdrawal_transactions: Counter,
 }
 
-#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static FINALIZER_METRICS: vise::Global<FinalizerMetrics> = vise::Global::new();

@@ -1,5 +1,7 @@
 //! Metrics for withdrawal watcher
 
+#![allow(unexpected_cfgs)]
+
 use vise::{Gauge, Metrics};
 
 /// Watcher metrics
@@ -19,6 +21,5 @@ pub(super) struct WatcherMetrics {
     pub l2_last_seen_block: Gauge,
 }
 
-#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static WATCHER_METRICS: vise::Global<WatcherMetrics> = vise::Global::new();

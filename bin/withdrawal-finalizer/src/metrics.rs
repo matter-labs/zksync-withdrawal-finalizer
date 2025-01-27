@@ -1,5 +1,7 @@
 //! Metrics for main binary
 
+#![allow(unexpected_cfgs)]
+
 use std::time::Duration;
 
 use ethers::types::U256;
@@ -25,7 +27,6 @@ pub(super) struct FinalizerMainMetrics {
     pub unexecuted_eth_withdrawals_below_current_threshold: Gauge,
 }
 
-#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static MAIN_FINALIZER_METRICS: vise::Global<FinalizerMainMetrics> = vise::Global::new();
 
