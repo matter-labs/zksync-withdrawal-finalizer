@@ -29,5 +29,6 @@ pub(super) struct WithdrawalsMetererMetrics {
     pub withdrawals: LabeledFamily<Labels, Gauge<f64>, 2>,
 }
 
+#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static WM_METRICS: vise::Global<WithdrawalsMetererMetrics> = vise::Global::new();

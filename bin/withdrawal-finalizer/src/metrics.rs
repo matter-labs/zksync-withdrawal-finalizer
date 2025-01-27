@@ -25,6 +25,7 @@ pub(super) struct FinalizerMainMetrics {
     pub unexecuted_eth_withdrawals_below_current_threshold: Gauge,
 }
 
+#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static MAIN_FINALIZER_METRICS: vise::Global<FinalizerMainMetrics> = vise::Global::new();
 

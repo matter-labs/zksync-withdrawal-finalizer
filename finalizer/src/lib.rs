@@ -512,7 +512,9 @@ where
         middleware
             .finalize_withdrawal_params(*h, *i as usize)
             .map_ok(|mut r| {
-                r.as_mut().map(|r| r.id = *id);
+                if let Some(r) = r.as_mut() {
+                    r.id = *id;
+                }
                 r
             })
             .map_err(crate::Error::from)

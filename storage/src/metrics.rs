@@ -12,5 +12,6 @@ pub(super) struct StorageMetrics {
     pub call: LabeledFamily<&'static str, Histogram<Duration>>,
 }
 
+#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static STORAGE_METRICS: vise::Global<StorageMetrics> = vise::Global::new();

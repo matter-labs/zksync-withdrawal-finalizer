@@ -10,5 +10,6 @@ pub(super) struct TxSenderMetrics {
     pub timedout_transactions: Counter,
 }
 
+#[allow(unexpected_cfgs)]
 #[vise::register]
 pub(super) static TX_SENDER_METRICS: vise::Global<TxSenderMetrics> = vise::Global::new();
