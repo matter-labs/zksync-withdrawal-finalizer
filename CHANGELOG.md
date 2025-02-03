@@ -587,7 +587,7 @@
 
 ### Bug Fixes
 
-* pagination increase and decrase should not be in sync ([#47](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/47)) ([37b32be](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/37b32be03da90f30e754650146b908a4d5285adf))
+* pagination increase and decrease should not be in sync ([#47](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/47)) ([37b32be](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/37b32be03da90f30e754650146b908a4d5285adf))
 
 ## [0.1.16](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.1.15...v0.1.16) (2023-07-13)
 
