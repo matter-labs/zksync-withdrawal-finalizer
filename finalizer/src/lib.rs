@@ -283,7 +283,7 @@ where
                     tokio::time::sleep(OUT_OF_FUNDS_BACKOFF).await;
                 }
                 // no need to bump the counter here, waiting for tx
-                // has failed becuase of networking or smth, but at
+                // has failed because of networking or smth, but at
                 // this point tx has already been accepted into tx pool
             }
         }
