@@ -88,8 +88,7 @@ fn inc_u256_percent(num: U256, percent: u8) -> U256 {
 /// * `tx`: Transaction to be sent
 /// * `retry_timeout`: A period after which to retry transaction.
 /// * `retries`: Amount of retries to perform.
-/// * `gas_increase_step`: If present increase gas price by this  number on every step, else ask
-///  actual gas price from `m` on every retry.
+/// * `gas_increase_step`: If present increase gas price by this  number on every step, else ask actual gas price from `m` on every retry.
 pub async fn send_tx_adjust_gas<M, T>(
     m: M,
     tx: T,
