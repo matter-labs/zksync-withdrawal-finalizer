@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.9.1...v0.10.0) (2025-08-12)
+
+
+### Features
+
+* **sl:** Add custom sl support ([#542](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/542)) ([8630922](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/86309221c255f50d9fca8315ba6fb8866291e951))
+
 ## [0.9.1](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.9.0...v0.9.1) (2025-01-27)
 
 
