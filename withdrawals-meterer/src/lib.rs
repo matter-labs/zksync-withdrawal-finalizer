@@ -31,8 +31,7 @@ impl WithdrawalsMeter {
     /// # Arguments
     ///
     /// * `pool`: DB connection pool
-    /// * `component_name`: Name of the component that does metering, metric names will be
-    ///    derived from it
+    /// * `component_name`: Name of the component that does metering, metric names will be derived from it
     pub fn new(pool: PgPool, metering_component: MeteringComponent) -> Self {
         let mut token_decimals = HashMap::new();
 

@@ -13,6 +13,13 @@ use url::Url;
 /// * TOML config file via [`Self::from_file()`]
 #[derive(Debug, Envconfig)]
 pub struct Config {
+    /// SL WS url.
+    #[envconfig(from = "SL_CLIENT_WS_URL")]
+    pub sl_client_ws_url: Option<Url>,
+
+    #[envconfig(from = "SL_CLIENT_HTTP_URL")]
+    pub sl_client_http_url: Option<Url>,
+
     /// L1 WS url.
     #[envconfig(from = "ETH_CLIENT_WS_URL")]
     pub eth_client_ws_url: Url,
