@@ -45,9 +45,12 @@ fn run_vise_exporter() -> Result<watch::Sender<()>> {
     Ok(shutdown_sender)
 }
 
+// During the migration period from l1 to sl information about chain id is missing, so if settlement layer is l1, it's safe to use chain_id == null
 async fn start_from_l1_block<M1, M2>(
-    client_l1: Arc<M1>,
+    client_sl: Arc<M1>,
     client_l2: Arc<M2>,
+    sl_chain_id: u32,
+    settlement_layer_is_l1: bool,
     conn: &mut PgConnection,
 ) -> Result<u64>
 where
@@ -56,7 +59,7 @@ where
     M2: Middleware,
     <M2 as Middleware>::Provider: JsonRpcClient,
 {
-    match storage::last_l1_block_seen(conn).await? {
+    match storage::last_l1_block_seen(conn, sl_chain_id, settlement_layer_is_l1).await? {
         Some(b2) => Ok(b2),
         None => {
             tracing::info!(concat!(
@@ -74,7 +77,7 @@ where
                 .commit_tx_hash
                 .expect("A first block on L2 is always committed; qed");
 
-            let commit_tx = client_l1
+            let commit_tx = client_sl
                 .get_transaction(commit_tx_hash)
                 .await
                 .map_err(|e| anyhow!("{e}"))?
@@ -203,10 +206,14 @@ async fn main() -> Result<()> {
 
     let we_tx_wrapped = tokio_util::sync::PollSender::new(we_tx.clone());
     let we_rx = tokio_stream::wrappers::ReceiverStream::new(we_rx);
+    let sl_chain_id = client_sl.get_chain_id().await?;
+    let l1_chain_id = client_l1.get_chain_id().await?;
 
     let from_l1_block = start_from_l1_block(
         client_sl.clone(),
         client_l2.clone(),
+        sl_chain_id,
+        sl_chain_id == l1_chain_id,
         &mut pgpool.acquire().await?.detach(),
     )
     .await?;
