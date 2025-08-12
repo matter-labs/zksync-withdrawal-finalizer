@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.10.0...v0.11.0) (2025-08-12)
+
+
+### Features
+
+* **sl:** Save sl chain id for l1 blocks ([#544](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/544)) ([3a495e4](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/3a495e4b069bc26916abc3a04c8cf98a0100d32a))
+
 ## [0.10.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.9.1...v0.10.0) (2025-08-12)
 
 
