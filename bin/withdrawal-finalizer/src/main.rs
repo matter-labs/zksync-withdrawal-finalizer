@@ -154,12 +154,29 @@ async fn main() -> Result<()> {
     let provider_l1 = Provider::<Http>::try_from(config.eth_client_http_url.as_ref()).unwrap();
     let client_l1 = Arc::new(provider_l1);
 
-    let provider_l2 =
+    let provider_l2: Provider<Http> =
         Provider::<Http>::try_from(config.api_web3_json_rpc_http_url.as_str()).unwrap();
 
     let client_l2 = Arc::new(provider_l2);
 
-    let event_mux = BlockEvents::new(config.eth_client_ws_url.as_ref());
+    let provider_sl: Provider<Http> = Provider::<Http>::try_from(
+        config
+            .sl_client_http_url
+            .clone()
+            .unwrap_or(config.eth_client_http_url.clone())
+            .as_str(),
+    )
+    .unwrap();
+
+    let client_sl = Arc::new(provider_sl);
+
+    let event_mux = BlockEvents::new(
+        config
+            .sl_client_ws_url
+            .clone()
+            .unwrap_or(config.eth_client_ws_url.clone())
+            .as_ref(),
+    );
     let (blocks_tx, blocks_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
 
     let blocks_tx_wrapped = tokio_util::sync::PollSender::new(blocks_tx.clone());
@@ -188,7 +205,7 @@ async fn main() -> Result<()> {
     let we_rx = tokio_stream::wrappers::ReceiverStream::new(we_rx);
 
     let from_l1_block = start_from_l1_block(
-        client_l1.clone(),
+        client_sl.clone(),
         client_l2.clone(),
         &mut pgpool.acquire().await?.detach(),
     )
@@ -224,7 +241,7 @@ async fn main() -> Result<()> {
 
     let l1_bridge = IL1Bridge::new(config.l1_erc20_bridge_proxy_addr, client_l1.clone());
 
-    let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_l1.clone());
+    let zksync_contract = IZkSync::new(config.diamond_proxy_addr, client_sl.clone());
 
     // by default meter withdrawals
     let meter_withdrawals = config.enable_withdrawal_metering.unwrap_or(true);
