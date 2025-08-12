@@ -146,14 +146,15 @@ enum BlockRangesParams {
 }
 
 impl BlockRangesParams {
-    async fn write_to_storage(self, pool: &PgPool) -> Result<()> {
+    async fn write_to_storage(self, pool: &PgPool, chain_id: u32) -> Result<()> {
         match self {
             BlockRangesParams::Commit {
                 range_begin,
                 range_end,
                 block_number,
             } => {
-                storage::committed_new_batch(pool, range_begin, range_end, block_number).await?;
+                storage::committed_new_batch(pool, range_begin, range_end, block_number, chain_id)
+                    .await?;
 
                 tracing::info!(
                     "Changed withdrawals status to committed for range {range_begin}-{range_end}"
@@ -164,7 +165,8 @@ impl BlockRangesParams {
                 range_end,
                 block_number,
             } => {
-                storage::verified_new_batch(pool, range_begin, range_end, block_number).await?;
+                storage::verified_new_batch(pool, range_begin, range_end, block_number, chain_id)
+                    .await?;
                 tracing::info!(
                     "Changed withdrawals status to verified for range {range_begin}-{range_end}"
                 );
@@ -174,7 +176,8 @@ impl BlockRangesParams {
                 range_end,
                 block_number,
             } => {
-                storage::executed_new_batch(pool, range_begin, range_end, block_number).await?;
+                storage::executed_new_batch(pool, range_begin, range_end, block_number, chain_id)
+                    .await?;
 
                 tracing::info!(
                     "Changed withdrawals status to executed for range {range_begin}-{range_end}"
@@ -278,6 +281,7 @@ async fn process_block_events<M2>(
     pool: &PgPool,
     events: Vec<BlockEvent>,
     l2_middleware: M2,
+    chain_id: u32,
 ) -> Result<()>
 where
     M2: ZksyncMiddleware,
@@ -294,7 +298,7 @@ where
     let results = results?;
 
     for result in results.into_iter().flatten() {
-        result.write_to_storage(pool).await?;
+        result.write_to_storage(pool, chain_id).await?;
     }
 
     Ok(())
@@ -353,7 +357,7 @@ where
     let mut batch_begin = Instant::now();
     let batch_backoff = Duration::from_secs(5);
     let batch_size = 1024;
-
+    let chain_id = l2_middleware.get_chain_id().await?;
     while let Some(event) = be.next().await {
         tracing::debug!("block event {event}");
         block_event_batch.push(event);
@@ -365,6 +369,7 @@ where
                 &pool,
                 std::mem::take(&mut block_event_batch),
                 &l2_middleware,
+                chain_id,
             )
             .await?;
 

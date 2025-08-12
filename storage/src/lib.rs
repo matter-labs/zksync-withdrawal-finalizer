@@ -42,6 +42,7 @@ pub async fn committed_new_batch(
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
+    chain_id: u32,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -54,19 +55,23 @@ pub async fn committed_new_batch(
         INSERT INTO
           l2_blocks (
             l2_block_number,
-            commit_l1_block_number
+            commit_l1_block_number,
+            commit_chain_id
           )
         SELECT
           u.l2_block_number,
-          $2
+          $2,
+          $3
         FROM
           UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
         UPDATE
         SET
-          commit_l1_block_number = $2
+          commit_l1_block_number = $2,
+          commit_chain_id = $3
         ",
         &range,
         l1_block_number as i64,
+        chain_id as i32,
     )
     .execute(&mut *tx)
     .await?;
@@ -106,66 +111,13 @@ pub async fn withdrawal_committed_in_block(
     Ok(res)
 }
 
-/// Request the number of L1 block this withdrawal was verified in.
-pub async fn withdrawal_verified_in_block(
-    conn: &mut PgConnection,
-    tx_hash: H256,
-) -> Result<Option<i64>> {
-    let latency = STORAGE_METRICS.call[&"withdrawal_verified_in_block"].start();
-
-    let res = sqlx::query!(
-        "
-        SELECT
-          l2_blocks.verify_l1_block_number
-        FROM
-          withdrawals
-          JOIN l2_blocks ON l2_blocks.l2_block_number = withdrawals.l2_block_number
-        WHERE
-          withdrawals.tx_hash = $1
-        ",
-        tx_hash.as_bytes(),
-    )
-    .fetch_optional(conn)
-    .await?
-    .and_then(|r| r.verify_l1_block_number);
-
-    latency.observe();
-
-    Ok(res)
-}
-
-/// Request the number of L1 block this withdrawal was executed in.
-pub async fn withdrawal_executed_in_block(
-    conn: &mut PgConnection,
-    tx_hash: H256,
-) -> Result<Option<i64>> {
-    let latency = STORAGE_METRICS.call[&"withdrawal_executed_in_block"].start();
-    let res = sqlx::query!(
-        "
-        SELECT
-          l2_blocks.execute_l1_block_number
-        FROM
-          withdrawals
-          JOIN l2_blocks ON l2_blocks.l2_block_number = withdrawals.l2_block_number
-        WHERE
-          withdrawals.tx_hash = $1
-        ",
-        tx_hash.as_bytes(),
-    )
-    .fetch_optional(conn)
-    .await?
-    .and_then(|r| r.execute_l1_block_number);
-
-    latency.observe();
-
-    Ok(res)
-}
 /// A new batch with a given range has been verified, update statuses of withdrawal records.
 pub async fn verified_new_batch(
     pool: &PgPool,
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
+    chain_id: u32,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
@@ -176,19 +128,23 @@ pub async fn verified_new_batch(
         INSERT INTO
           l2_blocks (
             l2_block_number,
-            verify_l1_block_number
+            verify_l1_block_number,
+            verify_chain_id
           )
         SELECT
           u.l2_block_number,
-          $2
+          $2,
+          $3
         FROM
           UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
         UPDATE
         SET
-          verify_l1_block_number = $2
+          verify_l1_block_number = $2,
+          verify_chain_id = $3
         ",
         &range,
         l1_block_number as i64,
+        chain_id as i32,
     )
     .execute(&mut *tx)
     .await?;
@@ -205,6 +161,7 @@ pub async fn executed_new_batch(
     batch_start: u64,
     batch_end: u64,
     l1_block_number: u64,
+    chain_id: u32,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
     let range: Vec<_> = (batch_start as i64..=batch_end as i64).collect();
@@ -215,19 +172,23 @@ pub async fn executed_new_batch(
         INSERT INTO
           l2_blocks (
             l2_block_number,
-            execute_l1_block_number
+            execute_l1_block_number,
+            execute_chain_id
           )
         SELECT
           u.l2_block_number,
-          $2
+          $2,
+          $3
         FROM
           UNNEST ($1 :: bigint []) AS u(l2_block_number) ON CONFLICT (l2_block_number) DO
         UPDATE
         SET
-          execute_l1_block_number = $2
+          execute_l1_block_number = $2,
+          execute_chain_id = $3
         ",
         &range,
         l1_block_number as i64,
+        chain_id as i32,
     )
     .execute(&mut *tx)
     .await?;
@@ -376,7 +337,11 @@ pub async fn last_l2_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
 }
 
 /// Get the block number of the last L1 block seen.
-pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
+pub async fn last_l1_block_seen(
+    conn: &mut PgConnection,
+    chain_id: u32,
+    allow_null: bool,
+) -> Result<Option<u64>> {
     let latency = STORAGE_METRICS.call[&"last_l1_block_seen"].start();
 
     let res = sqlx::query!(
@@ -385,29 +350,11 @@ pub async fn last_l1_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> 
           max(commit_l1_block_number)
         FROM
           l2_blocks
-        "
-    )
-    .fetch_one(conn)
-    .await?
-    .max
-    .map(|max| max as u64);
-
-    latency.observe();
-
-    Ok(res)
-}
-
-/// Get the last block seen for the `l2_to_l1_events` set
-pub async fn last_l2_to_l1_events_block_seen(conn: &mut PgConnection) -> Result<Option<u64>> {
-    let latency = STORAGE_METRICS.call[&"last_l2_to_l1_events_block_seen"].start();
-
-    let res = sqlx::query!(
-        "
-        SELECT
-          max(l1_block_number)
-        FROM
-          l2_to_l1_events
-        "
+        WHERE
+          commit_chain_id = $1 OR ($2 AND commit_chain_id IS NULL)
+        ",
+        chain_id as i32,
+        allow_null
     )
     .fetch_one(conn)
     .await?
