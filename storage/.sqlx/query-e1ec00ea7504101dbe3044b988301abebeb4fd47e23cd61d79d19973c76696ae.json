@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n          max(l2_block_number)\n        FROM\n          l2_blocks\n        WHERE\n          commit_chain_id is NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e1ec00ea7504101dbe3044b988301abebeb4fd47e23cd61d79d19973c76696ae"
+}

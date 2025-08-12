@@ -366,6 +366,33 @@ pub async fn last_l1_block_seen(
     Ok(res)
 }
 
+/// Get the last block that has been processed. It's safe to take care only about is null.
+/// Because if we switch settlement layers, the previous iteration will exist and we can continue from that point,
+/// If it's the first iteration the query will return none.
+/// If it's the very first switch it will return none
+pub async fn last_processed_l2_block(conn: &mut PgConnection) -> Result<u64> {
+    let latency = STORAGE_METRICS.call[&"last_processed_l2_block"].start();
+    let res = sqlx::query!(
+        "
+        SELECT
+          max(l2_block_number)
+        FROM
+          l2_blocks
+        WHERE
+          commit_chain_id is NULL
+        ",
+    )
+    .fetch_one(conn)
+    .await?
+    .max
+    .map(|max| max as u64)
+    .unwrap_or(0);
+
+    latency.observe();
+
+    Ok(res)
+}
+
 /// Adds a `L2ToL1Event` set to the DB.
 ///
 /// # Arguments

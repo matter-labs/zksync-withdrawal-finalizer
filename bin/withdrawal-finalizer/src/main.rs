@@ -67,9 +67,10 @@ where
                 "starting from L1 block corresponding to L2 block 1"
             ));
 
+            let new_block_to_process = storage::last_processed_l2_block(conn).await? + 1;
             let block_details = client_l2
                 .provider()
-                .get_block_details(1)
+                .get_block_details(new_block_to_process as u32)
                 .await?
                 .expect("Always start from the block that there is info about; qed");
 
