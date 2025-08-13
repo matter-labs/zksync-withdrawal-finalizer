@@ -374,19 +374,17 @@ pub async fn last_processed_l2_block_on_the_previous_chain(
     let latency = STORAGE_METRICS.call[&"last_processed_l2_block"].start();
     let res = sqlx::query!(
         "
-        SELECT
-          max(l2_block_number)
-        FROM
-          l2_blocks
-        WHERE
-          commit_chain_id != $1
+          SELECT l2_block_number
+          FROM l2_blocks
+          WHERE commit_chain_id != $1
+          ORDER BY l2_block_number DESC
+          LIMIT 1
         ",
         chain_id as i32
     )
-    .fetch_one(conn)
+    .fetch_optional(conn)
     .await?
-    .max
-    .map(|max| max as u64)
+    .map(|v| v.l2_block_number as u64)
     .unwrap_or(0);
 
     latency.observe();
