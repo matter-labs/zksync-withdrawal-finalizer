@@ -62,12 +62,19 @@ where
     match storage::last_l1_block_seen(conn, sl_chain_id, settlement_layer_is_l1).await? {
         Some(b2) => Ok(b2),
         None => {
-            tracing::info!(concat!(
-                "information about last block seen is missing, ",
-                "starting from L1 block corresponding to L2 block 1"
-            ));
+            let last_processed_block = if let Some(start_from_l2_block) =
+                storage::last_processed_l2_block_with_null(conn).await?
+            {
+                start_from_l2_block
+            } else {
+                storage::last_processed_l2_block_on_the_previous_chain(conn, sl_chain_id).await?
+            };
+            let new_block_to_process = last_processed_block + 1;
+            tracing::info!(
+                "information about last L1 block seen is missing, starting from L2 block {}",
+                new_block_to_process
+            );
 
-            let new_block_to_process = storage::last_processed_l2_block(conn).await? + 1;
             let block_details = client_l2
                 .provider()
                 .get_block_details(new_block_to_process as u32)
