@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n          SELECT l2_block_number\n          FROM l2_blocks\n          WHERE commit_chain_id != $1\n          ORDER BY l2_block_number DESC\n          LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "l2_block_number",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a01f4d56d3d47b1ac80f310d784c0414a559735874d49c9b0ad7df583c23b6b1"
+}
