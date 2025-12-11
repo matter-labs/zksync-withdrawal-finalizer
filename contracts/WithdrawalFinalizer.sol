@@ -3,12 +3,12 @@
 pragma solidity ^0.8.0;
 
 import { UncheckedMath } from "@matterlabs/zksync-contracts/l1/contracts/common/libraries/UncheckedMath.sol";
-import { IBridgehub } from "@matterlabs/zksync-contracts/l1/contracts/bridge/interfaces/IBridgeHub.sol";
+import { IL1AssetRouter } from "@matterlabs/zksync-contracts/l1/contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 
 contract WithdrawalFinalizer {
     using UncheckedMath for uint256;
-    IBridgehub constant BRIDGE_HUB = IBridgehub($(BRIDGE_HUB_ADDRESS));
+    IL1AssetRouter constant L1_ASSET_ROUTER = IL1AssetRouter($(L1_ASSET_ROUTER_ADDRESS));
 
     struct RequestFinalizeWithdrawal {
         uint256 _l2BlockNumber;

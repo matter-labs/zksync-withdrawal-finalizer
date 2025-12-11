@@ -4,7 +4,7 @@ import '@nomiclabs/hardhat-etherscan';
 import '@typechain/hardhat';
 
 const config = {
-    BRIDGE_HUB: process.env.CONTRACTS_BRIDGE_HUB_ADDR
+    L1_ASSET_ROUTER: process.env.CONTRACTS_L1_ASSET_ROUTER
 };
 
 export default {
