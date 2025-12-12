@@ -4,8 +4,7 @@ permissions:
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
   merge_group:
 
@@ -26,8 +25,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -44,9 +41,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
 
     steps:
       - name: Checkout
@@ -102,8 +96,7 @@ jobs:
       - name: Install Slither
         run: pip install slither-analyzer
 
-      # Preferred: force Slither to use Hardhat framework & artifacts
-      - name: Run Slither (using Hardhat artifacts)
+      - name: Run Slither (compiling through Hardhat)
         run: |
           slither . --compile-force-framework hardhat \
             --filter-paths "node_modules|artifacts|cache"
