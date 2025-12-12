@@ -41,24 +41,6 @@ jobs:
       - name: Compile (Hardhat)
         run: npm run contracts:build
 
-      - name: Verify WithdrawalFinalizer artifact exists
-        run: |
-          ARTIFACT="artifacts/contracts/WithdrawalFinalizer.sol/WithdrawalFinalizer.json"
-          if [ ! -f "$ARTIFACT" ]; then
-            echo "Expected artifact not found at: $ARTIFACT"
-            echo "Available artifacts:"
-            ls -R artifacts || true
-            exit 1
-          fi
-          echo "Found artifact: $ARTIFACT"
-
-      - name: Upload artifact (WithdrawalFinalizer.json)
-        uses: actions/upload-artifact@v4
-        with:
-          name: WithdrawalFinalizer-artifact
-          path: artifacts/contracts/WithdrawalFinalizer.sol/WithdrawalFinalizer.json
-          if-no-files-found: error
-
   lint:
     runs-on: ubuntu-latest
     defaults:
