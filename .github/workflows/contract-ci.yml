@@ -1,4 +1,6 @@
 name: Contracts CI
+permissions:
+  contents: read
 
 on:
   push:
