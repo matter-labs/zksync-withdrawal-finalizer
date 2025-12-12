@@ -2,13 +2,17 @@
 
 pragma solidity ^0.8.0;
 
-import { UncheckedMath } from "@matterlabs/zksync-contracts/contracts/l1-contracts/common/libraries/UncheckedMath.sol";
-import { IL1AssetRouter } from "@matterlabs/zksync-contracts/contracts/l1-contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {UncheckedMath} from "@matterlabs/zksync-contracts/contracts/l1-contracts/common/libraries/UncheckedMath.sol";
+import {IL1AssetRouter} from "@matterlabs/zksync-contracts/contracts/l1-contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-
+/// @title Withdrawal Finalizer
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract WithdrawalFinalizer {
     using UncheckedMath for uint256;
-    IL1AssetRouter constant L1_ASSET_ROUTER = IL1AssetRouter($(L1_ASSET_ROUTER_ADDRESS));
+
+    IL1AssetRouter public constant L1_ASSET_ROUTER =
+        IL1AssetRouter($(L1_ASSET_ROUTER_ADDRESS));
 
     struct RequestFinalizeWithdrawal {
         uint256 _l2BlockNumber;
@@ -37,7 +41,7 @@ contract WithdrawalFinalizer {
             uint256 gasBefore = gasleft();
             try
                 L1_ASSET_ROUTER.finalizeWithdrawal{gas: requests[i]._gas}({
-                    _chainId: 1, //@check ??
+                    _chainId: 1, //TODO placeholder
                     _l2BatchNumber: requests[i]._l2BlockNumber,
                     _l2MessageIndex: requests[i]._l2MessageIndex,
                     _l2TxNumberInBatch: requests[i]._l2TxNumberInBlock,
