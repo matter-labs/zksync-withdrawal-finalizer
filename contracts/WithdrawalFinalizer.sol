@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.0;
 
-import { UncheckedMath } from "@matterlabs/zksync-contracts/l1/contracts/common/libraries/UncheckedMath.sol";
-import { IL1AssetRouter } from "@matterlabs/zksync-contracts/l1/contracts/bridge/asset-router/IL1AssetRouter.sol";
+import { UncheckedMath } from "@matterlabs/zksync-contracts/contracts/l1-contracts/common/libraries/UncheckedMath.sol";
+import { IL1AssetRouter } from "@matterlabs/zksync-contracts/contracts/l1-contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 
 contract WithdrawalFinalizer {
