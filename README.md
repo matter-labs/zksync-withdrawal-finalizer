@@ -65,7 +65,7 @@ The configuration structure describing the service config can be found in [`conf
 
 ## Deploying the finalizer smart contract
 
-The finalizer smart contract needs to reference the addresses of the diamond proxy contract and l1 erc20 proxy contract.
+The finalizer smart contract needs to reference the addresses of the L1 Asset Router contract.
 You also need to know the key of the account you want to use to deploy the finalizer contract.
 
 When you know those to deploy the contract you need to run (assume you are running `anvil` in a separate terminal):
