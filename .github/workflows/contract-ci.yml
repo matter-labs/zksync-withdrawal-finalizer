@@ -96,5 +96,5 @@ jobs:
 
       - name: Run Slither (compiling through Hardhat)
         run: |
-          slither . --compile-force-framework hardhat \
+          slither --config slither.config.json . --compile-force-framework hardhat \
             --filter-paths "node_modules|artifacts|cache"
