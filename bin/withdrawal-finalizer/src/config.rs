@@ -30,7 +30,7 @@ pub struct Config {
 
     /// Address of the `L1Bridge` contract.
     #[envconfig(from = "CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR")]
-    pub l1_erc20_bridge_proxy_addr: Address, 
+    pub l1_erc20_bridge_proxy_addr: Address,
 
     /// Address of the `L2ERC20Bridge` contract.
     #[envconfig(from = "CONTRACTS_L2_ERC20_BRIDGE_ADDR")]
