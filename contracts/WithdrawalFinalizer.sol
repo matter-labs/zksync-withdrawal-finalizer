@@ -32,8 +32,8 @@ contract WithdrawalFinalizer {
     }
 
     function finalizeWithdrawals(
-        RequestFinalizeWithdrawal[] calldata requests,
-        uint256 _chainId
+        uint256 _chainId,
+        RequestFinalizeWithdrawal[] calldata requests
     ) external returns (Result[] memory) {
         uint256 requestsLength = requests.length;
         Result[] memory results = new Result[](requestsLength);
@@ -42,7 +42,7 @@ contract WithdrawalFinalizer {
             uint256 gasBefore = gasleft();
             try
                 L1_ASSET_ROUTER.finalizeWithdrawal{gas: requests[i]._gas}({
-                    _chainId: _chainId, 
+                    _chainId: _chainId,
                     _l2BatchNumber: requests[i]._l2BlockNumber,
                     _l2MessageIndex: requests[i]._l2MessageIndex,
                     _l2TxNumberInBatch: requests[i]._l2TxNumberInBlock,
