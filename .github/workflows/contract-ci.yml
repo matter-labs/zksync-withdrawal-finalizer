@@ -57,7 +57,7 @@ jobs:
         run: npm ci
 
       - name: solhint (contracts only)
-        run: npx solhint "contracts/**/*.sol"
+        run: npx solhint --noPoster "contracts/**/*.sol"
 
       - name: prettier (contracts only)
         run: npx prettier --plugin=prettier-plugin-solidity --check "contracts/**/*.sol"
