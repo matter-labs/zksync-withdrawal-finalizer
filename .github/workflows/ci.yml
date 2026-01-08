@@ -26,6 +26,11 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install Foundry (for anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
       
