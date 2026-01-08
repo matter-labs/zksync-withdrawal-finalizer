@@ -19,7 +19,8 @@ ignore = [
     "RUSTSEC-2024-0436", # paste - no longer maintained
     "RUSTSEC-2025-0134", # rustls-pemfile is unmaintained
     "RUSTSEC-2025-0057", # fxhash - no longer maintained
-    "RUSTSEC-2025-0056" # adler crate is unmaintained
+    "RUSTSEC-2025-0056", # adler crate is unmaintained
+    "RUSTSEC-2025-0141"  # Bincode is unmaintained
 ]
 
 [licenses]
