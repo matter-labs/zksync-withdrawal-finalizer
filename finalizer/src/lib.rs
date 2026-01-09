@@ -68,7 +68,7 @@ pub struct Finalizer<M1, M2> {
     finalizer_contract: WithdrawalFinalizer<M1>,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
-    chain_id:u32,
+    chain_id: u32,
     unsuccessful: Vec<WithdrawalParams>,
 
     no_new_withdrawals_backoff: Duration,
@@ -205,7 +205,9 @@ where
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        let tx = self.finalizer_contract.finalize_withdrawals(self.chain_id.into(), w);
+        let tx = self
+            .finalizer_contract
+            .finalize_withdrawals(self.chain_id.into(), w);
         let nonce = self
             .finalizer_contract
             .client()
@@ -572,8 +574,14 @@ async fn params_fetcher_loop<M1, M2>(
     M2: ZksyncMiddleware,
 {
     loop {
-        if let Err(e) =
-            params_fetcher_loop_iteration(&pool, &middleware, &zksync_contract, &l1_bridge, chain_id).await
+        if let Err(e) = params_fetcher_loop_iteration(
+            &pool,
+            &middleware,
+            &zksync_contract,
+            &l1_bridge,
+            chain_id,
+        )
+        .await
         {
             tracing::error!("params fetcher iteration ended with {e}");
             tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
@@ -608,7 +616,8 @@ where
         .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16, p.id))
         .collect();
 
-    let Some(params) = request_finalize_params(pool, &middleware, &hash_and_index_and_id, chain_id).await
+    let Some(params) =
+        request_finalize_params(pool, &middleware, &hash_and_index_and_id, chain_id).await
     else {
         // Early-return if params are not ready.
         tracing::info!("Params are not ready");

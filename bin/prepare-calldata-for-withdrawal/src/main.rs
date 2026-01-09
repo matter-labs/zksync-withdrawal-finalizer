@@ -41,7 +41,7 @@ async fn main() {
             .unwrap();
 
     let finalize_withdrawal_call = FinalizeWithdrawalsCall {
-        chain_id: chain_id.into(),  
+        chain_id: chain_id.into(),
         requests: vec![request_finalize_withdrawal],
     };
 

@@ -342,7 +342,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         &self,
         withdrawal_hash: H256,
         index: usize,
-        chain_id:u32, 
+        chain_id: u32,
     ) -> Result<Option<WithdrawalParams>> {
         let latency = CLIENT_METRICS.call[&"get_finalize_withdrawal_params"].start();
 
@@ -456,7 +456,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         latency.observe();
 
         Ok(Some(WithdrawalParams {
-            chain_id, 
+            chain_id,
             tx_hash: withdrawal_hash,
             event_index_in_tx: index as u32,
             id: 0,
