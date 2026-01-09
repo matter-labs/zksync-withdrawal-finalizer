@@ -8,6 +8,7 @@ on:
 
 env: 
   CARGO_TERM_COLOR: always
+  CHAIN_ID: 1234 # test
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

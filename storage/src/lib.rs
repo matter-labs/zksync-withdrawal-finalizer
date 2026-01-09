@@ -753,6 +753,7 @@ pub async fn withdrawals_to_finalize(
     limit_by: u64,
     eth_threshold: Option<U256>,
     only_l1_recipients: Option<&[Address]>,
+    chain_id: u32,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -852,6 +853,7 @@ pub async fn withdrawals_to_finalize(
             sender: Address::from_slice(&record.sender),
             proof: bincode::deserialize(&record.proof)
                 .expect("storage contains data correctly serialized by bincode; qed"),
+            chain_id,
         })
         .collect();
 

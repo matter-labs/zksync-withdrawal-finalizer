@@ -68,6 +68,7 @@ pub struct Finalizer<M1, M2> {
     finalizer_contract: WithdrawalFinalizer<M1>,
     zksync_contract: IZkSync<M2>,
     l1_bridge: IL1Bridge<M2>,
+    chain_id:u32,
     unsuccessful: Vec<WithdrawalParams>,
 
     no_new_withdrawals_backoff: Duration,
@@ -103,6 +104,7 @@ where
         finalizer_contract: WithdrawalFinalizer<S>,
         zksync_contract: IZkSync<M>,
         l1_bridge: IL1Bridge<M>,
+        chain_id: u32,
         tx_retry_timeout: usize,
         account_address: Address,
         meter_withdrawals: bool,
@@ -123,6 +125,7 @@ where
             finalizer_contract,
             zksync_contract,
             l1_bridge,
+            chain_id,
             unsuccessful: vec![],
             no_new_withdrawals_backoff: NO_NEW_WITHDRAWALS_BACKOFF,
             query_db_pagination_limit: QUERY_DB_PAGINATION_LIMIT,
@@ -147,6 +150,7 @@ where
             middleware,
             self.zksync_contract.clone(),
             self.l1_bridge.clone(),
+            self.chain_id,
         ));
 
         let finalizer_handle = tokio::spawn(self.finalizer_loop());
@@ -174,7 +178,7 @@ where
 
         let results = self
             .finalizer_contract
-            .finalize_withdrawals(w)
+            .finalize_withdrawals(self.chain_id.into(), w)
             .call()
             .await?;
         tracing::info!("predicted results for withdrawals: {results:?}");
@@ -201,7 +205,7 @@ where
             .map(|r| r.into_request_with_gaslimit(self.one_withdrawal_gas_limit))
             .collect();
 
-        let tx = self.finalizer_contract.finalize_withdrawals(w);
+        let tx = self.finalizer_contract.finalize_withdrawals(self.chain_id.into(), w);
         let nonce = self
             .finalizer_contract
             .client()
@@ -329,6 +333,7 @@ where
             self.query_db_pagination_limit,
             self.eth_threshold,
             self.only_l1_recipients.as_deref(),
+            self.chain_id,
         )
         .await?;
 
@@ -499,6 +504,7 @@ async fn request_finalize_params<M2>(
     pgpool: &PgPool,
     middleware: M2,
     hash_and_indices: &[(H256, u16, u64)],
+    chain_id: u32,
 ) -> Option<Vec<WithdrawalParams>>
 where
     M2: ZksyncMiddleware,
@@ -510,7 +516,7 @@ where
     // Return successful fetches.
     let params_opt = futures::future::join_all(hash_and_indices.iter().map(|(h, i, id)| {
         middleware
-            .finalize_withdrawal_params(*h, *i as usize)
+            .finalize_withdrawal_params(*h, *i as usize, chain_id)
             .map_ok(|mut r| {
                 if let Some(r) = r.as_mut() {
                     r.id = *id;
@@ -560,13 +566,14 @@ async fn params_fetcher_loop<M1, M2>(
     middleware: M2,
     zksync_contract: IZkSync<M1>,
     l1_bridge: IL1Bridge<M1>,
+    chain_id: u32,
 ) where
     M1: Middleware,
     M2: ZksyncMiddleware,
 {
     loop {
         if let Err(e) =
-            params_fetcher_loop_iteration(&pool, &middleware, &zksync_contract, &l1_bridge).await
+            params_fetcher_loop_iteration(&pool, &middleware, &zksync_contract, &l1_bridge, chain_id).await
         {
             tracing::error!("params fetcher iteration ended with {e}");
             tokio::time::sleep(LOOP_ITERATION_ERROR_BACKOFF).await;
@@ -581,6 +588,7 @@ async fn params_fetcher_loop_iteration<M1, M2>(
     middleware: &M2,
     zksync_contract: &IZkSync<M1>,
     l1_bridge: &IL1Bridge<M1>,
+    chain_id: u32,
 ) -> Result<()>
 where
     M1: Middleware,
@@ -600,7 +608,7 @@ where
         .map(|p| (p.key.tx_hash, p.key.event_index_in_tx as u16, p.id))
         .collect();
 
-    let Some(params) = request_finalize_params(pool, &middleware, &hash_and_index_and_id).await
+    let Some(params) = request_finalize_params(pool, &middleware, &hash_and_index_and_id, chain_id).await
     else {
         // Early-return if params are not ready.
         tracing::info!("Params are not ready");

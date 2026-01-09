@@ -327,6 +327,7 @@ async fn main() -> Result<()> {
         contract,
         zksync_contract,
         l1_bridge,
+        config.chain_id,
         config.tx_retry_timeout,
         finalizer_account_address,
         meter_withdrawals,
