@@ -3,9 +3,6 @@ import '@nomicfoundation/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
 import '@typechain/hardhat';
 
-const config = {
-    L1_ASSET_ROUTER_ADDRESS: process.env.CONTRACTS_L1_ASSET_ROUTER_ADDR
-};
 
 export default {
     solidity: {
@@ -29,7 +26,7 @@ export default {
         sources: './contracts'
     },
     solpp: {
-        defs: config
+        defs: {}
     },
     etherscan: {
         apiKey: process.env.MISC_ETHERSCAN_API_KEY

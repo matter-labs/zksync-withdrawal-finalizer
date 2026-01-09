@@ -1,6 +1,17 @@
 {
   "abi": [
     {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "l1_asset_router",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
       "inputs": [],
       "name": "L1_ASSET_ROUTER",
       "outputs": [
@@ -17,7 +28,7 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "_chainId",
+          "name": "chainId",
           "type": "uint256"
         },
         {

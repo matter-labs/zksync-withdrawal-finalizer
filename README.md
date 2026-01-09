@@ -43,7 +43,6 @@ Deployment is done by deploying a dockerized image of the service.
 | `CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR` | Address of the L1 ERC20 bridge contract** |
 | `CONTRACTS_L2_ERC20_BRIDGE_ADDR` | Address of the L2 ERC20 bridge contract** |
 | `CONTRACTS_DIAMOND_PROXY_ADDR` | Address of the L1 diamond proxy contract** |
-| `L1_ASSET_ROUTER_ADDR` | Address of the L1 asset router contract** |
 | `CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT` | Address of the Withdrawal Finalizer contract ** |
 | `API_WEB3_JSON_RPC_WS_URL` | Address of the zkSync Era WebSocket RPC endpoint |
 | `API_WEB3_JSON_RPC_HTTP_URL` | Address of the zkSync Era HTTP RPC endpoint |
@@ -72,7 +71,7 @@ When you know those to deploy the contract you need to run (assume you are runni
 
 ```
 $ yarn
-$ env L1_ASSET_ROUTER_ADDRESS="0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
+$ MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
 ```
 
 If all goes well the the result would be

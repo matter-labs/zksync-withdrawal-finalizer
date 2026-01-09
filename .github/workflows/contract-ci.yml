@@ -18,9 +18,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-        # Dummy address needed for successful compilation of the contract
-        CONTRACTS_L1_ASSET_ROUTER_ADDR: "0x0000000000000000000000000000000000000000"
 
     steps:
       - name: Checkout
@@ -69,9 +66,6 @@ jobs:
   slither:
     needs: [build]
     runs-on: ubuntu-latest
-    env:
-        # Dummy address needed for successful compilation of the contract
-        CONTRACTS_L1_ASSET_ROUTER_ADDR: "0x0000000000000000000000000000000000000000"    
 
     steps:
       - name: Checkout

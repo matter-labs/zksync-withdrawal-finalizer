@@ -11,8 +11,7 @@ import {IL1AssetRouter} from "@matterlabs/zksync-contracts/contracts/l1-contract
 contract WithdrawalFinalizer {
     using UncheckedMath for uint256;
 
-    IL1AssetRouter public constant L1_ASSET_ROUTER =
-        IL1AssetRouter($(L1_ASSET_ROUTER_ADDRESS));
+    IL1AssetRouter public immutable L1_ASSET_ROUTER;
 
     struct RequestFinalizeWithdrawal {
         uint256 _l2BlockNumber;
@@ -31,8 +30,12 @@ contract WithdrawalFinalizer {
         bool success;
     }
 
+    constructor(address l1_asset_router) {
+        L1_ASSET_ROUTER = IL1AssetRouter(l1_asset_router);
+    }
+
     function finalizeWithdrawals(
-        uint256 _chainId,
+        uint256 chainId,
         RequestFinalizeWithdrawal[] calldata requests
     ) external returns (Result[] memory) {
         uint256 requestsLength = requests.length;
@@ -42,7 +45,7 @@ contract WithdrawalFinalizer {
             uint256 gasBefore = gasleft();
             try
                 L1_ASSET_ROUTER.finalizeWithdrawal{gas: requests[i]._gas}({
-                    _chainId: _chainId,
+                    _chainId: chainId,
                     _l2BatchNumber: requests[i]._l2BlockNumber,
                     _l2MessageIndex: requests[i]._l2MessageIndex,
                     _l2TxNumberInBatch: requests[i]._l2TxNumberInBlock,
