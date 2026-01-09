@@ -71,7 +71,7 @@ When you know those to deploy the contract you need to run (assume you are runni
 
 ```
 $ yarn
-$ MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
+$ env MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
 ```
 
 If all goes well the the result would be
