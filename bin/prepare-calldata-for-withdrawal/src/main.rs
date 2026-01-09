@@ -16,6 +16,10 @@ struct Args {
     /// gas
     #[arg(short, long)]
     gas: u64,
+
+    /// L2 chain ID
+    #[arg(short, long)]
+    chain_id: u32,
 }
 
 #[tokio::main]
@@ -27,11 +31,6 @@ async fn main() {
         args.withdrawal_id
     );
 
-    let chain_id: u32 = std::env::var("CHAIN_ID")
-        .expect("CHAIN_ID not set")
-        .parse()
-        .expect("invalid CHAIN_ID");
-
     let pool = PgPool::connect(&args.database_url).await.unwrap();
 
     let request_finalize_withdrawal =
@@ -41,7 +40,7 @@ async fn main() {
             .unwrap();
 
     let finalize_withdrawal_call = FinalizeWithdrawalsCall {
-        chain_id: chain_id.into(),
+        chain_id: args.chain_id.into(),
         requests: vec![request_finalize_withdrawal],
     };
 

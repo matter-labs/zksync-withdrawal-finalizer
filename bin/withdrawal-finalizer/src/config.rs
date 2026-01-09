@@ -44,10 +44,6 @@ pub struct Config {
     #[envconfig(from = "CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT")]
     pub withdrawal_finalizer_addr: Address,
 
-    /// Chain ID of the target L2 for the Finalizer contract
-    #[envconfig(from = "CHAIN_ID")]
-    pub chain_id: u32,
-
     /// L2 WS Endpoint
     #[envconfig(from = "API_WEB3_JSON_RPC_WS_URL")]
     pub api_web3_json_rpc_ws_url: Url,
