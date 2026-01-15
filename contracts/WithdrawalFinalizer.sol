@@ -31,7 +31,7 @@ contract WithdrawalFinalizer {
     }
 
     constructor(address l1AssetRouter) {
-        L1_ASSET_ROUTER = IL1AssetRouter(l1_asset_router);
+        L1_ASSET_ROUTER = IL1AssetRouter(l1AssetRouter);
     }
 
     function finalizeWithdrawals(
