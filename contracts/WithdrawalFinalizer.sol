@@ -30,7 +30,7 @@ contract WithdrawalFinalizer {
         bool success;
     }
 
-    constructor(address l1_asset_router) {
+    constructor(address l1AssetRouter) {
         L1_ASSET_ROUTER = IL1AssetRouter(l1_asset_router);
     }
 
