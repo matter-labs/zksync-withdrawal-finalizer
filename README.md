@@ -71,13 +71,13 @@ When you know those to deploy the contract you need to run (assume you are runni
 
 ```
 $ yarn
-$ env MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat deploy --nullifier 0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB
+$ npm run contracts:build
+$ MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat deploy --nullifier 0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB
 ```
 
 If all goes well the the result would be
 
 ```
-...
 RPC: http://localhost:8545
 Signer: 0x1A24e5C53B1438f15B25c819fEe1F894e6D131f2
 CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS=0x32b6F45f18F9f46e9177f01A61CB1b0757b156f3
