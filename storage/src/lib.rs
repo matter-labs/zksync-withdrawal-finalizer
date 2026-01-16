@@ -947,6 +947,7 @@ pub async fn get_finalize_withdrawal_params(
             l2_message_index,
             l2_tx_number_in_block,
             message,
+            sender,
             proof,
             withdrawals.token
         FROM
@@ -960,6 +961,7 @@ pub async fn get_finalize_withdrawal_params(
     .fetch_optional(pool)
     .await?
     .map(|r| RequestFinalizeWithdrawal {
+        sender: Address::from_slice(&r.sender),
         l_2_block_number: r.l1_batch_number.into(),
         l_2_message_index: r.l2_message_index.into(),
         l_2_tx_number_in_block: r.l2_tx_number_in_block as u16,
