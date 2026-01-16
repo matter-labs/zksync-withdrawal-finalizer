@@ -33,7 +33,6 @@
     "typescript": "^5.0.0"
   },
   "scripts": {
-    "deploy": "ts-node scripts/deploy.ts",
     "contracts:build": "hardhat compile --show-stack-traces"
   }
 }

@@ -2,7 +2,7 @@ import '@nomiclabs/hardhat-solpp';
 import '@nomicfoundation/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
 import '@typechain/hardhat';
-
+import "./scripts/deploy.task";
 
 export default {
     solidity: {
