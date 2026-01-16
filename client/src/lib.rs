@@ -104,7 +104,7 @@ impl WithdrawalParams {
         withdrawal_gas_limit: U256,
     ) -> RequestFinalizeWithdrawal {
         RequestFinalizeWithdrawal {
-            sender: self.sender.into(),
+            sender: self.sender,
             l_2_block_number: self.l1_batch_number.as_u64().into(),
             l_2_message_index: self.l2_message_index.into(),
             l_2_tx_number_in_block: self.l2_tx_number_in_block,
