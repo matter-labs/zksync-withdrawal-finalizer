@@ -87,6 +87,7 @@ impl L2EventsListener {
             }
             Err(e) => {
                 tracing::warn!("Withdrawal events stream reconnect attempt failed: {e}");
+                tracing::warn!("\t{}\n\t{:?}\n\t{:?}", &self.url, &self.token_deployer_addrs, &self.tokens); //@check remove after testing
                 CHAIN_EVENTS_METRICS.reconnects_on_error.inc();
                 None
             }

@@ -46,7 +46,7 @@ Deployment is done by deploying a dockerized image of the service.
 | `CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT` | Address of the Withdrawal Finalizer contract ** |
 | `API_WEB3_JSON_RPC_WS_URL` | Address of the zkSync Era WebSocket RPC endpoint |
 | `API_WEB3_JSON_RPC_HTTP_URL` | Address of the zkSync Era HTTP RPC endpoint |
-| `DATABSE_URL` | The url of PostgreSQL database the service stores its state into |
+| `DATABASE_URL` | The url of PostgreSQL database the service stores its state into |
 | `GAS_LIMIT` | The gas limit of a single withdrawal finalization within the batch of withdrawals finalized in a call to `finalizeWithdrawals` in WithdrawalFinalizerContract |
 | `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalization of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
@@ -60,7 +60,7 @@ Deployment is done by deploying a dockerized image of the service.
 
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 
-** more about zkSync contracts can be found [here](https://github.com/matter-labs/era-contracts/blob/main/docs/Overview.md)
+** more about zkSync contracts can be found [here](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts/overview.md)
 
 ## Deploying the finalizer smart contract
 

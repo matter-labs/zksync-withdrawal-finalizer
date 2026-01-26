@@ -765,7 +765,7 @@ pub async fn withdrawals_to_finalize(
         l2_block_number: i64,
         l1_batch_number: i64,
         l2_message_index: i32,
-        l2_tx_number_in_block: i16,
+        l2_tx_number_in_block: i32,
         message: Vec<u8>,
         sender: Vec<u8>,
         proof: Vec<u8>,
