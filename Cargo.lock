@@ -1026,22 +1026,22 @@ dependencies = [
 
 [[package]]
 name = "envconfig"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea81cc7e21f55a9d9b1efb6816904978d0bfbe31a50347cb24b2e75564bcac9b"
+checksum = "2934d78aeb06e54961db5b96cfca2b01f5cb01cf11c34f7b088932fd48233ac6"
 dependencies = [
  "envconfig_derive",
 ]
 
 [[package]]
 name = "envconfig_derive"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dfca278e5f84b45519acaaff758ebfa01f18e96998bc24b8f1b722dd804b9bf"
+checksum = "452c458dfb890a2fea64e4c894f83daad61689fb9bbe84c382e1ce6d7536710b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -5004,7 +5004,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
