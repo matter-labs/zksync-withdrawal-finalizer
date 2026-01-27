@@ -12,12 +12,15 @@ db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "warn"
 ignore = [
-    "RUSTSEC-2023-0052",
-    "RUSTSEC-2024-0384",
-    "RUSTSEC-2024-0421",
-    "RUSTSEC-2025-0009",
-    "RUSTSEC-2025-0010",
-    "RUSTSEC-2024-0436"
+    "RUSTSEC-2024-0384", # instant is unmaintained
+    "RUSTSEC-2024-0421", # idna accepts Punycode labels that do not produce any non-ASCII when decoded
+    "RUSTSEC-2025-0009", # ring - Some AES functions may panic when overflow checking is enabled
+    "RUSTSEC-2025-0010", # Versions of ring prior to 0.17 are unmaintained
+    "RUSTSEC-2024-0436", # paste - no longer maintained
+    "RUSTSEC-2025-0134", # rustls-pemfile is unmaintained
+    "RUSTSEC-2025-0057", # fxhash - no longer maintained
+    "RUSTSEC-2025-0056", # adler crate is unmaintained
+    "RUSTSEC-2025-0141"  # Bincode is unmaintained
 ]
 
 [licenses]

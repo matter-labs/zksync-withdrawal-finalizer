@@ -1,12 +1,8 @@
 import '@nomiclabs/hardhat-solpp';
-import '@nomiclabs/hardhat-ethers';
+import '@nomicfoundation/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
 import '@typechain/hardhat';
-
-const config = {
-    ZKSYNC_ADDRESS: process.env.CONTRACTS_DIAMOND_PROXY_ADDR,
-    ERC20_BRIDGE_ADDRESS: process.env.CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR
-};
+import "./scripts/deploy.task";
 
 export default {
     solidity: {
@@ -30,9 +26,13 @@ export default {
         sources: './contracts'
     },
     solpp: {
-        defs: config
+        defs: {}
     },
     etherscan: {
         apiKey: process.env.MISC_ETHERSCAN_API_KEY
+    },
+    typechain: {
+        outDir: 'typechain-types',
+        target: 'ethers-v6'
     }
 };

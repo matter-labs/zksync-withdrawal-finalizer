@@ -753,6 +753,7 @@ pub async fn withdrawals_to_finalize(
     limit_by: u64,
     eth_threshold: Option<U256>,
     only_l1_recipients: Option<&[Address]>,
+    chain_id: u32,
 ) -> Result<Vec<WithdrawalParams>> {
     let latency = STORAGE_METRICS.call[&"withdrawals_to_finalize"].start();
     // if no threshold, query _all_ ethereum withdrawals since all of them are >= 0.
@@ -764,7 +765,7 @@ pub async fn withdrawals_to_finalize(
         l2_block_number: i64,
         l1_batch_number: i64,
         l2_message_index: i32,
-        l2_tx_number_in_block: i16,
+        l2_tx_number_in_block: i32,
         message: Vec<u8>,
         sender: Vec<u8>,
         proof: Vec<u8>,
@@ -852,6 +853,7 @@ pub async fn withdrawals_to_finalize(
             sender: Address::from_slice(&record.sender),
             proof: bincode::deserialize(&record.proof)
                 .expect("storage contains data correctly serialized by bincode; qed"),
+            chain_id,
         })
         .collect();
 
@@ -945,6 +947,7 @@ pub async fn get_finalize_withdrawal_params(
             l2_message_index,
             l2_tx_number_in_block,
             message,
+            sender,
             proof,
             withdrawals.token
         FROM
@@ -958,6 +961,7 @@ pub async fn get_finalize_withdrawal_params(
     .fetch_optional(pool)
     .await?
     .map(|r| RequestFinalizeWithdrawal {
+        sender: Address::from_slice(&r.sender),
         l_2_block_number: r.l1_batch_number.into(),
         l_2_message_index: r.l2_message_index.into(),
         l_2_tx_number_in_block: r.l2_tx_number_in_block as u16,

@@ -1,0 +1,94 @@
+name: Contracts CI
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  merge_group:
+
+env: 
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+    
+      - name: Compile (Hardhat)
+        run: npm run contracts:build
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: solhint (contracts only)
+        run: npx solhint --noPoster "contracts/**/*.sol"
+
+      - name: prettier (contracts only)
+        run: npx prettier --plugin=prettier-plugin-solidity --check "contracts/**/*.sol"
+
+  #
+  # Missing test job!
+  #
+
+  slither:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Slither
+        run: pip install slither-analyzer
+
+      - name: Run Slither (compiling through Hardhat)
+        run: |
+          slither --config slither.config.json . --compile-force-framework hardhat \
+            --filter-paths "node_modules|artifacts|cache"

@@ -16,6 +16,10 @@ struct Args {
     /// gas
     #[arg(short, long)]
     gas: u64,
+
+    /// L2 chain ID
+    #[arg(short, long)]
+    chain_id: u32,
 }
 
 #[tokio::main]
@@ -36,6 +40,7 @@ async fn main() {
             .unwrap();
 
     let finalize_withdrawal_call = FinalizeWithdrawalsCall {
+        chain_id: args.chain_id.into(),
         requests: vec![request_finalize_withdrawal],
     };
 

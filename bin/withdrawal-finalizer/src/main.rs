@@ -320,6 +320,13 @@ async fn main() -> Result<()> {
         }
         None => None,
     };
+
+    let chain_id_l2 = client_l2.provider().get_chain_id().await?;
+    assert!(
+        chain_id_l2 != 0,
+        "client_l2: eth_chainId returned 0; check L2 RPC"
+    );
+
     let finalizer = finalizer::Finalizer::new(
         pgpool.clone(),
         one_withdrawal_gas_limit,
@@ -327,6 +334,7 @@ async fn main() -> Result<()> {
         contract,
         zksync_contract,
         l1_bridge,
+        chain_id_l2,
         config.tx_retry_timeout,
         finalizer_account_address,
         meter_withdrawals,

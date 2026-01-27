@@ -104,6 +104,7 @@ impl WithdrawalParams {
         withdrawal_gas_limit: U256,
     ) -> RequestFinalizeWithdrawal {
         RequestFinalizeWithdrawal {
+            sender: self.sender,
             l_2_block_number: self.l1_batch_number.as_u64().into(),
             l_2_message_index: self.l2_message_index.into(),
             l_2_tx_number_in_block: self.l2_tx_number_in_block,
@@ -128,6 +129,9 @@ pub struct WithdrawalKey {
 /// Withdrawal parameters
 #[derive(Debug, Clone)]
 pub struct WithdrawalParams {
+    /// Chain ID of the target L2
+    pub chain_id: u32,
+
     /// Hash of the withdrawal transaction.
     pub tx_hash: H256,
 
@@ -230,6 +234,7 @@ pub trait ZksyncMiddleware: Middleware {
         &self,
         withdrawal_hash: H256,
         index: usize,
+        chain_id: u32,
     ) -> Result<Option<WithdrawalParams>>;
 
     /// Get the `zksync` withdrawal logs by tx hash.
@@ -338,6 +343,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         &self,
         withdrawal_hash: H256,
         index: usize,
+        chain_id: u32,
     ) -> Result<Option<WithdrawalParams>> {
         let latency = CLIENT_METRICS.call[&"get_finalize_withdrawal_params"].start();
 
@@ -451,6 +457,7 @@ impl<P: JsonRpcClient> ZksyncMiddleware for Provider<P> {
         latency.observe();
 
         Ok(Some(WithdrawalParams {
+            chain_id,
             tx_hash: withdrawal_hash,
             event_index_in_tx: index as u32,
             id: 0,

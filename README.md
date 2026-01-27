@@ -46,7 +46,7 @@ Deployment is done by deploying a dockerized image of the service.
 | `CONTRACTS_WITHDRAWAL_FINALIZER_CONTRACT` | Address of the Withdrawal Finalizer contract ** |
 | `API_WEB3_JSON_RPC_WS_URL` | Address of the zkSync Era WebSocket RPC endpoint |
 | `API_WEB3_JSON_RPC_HTTP_URL` | Address of the zkSync Era HTTP RPC endpoint |
-| `DATABSE_URL` | The url of PostgreSQL database the service stores its state into |
+| `DATABASE_URL` | The url of PostgreSQL database the service stores its state into |
 | `GAS_LIMIT` | The gas limit of a single withdrawal finalization within the batch of withdrawals finalized in a call to `finalizeWithdrawals` in WithdrawalFinalizerContract |
 | `BATCH_FINALIZATION_GAS_LIMIT` | The gas limit of the finalization of the whole batch in a call to `finalizeWithdrawals` in Withdrawal Finalizer Contract |
 | `WITHDRAWAL_FINALIZER_ACCOUNT_PRIVATE_KEY` | The private key of the account that is going to be submit finalization transactions |
@@ -60,26 +60,27 @@ Deployment is done by deploying a dockerized image of the service.
 
 The configuration structure describing the service config can be found in [`config.rs`](https://github.com/matter-labs/zksync-withdrawal-finalizer/blob/main/bin/withdrawal-finalizer/src/config.rs)
 
-** more about zkSync contracts can be found [here](https://github.com/matter-labs/era-contracts/blob/main/docs/Overview.md)
+** more about zkSync contracts can be found [here](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts/overview.md)
 
 ## Deploying the finalizer smart contract
 
-The finalizer smart contract needs to reference the addresses of the diamond proxy contract and l1 erc20 proxy contract.
+The finalizer smart contract needs to reference the addresses of the L1 Nullifier contract, which is fed through the constructor.
 You also need to know the key of the account you want to use to deploy the finalizer contract.
 
 When you know those to deploy the contract you need to run (assume you are running `anvil` in a separate terminal):
 
 ```
 $ yarn
-$ env CONTRACTS_DIAMOND_PROXY_ADDR="0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9" CONTRACTS_L1_ERC20_BRIDGE_PROXY_ADDR="0x2Ae09702F77a4940621572fBcDAe2382D44a2cbA" MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat run ./scripts/deploy.ts
+$ npm run contracts:build
+$ MNEMONIC="test test test test test test test test test test test junk" ETH_CLIENT_WEB3_URL="http://localhost:8545" npx hardhat deploy --nullifier 0xD7f9f54194C633F36CCD5F3da84ad4a1c38cB2cB
 ```
 
 If all goes well the the result would be
 
 ```
-...
-Compiled 18 Solidity files successfully (evm target: paris).
-CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS=0x712516e61C8B383dF4A63CFe83d7701Bce54B03e
+RPC: http://localhost:8545
+Signer: 0x1A24e5C53B1438f15B25c819fEe1F894e6D131f2
+CONTRACTS_WITHDRAWAL_FINALIZER_ADDRESS=0x32b6F45f18F9f46e9177f01A61CB1b0757b156f3
 ```
 
 And so you know the address of the deployed contract.

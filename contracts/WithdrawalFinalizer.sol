@@ -2,89 +2,74 @@
 
 pragma solidity ^0.8.0;
 
-import "@matterlabs/zksync-contracts/l1/contracts/bridge/interfaces/IL1Bridge.sol";
-import "@matterlabs/zksync-contracts/l1/contracts/zksync/interfaces/IMailbox.sol";
-import "@matterlabs/zksync-contracts/l1/contracts/common/libraries/UncheckedMath.sol";
+import {UncheckedMath} from "@matterlabs/zksync-contracts/contracts/l1-contracts/common/libraries/UncheckedMath.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "@matterlabs/zksync-contracts/contracts/l1-contracts/bridge/interfaces/IL1Nullifier.sol";
 
-
+/// @title Withdrawal Finalizer
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 contract WithdrawalFinalizer {
     using UncheckedMath for uint256;
-    IMailbox constant ZKSYNC_MAILBOX = IMailbox($(ZKSYNC_ADDRESS));
-    IL1Bridge constant ERC20_BRIDGE = IL1Bridge($(ERC20_BRIDGE_ADDRESS));
+
+    IL1Nullifier public immutable L1_NULLIFIER;
 
     struct RequestFinalizeWithdrawal {
-        uint256 _l2BlockNumber;
-        uint256 _l2MessageIndex;
-        uint16 _l2TxNumberInBlock;
-        bytes _message;
-        bytes32[] _merkleProof;
-        bool _isEth;
-        uint256 _gas;
+        address sender;
+        uint256 l2BlockNumber;
+        uint256 l2MessageIndex;
+        uint16 l2TxNumberInBlock;
+        bytes message;
+        bytes32[] merkleProof;
+        bool isEth;
+        uint256 gas;
     }
 
     struct Result {
-        uint256 _l2BlockNumber;
-        uint256 _l2MessageIndex;
-        uint256 _gas;
+        uint256 l2BlockNumber;
+        uint256 l2MessageIndex;
+        uint256 gas;
         bool success;
     }
 
+    constructor(address _l1Nullifier) {
+        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
+    }
+
     function finalizeWithdrawals(
-        RequestFinalizeWithdrawal[] calldata requests
+        uint256 _chainId,
+        RequestFinalizeWithdrawal[] calldata _requests
     ) external returns (Result[] memory) {
-        uint256 requestsLength = requests.length;
+        uint256 requestsLength = _requests.length;
         Result[] memory results = new Result[](requestsLength);
         for (uint256 i = 0; i < requestsLength; i = i.uncheckedInc()) {
-            require(gasleft() >= ((requests[i]._gas * 64) / 63) + 500, "i");
+            require(gasleft() >= ((_requests[i].gas * 64) / 63) + 500, "i");
             uint256 gasBefore = gasleft();
-            if (requests[i]._isEth) {
-                try
-                    ZKSYNC_MAILBOX.finalizeEthWithdrawal{gas: requests[i]._gas}(
-                        requests[i]._l2BlockNumber,
-                        requests[i]._l2MessageIndex,
-                        requests[i]._l2TxNumberInBlock,
-                        requests[i]._message,
-                        requests[i]._merkleProof
-                    )
-                {
-                    results[i] = Result({
-                        _l2BlockNumber: requests[i]._l2BlockNumber,
-                        _l2MessageIndex: requests[i]._l2MessageIndex,
-                        _gas: gasBefore - gasleft(),
-                        success: true
-                    });
-                } catch {
-                    results[i] = Result({
-                        _l2BlockNumber: requests[i]._l2BlockNumber,
-                        _l2MessageIndex: requests[i]._l2MessageIndex,
-                        _gas: 0,
-                        success: false
-                    });
-                }
-            } else {
-                try
-                    ERC20_BRIDGE.finalizeWithdrawal{gas: requests[i]._gas}(
-                        requests[i]._l2BlockNumber,
-                        requests[i]._l2MessageIndex,
-                        requests[i]._l2TxNumberInBlock,
-                        requests[i]._message,
-                        requests[i]._merkleProof
-                    )
-                {
-                    results[i] = Result({
-                        _l2BlockNumber: requests[i]._l2BlockNumber,
-                        _l2MessageIndex: requests[i]._l2MessageIndex,
-                        _gas: gasBefore - gasleft(),
-                        success: true
-                    });
-                } catch {
-                    results[i] = Result({
-                        _l2BlockNumber: requests[i]._l2BlockNumber,
-                        _l2MessageIndex: requests[i]._l2MessageIndex,
-                        _gas: 0,
-                        success: false
-                    });
-                }
+            try
+                L1_NULLIFIER.finalizeDeposit{gas: _requests[i].gas}(
+                    FinalizeL1DepositParams({
+                        chainId: _chainId,
+                        l2BatchNumber: _requests[i].l2BlockNumber,
+                        l2MessageIndex: _requests[i].l2MessageIndex,
+                        l2Sender: _requests[i].sender,
+                        l2TxNumberInBatch: _requests[i].l2TxNumberInBlock,
+                        message: _requests[i].message,
+                        merkleProof: _requests[i].merkleProof
+                    })
+                )
+            {
+                results[i] = Result({
+                    l2BlockNumber: _requests[i].l2BlockNumber,
+                    l2MessageIndex: _requests[i].l2MessageIndex,
+                    gas: gasBefore - gasleft(),
+                    success: true
+                });
+            } catch {
+                results[i] = Result({
+                    l2BlockNumber: _requests[i].l2BlockNumber,
+                    l2MessageIndex: _requests[i].l2MessageIndex,
+                    gas: 0,
+                    success: false
+                });
             }
         }
         return results;
