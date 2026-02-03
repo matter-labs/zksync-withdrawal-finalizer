@@ -72,7 +72,7 @@ where
         } = self;
 
         // While reading the stream of withdrawal events asyncronously
-        // we may never be sure that we are currenly looking at the last
+        // we may never be sure that we are currently looking at the last
         // event from the given block.
         //
         // The following code asyncronously reads and accumulates events
