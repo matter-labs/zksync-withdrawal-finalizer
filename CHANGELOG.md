@@ -7,6 +7,13 @@
 
 * **db:** get the the first block to process properly ([#546](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/546)) ([aad6a1e](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/aad6a1eafa780eba3f0e628b092d5106668b5f35))
 
+## [0.12.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.11.0...v0.12.0) (2025-08-13)
+
+
+### Features
+
+* **db:** get the the first block to process properly ([#546](https://github.com/matter-labs/zksync-withdrawal-finalizer/issues/546)) ([aad6a1e](https://github.com/matter-labs/zksync-withdrawal-finalizer/commit/aad6a1eafa780eba3f0e628b092d5106668b5f35))
+
 ## [0.11.0](https://github.com/matter-labs/zksync-withdrawal-finalizer/compare/v0.10.0...v0.11.0) (2025-08-12)
 
 
