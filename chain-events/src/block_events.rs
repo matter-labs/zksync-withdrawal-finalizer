@@ -156,7 +156,7 @@ impl BlockEvents {
 
         let past_filter = Filter::new()
             .from_block(from_block)
-            .to_block(latest_block)
+            .to_block(latest_block - 1)
             .address(diamond_proxy_addr)
             .topic0(vec![
                 BlockCommitFilter::signature(),

@@ -269,7 +269,7 @@ async fn main() -> Result<()> {
         we_tx_wrapped,
     ));
 
-    let watcher_handle = tokio::spawn(watcher.run(blocks_rx, we_rx, from_l2_block));
+    let watcher_handle = tokio::spawn(watcher.run(blocks_rx, we_rx, from_l2_block, sl_chain_id));
 
     let block_events_handle = tokio::spawn(event_mux.run_with_reconnects(
         config.diamond_proxy_addr,

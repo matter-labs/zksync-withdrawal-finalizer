@@ -60,6 +60,7 @@ where
         block_events: BE,
         withdrawal_events: WE,
         from_l2_block: u64,
+        sl_chain_id: u32,
     ) -> Result<()>
     where
         BE: Stream<Item = BlockEvent> + Send + 'static,
@@ -90,6 +91,7 @@ where
             pgpool.clone(),
             block_events,
             l2_provider,
+            sl_chain_id,
         ));
         let l2_loop_handler = tokio::spawn(async move {
             run_l2_events_loop(
@@ -346,7 +348,12 @@ async fn process_withdrawals_in_block(
     Ok(())
 }
 
-async fn run_l1_events_loop<BE, M2>(pool: PgPool, be: BE, l2_middleware: M2) -> Result<()>
+async fn run_l1_events_loop<BE, M2>(
+    pool: PgPool,
+    be: BE,
+    l2_middleware: M2,
+    chain_id: u32,
+) -> Result<()>
 where
     BE: Stream<Item = BlockEvent>,
     M2: ZksyncMiddleware,
@@ -357,7 +364,6 @@ where
     let mut batch_begin = Instant::now();
     let batch_backoff = Duration::from_secs(5);
     let batch_size = 1024;
-    let chain_id = l2_middleware.get_chain_id().await?;
     while let Some(event) = be.next().await {
         tracing::debug!("block event {event}");
         block_event_batch.push(event);
